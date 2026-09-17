@@ -608,12 +608,28 @@
     });
 
     // --- Detalhe do pedido -----------------------------------------------------
+    // US20: aviso de cartão de recompra — só pra canal próprio. Marketplace
+    // (Shopee/TikTok Shop/Mercado Livre) proíbe material de outro
+    // produto/serviço ou link externo dentro do pacote (seção 9 do doc);
+    // regras do TikTok Shop ainda não confirmadas (DECISOES-PENDENTES #6),
+    // tratado com a mesma cautela da Shopee por ora.
+    const ORIGENS_MARKETPLACE = ['shopee', 'tiktok', 'mercado livre', 'mercadolivre', ' ml'];
+    function ehOrigemPropria(origem) {
+      const o = ` ${(origem || '').toLowerCase()}`;
+      return !ORIGENS_MARKETPLACE.some((m) => o.includes(m));
+    }
+
     function abrirDetalhe(pedidoId) {
       const p = pedidos.find((x) => x.id === pedidoId);
       if (!p) return;
       const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
       const overlay = abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
         <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
+
+        ${ehOrigemPropria(p.origem) ? `
+        <div class="banner-assinatura" style="margin-top:12px">
+          <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
+        </div>` : ''}
 
         <div class="grid2">
           <div><label for="d-etapa">Etapa</label>

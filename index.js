@@ -9,6 +9,7 @@ const fastifyMultipart = require('@fastify/multipart');
 const { pool, migrar } = require('./lib/db');
 const { paraE164 } = require('./lib/telefone');
 const { encontrarOuCriarPorTelefone, buscarMetricas } = require('./lib/clientes');
+const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 
 const PORT = process.env.PORT || 3005;
@@ -95,6 +96,7 @@ async function build() {
     const { tenantId } = await acessoRes.json();
 
     await inicializarEtapasPadrao(pool, tenantId);
+    await inicializarModelosPadrao(pool, tenantId);
 
     const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
     return { token, nome };
@@ -129,6 +131,7 @@ async function build() {
     }
 
     await inicializarEtapasPadrao(pool, tenantId);
+    await inicializarModelosPadrao(pool, tenantId);
     const token = fastify.jwt.sign({ tenantId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
     return reply.code(201).send({ token, nome: dados.nome });
   });
@@ -676,6 +679,25 @@ async function build() {
     const { rowCount } = await pool.query('delete from crm_produtos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     if (!rowCount) return reply.code(404).send({ error: 'Produto não encontrado' });
     return { ok: true };
+  });
+
+  // --- Modelos de mensagem (US25) -----------------------------------------------
+  // Sem POST/DELETE livre: as 4 chaves mapeiam pra pontos fixos do código
+  // (Painel Hoje), então só editar o texto faz sentido no MVP.
+  fastify.get('/crm/api/modelos-mensagem', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_modelos_mensagem where tenant_id = $1 order by chave', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.patch('/crm/api/modelos-mensagem/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const texto = (request.body?.texto || '').trim();
+    if (!texto) return reply.code(400).send({ error: 'Texto é obrigatório' });
+    const { rows } = await pool.query(
+      'update crm_modelos_mensagem set texto = $1 where id = $2 and tenant_id = $3 returning *',
+      [texto, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Modelo não encontrado' });
+    return rows[0];
   });
 
   // --- Painel Hoje (seção 7.6) -------------------------------------------------
