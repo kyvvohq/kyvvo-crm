@@ -267,15 +267,38 @@ async function build() {
     }
   });
 
+  // Aceita nome e/ou eh_pronto (US28) — pelo menos um dos dois. Marcar
+  // eh_pronto=true desmarca qualquer outra etapa da conta primeiro (só uma
+  // etapa "pronto" por vez).
   fastify.patch('/crm/api/etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const nome = (request.body?.nome || '').trim();
-    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
-    const { rows } = await pool.query(
-      'update crm_etapas set nome = $1 where id = $2 and tenant_id = $3 returning *',
-      [nome, request.params.id, request.user.tenantId]
-    );
-    if (!rows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
-    return rows[0];
+    const { tenantId } = request.user;
+    const { nome, eh_pronto: ehPronto } = request.body || {};
+    if (nome !== undefined && !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    if (nome === undefined && ehPronto === undefined) return reply.code(400).send({ error: 'Nada pra atualizar' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (ehPronto === true) {
+        await client.query('update crm_etapas set eh_pronto = false where tenant_id = $1', [tenantId]);
+      }
+      const sets = [];
+      const params = [request.params.id, tenantId];
+      if (nome !== undefined) { params.push(nome.trim()); sets.push(`nome = $${params.length}`); }
+      if (ehPronto !== undefined) { params.push(ehPronto); sets.push(`eh_pronto = $${params.length}`); }
+      const { rows } = await client.query(
+        `update crm_etapas set ${sets.join(', ')} where id = $1 and tenant_id = $2 returning *`,
+        params
+      );
+      await client.query('COMMIT');
+      if (!rows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
+      return rows[0];
+    } catch (erro) {
+      await client.query('ROLLBACK');
+      throw erro;
+    } finally {
+      client.release();
+    }
   });
 
   // Nunca apaga em cascata: pedido é dado demais pra sumir junto de uma

@@ -34,6 +34,9 @@
   .coluna-header button { background:transparent; color:var(--muted); width:auto; height:auto; margin:0; padding:2px 6px;
     font-size:12px; border-radius:6px; }
   .coluna-header button:hover { background:var(--surface-muted); color:var(--danger); }
+  .coluna-header .btn-pronto { display:flex; }
+  .coluna-header .btn-pronto:hover { color:var(--accent); }
+  .coluna-header .btn-pronto.ativo { color:var(--accent-strong); }
 
   .coluna-add { display:flex; align-items:center; min-width:180px; }
   .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
@@ -156,7 +159,11 @@
     const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
 
     function cartaoHtml(p) {
-      const alerta = p.dias_na_etapa >= 3;
+      // Usa o prazo real configurado na etapa (US19) — não um limiar fixo.
+      // Etapa sem prazo configurado nunca alerta.
+      const etapaDoCartao = etapas.find((et) => et.id === p.etapa_id);
+      const prazo = etapaDoCartao ? etapaDoCartao.prazo_alerta_dias : null;
+      const alerta = prazo != null && p.dias_na_etapa >= prazo;
       const numQtd = Number(p.quantidade_itens);
       const qtd = numQtd > 1 ? `${Number.isInteger(numQtd) ? numQtd : numQtd.toLocaleString('pt-BR')}× ` : '';
       return `
@@ -185,6 +192,7 @@
           <div class="coluna-header tipo-${et.tipo}" draggable="true" data-etapa-header="${et.id}">
             <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
             <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
+            <button type="button" class="btn-pronto${et.eh_pronto ? ' ativo' : ''}" data-marcar-pronto="${et.id}" data-valor-pronto="${!et.eh_pronto}" title="${et.eh_pronto ? 'Esta é a etapa de pronto pra envio/retirada (clique pra desmarcar)' : 'Marcar como etapa de pronto pra envio/retirada'}">${icon('package-check', 14)}</button>
             <button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>
           </div>
         `;
@@ -293,6 +301,17 @@
         });
       });
 
+      document.querySelectorAll('[data-marcar-pronto]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await apiFetch(`/crm/api/etapas/${btn.dataset.marcarPronto}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ eh_pronto: btn.dataset.valorPronto === 'true' }),
+          });
+          carregar();
+        });
+      });
+
       const inputNova = document.getElementById('input-nova-etapa');
       if (inputNova) {
         inputNova.addEventListener('keydown', async (e) => {
@@ -328,6 +347,44 @@
       });
     }
 
+    // Modal próprio no lugar do prompt() nativo (US27) — window.prompt trava
+    // automação de browser e destoa do resto da UI, que já usa abrirModal em
+    // todo canto. Resolve com o texto digitado, ou null se cancelado/fechado.
+    function pedirMotivoPerda() {
+      return new Promise((resolve) => {
+        const overlay = abrirModal('<h3>Motivo da perda</h3>', `
+          <label for="motivo-perda-texto">Por que este pedido foi perdido?</label>
+          <textarea id="motivo-perda-texto" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
+          <div class="modal-erro" id="motivo-perda-erro"></div>
+          <div class="modal-acoes">
+            <button type="button" class="btn-secundario" id="motivo-perda-cancelar">Cancelar</button>
+            <button type="button" class="btn-perigo" id="motivo-perda-confirmar">Marcar como perdido</button>
+          </div>
+        `);
+        let resolvido = false;
+        const finalizar = (valor) => {
+          if (resolvido) return;
+          resolvido = true;
+          resolve(valor);
+        };
+        document.getElementById('motivo-perda-cancelar').addEventListener('click', () => { finalizar(null); fecharModal(); });
+        document.getElementById('motivo-perda-confirmar').addEventListener('click', () => {
+          const texto = document.getElementById('motivo-perda-texto').value.trim();
+          if (!texto) { document.getElementById('motivo-perda-erro').textContent = 'Motivo é obrigatório'; return; }
+          finalizar(texto);
+          fecharModal();
+        });
+        // Fechar pelo X, clique fora ou Esc conta como cancelar.
+        overlay.querySelector('#modal-close').addEventListener('click', () => finalizar(null));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) finalizar(null); });
+        document.addEventListener('keydown', function escHandler(e) {
+          if (e.key !== 'Escape') return;
+          finalizar(null);
+          document.removeEventListener('keydown', escHandler);
+        });
+      });
+    }
+
     async function moverPedido(pedidoId, etapaId, recursoId, tipoEtapa) {
       const pedido = pedidos.find((p) => p.id === pedidoId);
       if (!pedido) return;
@@ -338,7 +395,7 @@
       if (etapaMudou) {
         let motivoPerda;
         if (tipoEtapa === 'perdida') {
-          motivoPerda = prompt('Motivo da perda:');
+          motivoPerda = await pedirMotivoPerda();
           if (!motivoPerda) return;
         }
         const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/etapa`, {
@@ -531,7 +588,10 @@
           const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
           let motivoPerda;
           if (etapaAlvo.tipo === 'perdida') {
-            motivoPerda = prompt('Motivo da perda:');
+            // Abre por cima do modal de detalhe (abrirModal fecha o atual antes
+            // de abrir o novo) — os valores do formulário já foram lidos acima,
+            // então perder o modal de detalhe aqui não perde dado nenhum.
+            motivoPerda = await pedirMotivoPerda();
             if (!motivoPerda) return;
           }
           const resEtapa = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, {
