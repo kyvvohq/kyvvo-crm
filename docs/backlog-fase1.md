@@ -1,91 +1,30 @@
 # Backlog — Fase 1 (MVP)
 
-A partir da seção 7 do doc de instruções do projeto. Formato pronto pra colar
-no Notion assim que a database for escolhida (docs/DECISOES-PENDENTES.md #5).
-Cada história aponta se já tem API implementada neste scaffold — falta
-sempre o frontend.
+A partir da seção 7 do doc de instruções do projeto. **Fonte de verdade agora
+é [kyvvohq/kyvvo-crm/issues](https://github.com/kyvvohq/kyvvo-crm/issues)** —
+este arquivo é só um índice rápido, não duplique detalhe aqui.
 
-## Clientes
+## Entregue (issues fechadas #1–#14)
 
-- [x] API: listar clientes com busca (nome/telefone/CPF).
-- [x] API: criar cliente manualmente.
-- [x] API: editar cliente.
-- [x] API: ficha do cliente (dados, tags, campos customizados, métricas
-      calculadas, pedidos, timeline completa).
-- [ ] Frontend: lista + busca + filtros.
-- [ ] Frontend: ficha do cliente.
-- [ ] API + frontend: criar/gerenciar tags.
-- [ ] API + frontend: criar/gerenciar campos customizados por conta.
-- [ ] API: sugestão de mesclagem por CPF ou nome+cidade (mesclagem sempre
-      confirmada por humano — nunca automática).
+Login/cadastro/landing, clientes (CRUD + ficha + segmento), pedidos (criação
+rápida + kanban + pagamento), quadro de etapas editável, raias de produção
+(recursos), máscara de moeda/campos obrigatórios, Painel Hoje.
 
-## Pedidos / kanban
+## Em aberto (issues #15–#29)
 
-- [x] API: listar pedidos (kanban).
-- [x] API: criação rápida (telefone acha-ou-cria cliente, itens/descrição,
-      valor, origem, tipo de entrega).
-- [x] API: mover etapa (exige motivo quando etapa é "perdida").
-- [x] API: atualizar status de pagamento / valor recebido (paralelo à etapa).
-- [ ] Frontend: kanban com colunas configuráveis, drag-and-drop.
-- [ ] Card do pedido: sinalização visual de "passou do prazo da etapa".
-- [ ] Aviso de "incluir cartão de recompra no kit" pra pedidos de origem
-      própria (nunca marketplace — restrição Shopee, seção 9 do doc).
-- [ ] API + frontend: CRUD de etapas (config por conta).
-- [ ] API + frontend: CRUD de produtos.
+- **Clientes**: tags (#15), campos customizados (#16), sugestão de mesclagem (#17).
+- **Pedidos**: catálogo de produtos (#18), sinalização de prazo (#19), aviso de cartão de recompra (#20).
+- **Importação**: UpSeller/NF-e/CSV (#21) — bloqueada em parte por dados reais da Basic (ver `DECISOES-PENDENTES.md` #6).
+- **Formulário de captação** (#22).
+- **Segmentos e sorteio**: segmentos salvos (#23), sorteio (#24).
+- **Mensagens**: modelos de mensagem (#25).
+- **Onboarding visível** (#26).
+- **Débito técnico**: trocar `prompt()` nativo por modal (#27), flag explícito de etapa "pronta" (#28).
+- **Decisão bloqueada**: plano/preço/billing do módulo CRM (#29).
 
-## Importação
+## Critérios de sucesso com a Basic (30–45 dias, seção 7.7 do doc)
 
-- [ ] Importar exportação de pedidos do UpSeller (Excel) — mapeamento de
-      colunas + preview. Bloqueado por docs/DECISOES-PENDENTES.md #6
-      (colunas reais ainda não confirmadas).
-- [ ] Importar XML de NF-e — enriquece pedido existente por número do
-      pedido; cria novo só se não achar correspondência.
-- [ ] Importar CSV/Excel genérico (planilhas antigas, respostas de Google
-      Forms).
-- [ ] Todas idempotentes: reimportar mesmo arquivo/número de pedido/chave de
-      NF-e não duplica (já garantido no schema por índices únicos parciais
-      em `crm_pedidos`).
-
-## Formulário de captação
-
-- [ ] API: criar formulário (campos escolhidos pela conta).
-- [ ] Página pública do formulário, com aceite de comunicação obrigatório.
-- [ ] Tag automática por formulário respondido.
-- [ ] Aplica a regra de identidade (mesmo dedupe por telefone dos clientes).
-
-## Segmentos e sorteio
-
-- [ ] API + frontend: montar segmento (filtros combináveis: tag, campo
-      customizado, cidade, origem, produto comprado, período de compra, dias
-      sem comprar, aniversário no mês, status de pagamento, consentimento).
-- [ ] Salvar segmento, exportar CSV.
-- [ ] Botão "Sortear": congela participantes, sorteia, registra vencedor e
-      ator (auditável) — schema já pronto (`crm_sorteios`).
-
-## Painel Hoje
-
-- [x] API: o que produzir / orçamentos parados / pagamentos pendentes /
-      prontos pra envio / aniversariantes do dia.
-- [ ] Frontend: tela inicial.
-- [ ] Botão de WhatsApp por item (link wa.me com mensagem pronta a partir de
-      `crm_modelos_mensagem`) — sem disparo automático no MVP.
-- [ ] API + frontend: CRUD de modelos de mensagem.
-
-## Onboarding
-
-- [x] Modelo de segmento único "Produção sob encomenda" (config da Basic),
-      inicializado automaticamente no primeiro login de um tenant novo
-      (`lib/etapas.js`).
-- [ ] Frontend do onboarding (hoje é 100% automático/invisível — falta se o
-      produto quiser deixar o dono escolher/editar antes de começar a usar).
-
-## Critérios de sucesso com a Basic (30–45 dias, seção 7.7)
-
-- [ ] Nauara usa o Painel Hoje no lugar das etiquetas do WhatsApp.
-- [ ] Todo pedido direto (WhatsApp, retirada, entrega local) registrado no
-      CRM.
-- [ ] Sorteio mensal sai de um segmento, sem planilha.
-- [ ] Orçamentos parados recuperados pelo follow-up do painel.
-
-Nenhum desses é alcançável sem frontend — é o gargalo real pra validar com a
-Basic, mais do que qualquer rota de API que falte.
+- [x] Painel Hoje no lugar das etiquetas do WhatsApp (existe; falta uso real).
+- [x] Pedido direto registrável no CRM (existe; falta uso real).
+- [ ] Sorteio mensal sai de um segmento, sem planilha — depende de #23 e #24.
+- [ ] Orçamentos parados recuperados pelo follow-up do painel — depende de uso real.
