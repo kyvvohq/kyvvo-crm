@@ -181,7 +181,7 @@ async function build() {
         [rows[0].id]
       ),
       pool.query(
-        `select cc.id, cc.chave, cc.label, cc.tipo, cv.valor from crm_campos_customizados cc
+        `select cc.id, cc.chave, cc.label, cc.tipo, cc.opcoes, cv.valor from crm_campos_customizados cc
          left join crm_clientes_valores cv on cv.campo_id = cc.id and cv.cliente_id = $1
          where cc.tenant_id = $2 order by cc.ordem`,
         [rows[0].id, tenantId]
@@ -225,6 +225,124 @@ async function build() {
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
     return rows[0];
+  });
+
+  // --- Tags (US15) -------------------------------------------------------------
+  fastify.get('/crm/api/tags', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_tags where tenant_id = $1 order by nome', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.delete('/crm/api/tags/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rowCount } = await pool.query('delete from crm_tags where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Tag não encontrada' });
+    return { ok: true };
+  });
+
+  // Acha-ou-cria a tag pelo nome (dedupe por tenant_id+nome) e associa ao
+  // cliente — evita duas telas separadas (cadastrar tag / aplicar tag).
+  fastify.post('/crm/api/clientes/:id/tags', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome da tag é obrigatório' });
+
+    const { rows: clienteRows } = await pool.query('select 1 from crm_clientes where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!clienteRows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
+
+    const { rows: tagRows } = await pool.query(
+      `insert into crm_tags (tenant_id, nome) values ($1, $2)
+       on conflict (tenant_id, nome) do update set nome = excluded.nome returning *`,
+      [tenantId, nome]
+    );
+    await pool.query(
+      'insert into crm_clientes_tags (cliente_id, tag_id) values ($1, $2) on conflict do nothing',
+      [request.params.id, tagRows[0].id]
+    );
+    return reply.code(201).send(tagRows[0]);
+  });
+
+  fastify.delete('/crm/api/clientes/:id/tags/:tagId', { preHandler: fastify.authenticate }, async (request, reply) => {
+    await pool.query(
+      `delete from crm_clientes_tags where cliente_id = $1 and tag_id = $2
+       and cliente_id in (select id from crm_clientes where tenant_id = $3)`,
+      [request.params.id, request.params.tagId, request.user.tenantId]
+    );
+    return { ok: true };
+  });
+
+  // --- Campos customizados (US16) -----------------------------------------------
+  function slugificar(texto) {
+    return String(texto)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'campo';
+  }
+
+  fastify.get('/crm/api/campos-customizados', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_campos_customizados where tenant_id = $1 order by ordem', [request.user.tenantId]);
+    return rows;
+  });
+
+  const TIPOS_CAMPO_CUSTOMIZADO = ['texto', 'numero', 'booleano', 'data', 'selecao'];
+
+  fastify.post('/crm/api/campos-customizados', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { label, tipo, opcoes } = request.body || {};
+    if (!label || !label.trim()) return reply.code(400).send({ error: 'Label é obrigatório' });
+    if (!TIPOS_CAMPO_CUSTOMIZADO.includes(tipo)) return reply.code(400).send({ error: 'Tipo inválido' });
+
+    const base = slugificar(label);
+    let chave = base;
+    let contador = 2;
+    // Chave é derivada do label (o backend não pede pro usuário digitar as
+    // duas coisas) — precisa ser única por conta.
+    for (;;) {
+      const { rows: existe } = await pool.query('select 1 from crm_campos_customizados where tenant_id = $1 and chave = $2', [tenantId, chave]);
+      if (!existe[0]) break;
+      chave = `${base}_${contador++}`;
+    }
+
+    const { rows: ordemRows } = await pool.query('select coalesce(max(ordem), -1) + 1 as prox from crm_campos_customizados where tenant_id = $1', [tenantId]);
+    const { rows } = await pool.query(
+      `insert into crm_campos_customizados (tenant_id, chave, label, tipo, opcoes, ordem) values ($1, $2, $3, $4, $5, $6) returning *`,
+      [tenantId, chave, label.trim(), tipo, Array.isArray(opcoes) ? JSON.stringify(opcoes) : null, ordemRows[0].prox]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.delete('/crm/api/campos-customizados/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rowCount } = await pool.query('delete from crm_campos_customizados where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Campo não encontrado' });
+    return { ok: true };
+  });
+
+  // Upsert em lote dos valores dos campos customizados de um cliente.
+  fastify.put('/crm/api/clientes/:id/campos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const valores = request.body?.valores;
+    if (!Array.isArray(valores)) return reply.code(400).send({ error: 'valores deve ser uma lista' });
+
+    const { rows: clienteRows } = await pool.query('select 1 from crm_clientes where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!clienteRows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const item of valores) {
+        const valor = item.valor === undefined || item.valor === '' ? null : String(item.valor);
+        await client.query(
+          `insert into crm_clientes_valores (cliente_id, campo_id, valor) values ($1, $2, $3)
+           on conflict (cliente_id, campo_id) do update set valor = excluded.valor`,
+          [request.params.id, item.campo_id, valor]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (erro) {
+      await client.query('ROLLBACK');
+      throw erro;
+    } finally {
+      client.release();
+    }
+    return { ok: true };
   });
 
   // --- Etapas (config do funil, editável direto no quadro — mesmo padrão do
@@ -400,7 +518,7 @@ async function build() {
   // (raia) opcional. Resto é opcional.
   fastify.post('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { telefone, nome_cliente, itens, descricao, quantidade, valor_total, origem, tipo_entrega, recurso_id } = request.body || {};
+    const { telefone, nome_cliente, itens, descricao, quantidade, produto_id, valor_total, origem, tipo_entrega, recurso_id } = request.body || {};
     if (!origem) return reply.code(400).send({ error: 'Origem é obrigatória' });
 
     const { rows: etapaRows } = await pool.query(
@@ -431,9 +549,9 @@ async function build() {
         }
       } else if (descricao) {
         await client.query(
-          `insert into crm_pedidos_itens (pedido_id, descricao, quantidade, valor_unitario)
-           values ($1, $2, $3, $4)`,
-          [pedido.id, descricao, quantidade || 1, valor_total || 0]
+          `insert into crm_pedidos_itens (pedido_id, produto_id, descricao, quantidade, valor_unitario)
+           values ($1, $2, $3, $4, $5)`,
+          [pedido.id, produto_id || null, descricao, quantidade || 1, valor_total || 0]
         );
       }
 
@@ -514,6 +632,50 @@ async function build() {
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
     return rows[0];
+  });
+
+  // --- Produtos (US18) -----------------------------------------------------------
+  fastify.get('/crm/api/produtos', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_produtos where tenant_id = $1 order by nome', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.post('/crm/api/produtos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { nome, categoria, preco_referencia, identificador_externo } = request.body || {};
+    if (!nome || !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const { rows } = await pool.query(
+      `insert into crm_produtos (tenant_id, nome, categoria, preco_referencia, identificador_externo)
+       values ($1, $2, $3, $4, $5) returning *`,
+      [tenantId, nome.trim(), categoria || null, preco_referencia || null, identificador_externo || null]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.patch('/crm/api/produtos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const campos = ['nome', 'categoria', 'preco_referencia', 'identificador_externo'];
+    const body = request.body || {};
+    const sets = [];
+    const params = [request.params.id, tenantId];
+    for (const campo of campos) {
+      if (body[campo] === undefined) continue;
+      params.push(body[campo]);
+      sets.push(`${campo} = $${params.length}`);
+    }
+    if (!sets.length) return reply.code(400).send({ error: 'Nenhum campo pra atualizar' });
+    const { rows } = await pool.query(`update crm_produtos set ${sets.join(', ')} where id = $1 and tenant_id = $2 returning *`, params);
+    if (!rows[0]) return reply.code(404).send({ error: 'Produto não encontrado' });
+    return rows[0];
+  });
+
+  // Apagar um produto não afeta itens de pedido já lançados com ele — o FK
+  // (ON DELETE SET NULL em crm_pedidos_itens.produto_id) só solta a
+  // referência, a descrição/valor do item já lançado continuam intactos.
+  fastify.delete('/crm/api/produtos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rowCount } = await pool.query('delete from crm_produtos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Produto não encontrado' });
+    return { ok: true };
   });
 
   // --- Painel Hoje (seção 7.6) -------------------------------------------------

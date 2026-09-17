@@ -113,6 +113,7 @@
           <p class="descricao">Arraste os cards entre etapas e raias. Clique no nome de uma etapa pra renomear.</p>
         </div>
         <div class="acoes">
+          <button type="button" class="btn-secundario" id="btn-gerenciar-produtos">Produtos</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-recursos">Recursos</button>
           <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
         </div>
@@ -132,17 +133,20 @@
     let etapas = [];
     let recursos = [];
     let pedidos = [];
+    let produtos = [];
     const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
 
     async function carregar() {
-      const [resEtapas, resRecursos, resPedidos] = await Promise.all([
+      const [resEtapas, resRecursos, resPedidos, resProdutos] = await Promise.all([
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
         apiFetch('/crm/api/pedidos'),
+        apiFetch('/crm/api/produtos'),
       ]);
       etapas = await resEtapas.json();
       recursos = await resRecursos.json();
       pedidos = await resPedidos.json();
+      produtos = await resProdutos.json();
       renderizar();
     }
 
@@ -480,14 +484,68 @@
       });
     }
 
+    // --- Gerenciar produtos (US18) ------------------------------------------
+    document.getElementById('btn-gerenciar-produtos').addEventListener('click', () => abrirModalProdutos());
+
+    function abrirModalProdutos() {
+      abrirModal('<h3>Catálogo de produtos</h3>', `
+        <p class="modal-texto">Cadastre os produtos que você mais vende pra escolher rápido na hora de criar um pedido.</p>
+        <div id="lista-produtos"></div>
+        <div class="grid2">
+          <div><label for="input-novo-produto">Novo produto</label><input type="text" id="input-novo-produto" placeholder="ex.: Vaso decorativo P"></div>
+          <div><label for="input-novo-produto-preco">Preço de referência</label><input type="text" id="input-novo-produto-preco" placeholder="0,00"></div>
+        </div>
+        <div class="modal-acoes">
+          <button type="button" id="btn-adicionar-produto">Adicionar produto</button>
+        </div>
+      `, 'modal-card-larga');
+      aplicarMascaraMoeda(document.getElementById('input-novo-produto-preco'));
+      renderizarListaProdutos();
+      document.getElementById('btn-adicionar-produto').addEventListener('click', async () => {
+        const nome = document.getElementById('input-novo-produto').value.trim();
+        if (!nome) return;
+        const precoInput = document.getElementById('input-novo-produto-preco');
+        const preco = valorMoedaParaNumero(precoInput);
+        await apiFetch('/crm/api/produtos', { method: 'POST', body: JSON.stringify({ nome, preco_referencia: preco || null }) });
+        await carregar();
+        document.getElementById('input-novo-produto').value = '';
+        precoInput.value = '';
+        renderizarListaProdutos();
+      });
+    }
+
+    function renderizarListaProdutos() {
+      const el = document.getElementById('lista-produtos');
+      if (!el) return;
+      el.innerHTML = produtos.length ? produtos.map((p) => `
+        <div class="linha-recurso">
+          <span>${escapeHtml(p.nome)}${p.preco_referencia ? ` <span style="color:var(--muted);font-size:12px">(${formatarMoeda(p.preco_referencia)})</span>` : ''}</span>
+          <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-produto="${p.id}">Remover</button>
+        </div>
+      `).join('') : '<p class="vazio">Nenhum produto cadastrado ainda.</p>';
+
+      el.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
+          await carregar();
+          renderizarListaProdutos();
+        });
+      });
+    }
+
     // --- Novo pedido ---------------------------------------------------------
     document.getElementById('btn-novo-pedido').addEventListener('click', () => {
       const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
+      const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
       const overlay = abrirModal('<h3>Novo pedido</h3>', `
         <div class="grid2">
           <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
           <div><label for="p-nome-cliente">Nome (se cliente novo)</label><input id="p-nome-cliente"></div>
         </div>
+        ${produtos.length ? `
+        <label for="p-produto">Produto do catálogo (opcional)</label>
+        <select id="p-produto"><option value="">— escolher da lista preenche descrição e valor —</option>${opcoesProduto}</select>
+        ` : ''}
         <div class="grid2">
           <div><label for="p-descricao">Item / descrição</label><input id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
           <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
@@ -508,7 +566,19 @@
           <button type="button" id="btn-salvar-pedido">Criar pedido</button>
         </div>
       `);
-      aplicarMascaraMoeda(document.getElementById('p-valor'));
+      const campoValorPedido = document.getElementById('p-valor');
+      aplicarMascaraMoeda(campoValorPedido);
+      const selectProduto = document.getElementById('p-produto');
+      if (selectProduto) {
+        selectProduto.addEventListener('change', () => {
+          const opcao = selectProduto.selectedOptions[0];
+          if (!opcao.value) return;
+          document.getElementById('p-descricao').value = opcao.textContent;
+          if (opcao.dataset.preco) {
+            campoValorPedido.value = Number(opcao.dataset.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
+        });
+      }
       document.getElementById('btn-cancelar-pedido').addEventListener('click', fecharModal);
       document.getElementById('btn-salvar-pedido').addEventListener('click', async () => {
         const origem = document.getElementById('p-origem').value.trim();
@@ -518,9 +588,10 @@
           body: JSON.stringify({
             telefone: document.getElementById('p-telefone').value.trim() || null,
             nome_cliente: document.getElementById('p-nome-cliente').value.trim() || null,
+            produto_id: selectProduto ? (selectProduto.value || null) : null,
             descricao: document.getElementById('p-descricao').value.trim() || null,
             quantidade: Number(document.getElementById('p-quantidade').value) || 1,
-            valor_total: valorMoedaParaNumero(document.getElementById('p-valor')),
+            valor_total: valorMoedaParaNumero(campoValorPedido),
             origem,
             tipo_entrega: document.getElementById('p-entrega').value.trim() || null,
             recurso_id: document.getElementById('p-recurso').value || null,
