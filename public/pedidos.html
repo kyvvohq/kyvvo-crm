@@ -157,7 +157,8 @@
 
     function cartaoHtml(p) {
       const alerta = p.dias_na_etapa >= 3;
-      const qtd = Number(p.quantidade_itens) > 1 ? `${p.quantidade_itens}× ` : '';
+      const numQtd = Number(p.quantidade_itens);
+      const qtd = numQtd > 1 ? `${Number.isInteger(numQtd) ? numQtd : numQtd.toLocaleString('pt-BR')}× ` : '';
       return `
         <div class="cartao-pedido" draggable="true" data-pedido="${p.id}">
           <div class="nome">${qtd}${escapeHtml(p.cliente_nome)}</div>
@@ -484,7 +485,7 @@
       if (!p) return;
       const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
       const overlay = abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${p.quantidade_itens} item(ns)` : ''}</p>
+        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
 
         <div class="grid2">
           <div><label for="d-etapa">Etapa</label>
