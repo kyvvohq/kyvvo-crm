@@ -10,6 +10,7 @@ const { pool, migrar } = require('./lib/db');
 const { paraE164 } = require('./lib/telefone');
 const { encontrarOuCriarPorTelefone, buscarMetricas } = require('./lib/clientes');
 const { inicializarModelosPadrao } = require('./lib/mensagens');
+const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 
 const PORT = process.env.PORT || 3005;
@@ -95,10 +96,21 @@ async function build() {
     }
     const { tenantId } = await acessoRes.json();
 
+    // userId vem do payload do token do platform (RS256, confiamos na
+    // resposta HTTPS do próprio serviço que acabamos de chamar — mesmo
+    // princípio do register mais abaixo) — precisa dele pra registrar quem
+    // fez uma ação sensível (ex.: ator do sorteio, seção 7.5 do doc).
+    let userId;
+    try {
+      userId = JSON.parse(Buffer.from(kyvvoToken.split('.')[1], 'base64url').toString('utf8')).userId;
+    } catch {
+      userId = null;
+    }
+
     await inicializarEtapasPadrao(pool, tenantId);
     await inicializarModelosPadrao(pool, tenantId);
 
-    const token = fastify.jwt.sign({ tenantId, email, nome }, { expiresIn: '12h' });
+    const token = fastify.jwt.sign({ tenantId, userId, email, nome }, { expiresIn: '12h' });
     return { token, nome };
   });
 
@@ -123,8 +135,11 @@ async function build() {
     if (!platformRes.ok) return reply.code(platformRes.status).send(dados);
 
     let tenantId;
+    let userId;
     try {
-      tenantId = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8')).tenantId;
+      const payload = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8'));
+      tenantId = payload.tenantId;
+      userId = payload.userId;
     } catch (err) {
       request.log.error(`Conta criada no platform mas não consegui ler o tenantId do token: ${err.message}`);
       return reply.code(502).send({ error: 'Conta criada, mas não foi possível iniciar sua sessão. Faça login manualmente.' });
@@ -132,7 +147,7 @@ async function build() {
 
     await inicializarEtapasPadrao(pool, tenantId);
     await inicializarModelosPadrao(pool, tenantId);
-    const token = fastify.jwt.sign({ tenantId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
+    const token = fastify.jwt.sign({ tenantId, userId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
     return reply.code(201).send({ token, nome: dados.nome });
   });
 
@@ -698,6 +713,77 @@ async function build() {
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Modelo não encontrado' });
     return rows[0];
+  });
+
+  // --- Segmentos e sorteio (US23/US24) --------------------------------------------
+  fastify.post('/crm/api/segmentos/preview', { preHandler: fastify.authenticate }, async (request) => {
+    const clientes = await resolverSegmento(pool, request.user.tenantId, request.body?.filtros);
+    return { total: clientes.length, clientes };
+  });
+
+  fastify.get('/crm/api/segmentos', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_segmentos where tenant_id = $1 order by criado_em desc', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.post('/crm/api/segmentos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { nome, filtros } = request.body || {};
+    if (!nome || !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const { rows } = await pool.query(
+      'insert into crm_segmentos (tenant_id, nome, filtros) values ($1, $2, $3) returning *',
+      [tenantId, nome.trim(), JSON.stringify(filtros || {})]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.delete('/crm/api/segmentos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rowCount } = await pool.query('delete from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Segmento não encontrado' });
+    return { ok: true };
+  });
+
+  fastify.get('/crm/api/segmentos/:id/clientes', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query('select * from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Segmento não encontrado' });
+    const clientes = await resolverSegmento(pool, tenantId, rows[0].filtros);
+    return { segmento: rows[0], clientes };
+  });
+
+  // Congela a lista de participantes no momento do sorteio — reabrir o
+  // mesmo segmento depois pode trazer clientes diferentes, o sorteio já
+  // feito não muda (seção 7.5 do doc: "auditável").
+  fastify.post('/crm/api/segmentos/:id/sortear', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, userId } = request.user;
+    if (!userId) return reply.code(400).send({ error: 'Sessão sem usuário identificado — faça login de novo pra sortear.' });
+
+    const { rows: segRows } = await pool.query('select * from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!segRows[0]) return reply.code(404).send({ error: 'Segmento não encontrado' });
+
+    const participantes = await resolverSegmento(pool, tenantId, segRows[0].filtros);
+    if (!participantes.length) return reply.code(400).send({ error: 'Este segmento não tem nenhum participante agora.' });
+
+    const quantidade = Math.min(Math.max(Number(request.body?.quantidade) || 1, 1), participantes.length);
+    const embaralhados = [...participantes].sort(() => Math.random() - 0.5);
+    const vencedores = embaralhados.slice(0, quantidade).map((c) => ({ id: c.id, nome: c.nome, telefone: c.telefone }));
+
+    const { rows } = await pool.query(
+      `insert into crm_sorteios (tenant_id, segmento_id, participantes, vencedores, ator_id)
+       values ($1, $2, $3, $4, $5) returning *`,
+      [tenantId, segRows[0].id, JSON.stringify(participantes.map((c) => c.id)), JSON.stringify(vencedores), userId]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.get('/crm/api/sorteios', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      `select s.*, seg.nome as segmento_nome from crm_sorteios s
+       left join crm_segmentos seg on seg.id = s.segmento_id
+       where s.tenant_id = $1 order by s.criado_em desc`,
+      [request.user.tenantId]
+    );
+    return rows;
   });
 
   // --- Painel Hoje (seção 7.6) -------------------------------------------------

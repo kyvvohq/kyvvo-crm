@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Segmentos</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:0 16px; }
+  @media(max-width:760px) { .grid3 { grid-template-columns:1fr 1fr; } }
+  @media(max-width:480px) { .grid3 { grid-template-columns:1fr; } }
+  .campo-check { display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .campo-check input { width:auto; }
+  .resultado-preview { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+  .resultado-preview .contagem { font-weight:700; color:var(--text); font-family:var(--font-display); }
+  .linha-item { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border); font-size:13px; }
+  .linha-item:first-child { border-top:none; }
+  .lista-segmentos-item, .lista-sorteios-item { padding:12px 0; border-top:1px solid var(--border); }
+  .lista-segmentos-item:first-child, .lista-sorteios-item:first-child { border-top:none; }
+  .lista-segmentos-item .topo, .lista-sorteios-item .topo { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .lista-segmentos-item .nome { font-weight:600; color:var(--text); }
+  .lista-segmentos-item .acoes-linha { display:flex; gap:8px; }
+  .lista-segmentos-item .acoes-linha button { height:30px; padding:0 12px; font-size:12px; }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Kyvvo CRM</div>
+        <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
+        <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
+        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="kanban"></span><span class="rotulo">Pedidos</span></a>
+        <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Segmentos</span></a>
+      </nav>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Segmentos</h1></div>
+          <p class="descricao">Combine filtros pra achar um grupo de clientes — pra campanha, ou pra sortear.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Novo segmento</h2>
+        <div class="grid3">
+          <div><label for="f-tag">Tag</label><select id="f-tag"><option value="">Qualquer</option></select></div>
+          <div><label for="f-cidade">Cidade</label><input type="text" id="f-cidade" placeholder="ex.: Uberlândia"></div>
+          <div><label for="f-origem">Origem</label><input type="text" id="f-origem" placeholder="ex.: whatsapp"></div>
+        </div>
+        <div class="grid3">
+          <div><label for="f-produto">Produto comprado</label><select id="f-produto"><option value="">Qualquer</option></select></div>
+          <div><label for="f-dias-sem-comprar">Dias sem comprar (mínimo)</label><input type="number" min="0" id="f-dias-sem-comprar" placeholder="ex.: 30"></div>
+          <div><label for="f-pagamento">Status de pagamento</label>
+            <select id="f-pagamento">
+              <option value="">Qualquer</option>
+              <option value="pendente">Pendente</option>
+              <option value="parcial">Parcial</option>
+              <option value="pago">Pago</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid3">
+          <div><label for="f-campo">Campo customizado</label><select id="f-campo"><option value="">Nenhum</option></select></div>
+          <div id="f-campo-valor-wrap" hidden><label for="f-campo-valor">Valor do campo</label><input type="text" id="f-campo-valor"></div>
+        </div>
+        <div class="campo-check"><input type="checkbox" id="f-aniversario"><label for="f-aniversario" style="margin:0">Aniversário no mês atual</label></div>
+        <div class="campo-check"><input type="checkbox" id="f-consentimento"><label for="f-consentimento" style="margin:0">Só clientes com consentimento de comunicação registrado</label></div>
+
+        <div class="modal-acoes" style="margin-top:20px">
+          <button type="button" class="btn-secundario" id="btn-pre-visualizar">Pré-visualizar</button>
+          <button type="button" class="btn-secundario" id="btn-exportar-csv" disabled>Exportar CSV</button>
+          <button type="button" id="btn-salvar-segmento" disabled>Salvar segmento</button>
+        </div>
+
+        <div class="resultado-preview" id="resultado-preview" hidden>
+          <p><span class="contagem" id="preview-contagem">0</span> cliente(s) encontrado(s).</p>
+          <div id="preview-lista"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Segmentos salvos</h2>
+        <div id="lista-segmentos-salvos"><p class="vazio">Carregando…</p></div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Sorteios recentes</h2>
+        <div id="lista-sorteios"><p class="vazio">Carregando…</p></div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    let tags = [];
+    let produtos = [];
+    let camposCustomizados = [];
+    let segmentosSalvos = [];
+    let ultimoPreview = [];
+
+    async function carregar() {
+      const [resTags, resProdutos, resCampos, resSegmentos, resSorteios] = await Promise.all([
+        apiFetch('/crm/api/tags'),
+        apiFetch('/crm/api/produtos'),
+        apiFetch('/crm/api/campos-customizados'),
+        apiFetch('/crm/api/segmentos'),
+        apiFetch('/crm/api/sorteios'),
+      ]);
+      tags = await resTags.json();
+      produtos = await resProdutos.json();
+      camposCustomizados = await resCampos.json();
+      segmentosSalvos = await resSegmentos.json();
+      const sorteios = await resSorteios.json();
+
+      document.getElementById('f-tag').innerHTML = '<option value="">Qualquer</option>' + tags.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
+      document.getElementById('f-produto').innerHTML = '<option value="">Qualquer</option>' + produtos.map((p) => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+      document.getElementById('f-campo').innerHTML = '<option value="">Nenhum</option>' + camposCustomizados.map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join('');
+
+      renderizarSegmentosSalvos();
+      renderizarSorteios(sorteios);
+    }
+
+    document.getElementById('f-campo').addEventListener('change', (e) => {
+      document.getElementById('f-campo-valor-wrap').hidden = !e.target.value;
+    });
+
+    function lerFiltros() {
+      const filtros = {};
+      if (document.getElementById('f-tag').value) filtros.tag_id = document.getElementById('f-tag').value;
+      if (document.getElementById('f-cidade').value.trim()) filtros.cidade = document.getElementById('f-cidade').value.trim();
+      if (document.getElementById('f-origem').value.trim()) filtros.origem = document.getElementById('f-origem').value.trim();
+      if (document.getElementById('f-produto').value) filtros.produto_id = document.getElementById('f-produto').value;
+      if (document.getElementById('f-dias-sem-comprar').value) filtros.dias_sem_comprar_min = Number(document.getElementById('f-dias-sem-comprar').value);
+      if (document.getElementById('f-pagamento').value) filtros.status_pagamento = document.getElementById('f-pagamento').value;
+      if (document.getElementById('f-campo').value && document.getElementById('f-campo-valor').value.trim()) {
+        filtros.campo_customizado_id = document.getElementById('f-campo').value;
+        filtros.campo_customizado_valor = document.getElementById('f-campo-valor').value.trim();
+      }
+      if (document.getElementById('f-aniversario').checked) filtros.aniversario_mes = true;
+      if (document.getElementById('f-consentimento').checked) filtros.consentimento = true;
+      return filtros;
+    }
+
+    function renderizarPreview(clientes) {
+      ultimoPreview = clientes;
+      document.getElementById('resultado-preview').hidden = false;
+      document.getElementById('preview-contagem').textContent = clientes.length;
+      document.getElementById('preview-lista').innerHTML = clientes.slice(0, 30).map((c) => `
+        <div class="linha-item"><span>${escapeHtml(c.nome)}</span><span style="color:var(--muted)">${escapeHtml(c.telefone || '—')}</span></div>
+      `).join('') || '<p class="vazio">Nenhum cliente bate com esses filtros.</p>';
+      document.getElementById('btn-exportar-csv').disabled = clientes.length === 0;
+      document.getElementById('btn-salvar-segmento').disabled = false;
+    }
+
+    document.getElementById('btn-pre-visualizar').addEventListener('click', async () => {
+      const res = await apiFetch('/crm/api/segmentos/preview', { method: 'POST', body: JSON.stringify({ filtros: lerFiltros() }) });
+      const dados = await res.json();
+      renderizarPreview(dados.clientes);
+    });
+
+    document.getElementById('btn-exportar-csv').addEventListener('click', () => {
+      exportarCsv(ultimoPreview, 'segmento');
+    });
+
+    function exportarCsv(clientes, nomeArquivo) {
+      const linhas = [['nome', 'telefone', 'email', 'cidade', 'uf', 'segmento', 'origem'].join(',')];
+      clientes.forEach((c) => {
+        linhas.push([c.nome, c.telefone, c.email, c.cidade, c.uf, c.segmento, c.origem].map((v) => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+      });
+      const blob = new Blob([linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${nomeArquivo}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('btn-salvar-segmento').addEventListener('click', () => {
+      const overlay = abrirModal('<h3>Salvar segmento</h3>', `
+        <label for="seg-nome">Nome do segmento</label>
+        <input type="text" id="seg-nome" placeholder="ex.: Clientes de Uberlândia sem comprar há 30 dias">
+        <div class="modal-erro" id="seg-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="seg-cancelar">Cancelar</button>
+          <button type="button" id="seg-confirmar">Salvar</button>
+        </div>
+      `);
+      document.getElementById('seg-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('seg-confirmar').addEventListener('click', async () => {
+        const nome = document.getElementById('seg-nome').value.trim();
+        if (!nome) { document.getElementById('seg-erro').textContent = 'Nome é obrigatório'; return; }
+        const res = await apiFetch('/crm/api/segmentos', { method: 'POST', body: JSON.stringify({ nome, filtros: lerFiltros() }) });
+        if (!res.ok) { document.getElementById('seg-erro').textContent = 'Falha ao salvar'; return; }
+        fecharModal();
+        carregar();
+      });
+    });
+
+    function renderizarSegmentosSalvos() {
+      const el = document.getElementById('lista-segmentos-salvos');
+      el.innerHTML = segmentosSalvos.length ? segmentosSalvos.map((s) => `
+        <div class="lista-segmentos-item">
+          <div class="topo">
+            <span class="nome">${escapeHtml(s.nome)}</span>
+            <div class="acoes-linha">
+              <button type="button" class="btn-secundario" data-ver-segmento="${s.id}">Ver</button>
+              <button type="button" data-sortear-segmento="${s.id}" data-nome-segmento="${escapeHtml(s.nome)}">Sortear</button>
+              <button type="button" class="btn-secundario" data-apagar-segmento="${s.id}">Remover</button>
+            </div>
+          </div>
+        </div>
+      `).join('') : '<p class="vazio">Nenhum segmento salvo ainda.</p>';
+
+      el.querySelectorAll('[data-ver-segmento]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const res = await apiFetch(`/crm/api/segmentos/${btn.dataset.verSegmento}/clientes`);
+          const dados = await res.json();
+          renderizarPreview(dados.clientes);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+      el.querySelectorAll('[data-apagar-segmento]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/segmentos/${btn.dataset.apagarSegmento}`, { method: 'DELETE' });
+          carregar();
+        });
+      });
+      el.querySelectorAll('[data-sortear-segmento]').forEach((btn) => {
+        btn.addEventListener('click', () => abrirModalSortear(btn.dataset.sortearSegmento, btn.dataset.nomeSegmento));
+      });
+    }
+
+    function abrirModalSortear(segmentoId, nomeSegmento) {
+      const overlay = abrirModal(`<h3>Sortear — ${escapeHtml(nomeSegmento)}</h3>`, `
+        <p class="modal-texto">A lista de participantes é congelada no momento do sorteio — fica registrada pra sempre, mesmo se o segmento mudar depois.</p>
+        <label for="sorteio-qtd">Quantos vencedores?</label>
+        <input type="number" id="sorteio-qtd" min="1" value="1">
+        <div class="modal-erro" id="sorteio-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="sorteio-cancelar">Cancelar</button>
+          <button type="button" id="sorteio-confirmar">Sortear</button>
+        </div>
+      `);
+      document.getElementById('sorteio-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('sorteio-confirmar').addEventListener('click', async () => {
+        const quantidade = Number(document.getElementById('sorteio-qtd').value) || 1;
+        const res = await apiFetch(`/crm/api/segmentos/${segmentoId}/sortear`, { method: 'POST', body: JSON.stringify({ quantidade }) });
+        const dados = await res.json();
+        if (!res.ok) { document.getElementById('sorteio-erro').textContent = dados.error || 'Falha ao sortear'; return; }
+        abrirModal('<h3>🎉 Resultado do sorteio</h3>', `
+          ${dados.vencedores.map((v) => `<div class="linha-item"><span>${escapeHtml(v.nome)}</span><span style="color:var(--muted)">${escapeHtml(v.telefone || '—')}</span></div>`).join('')}
+          <div class="modal-acoes"><button type="button" id="sorteio-fechar">Fechar</button></div>
+        `);
+        document.getElementById('sorteio-fechar').addEventListener('click', () => { fecharModal(); carregar(); });
+      });
+    }
+
+    function renderizarSorteios(sorteios) {
+      const el = document.getElementById('lista-sorteios');
+      el.innerHTML = sorteios.length ? sorteios.map((s) => `
+        <div class="lista-sorteios-item">
+          <div class="topo">
+            <span class="nome">${escapeHtml(s.segmento_nome || 'Segmento removido')}</span>
+            <span style="color:var(--muted);font-size:12px">${formatarDataHora(s.criado_em)}</span>
+          </div>
+          <p class="campo-ajuda" style="margin-top:6px">Vencedor(es): ${(s.vencedores || []).map((v) => escapeHtml(v.nome)).join(', ') || '—'}</p>
+        </div>
+      `).join('') : '<p class="vazio">Nenhum sorteio ainda.</p>';
+    }
+
+    carregar();
+  </script>
+</body>
+</html>
