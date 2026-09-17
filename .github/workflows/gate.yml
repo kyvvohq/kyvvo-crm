@@ -1,0 +1,78 @@
+name: Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: kyvvo_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/kyvvo_test
+      NODE_ENV: test
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
+      NPM_PACKAGES_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://npm.pkg.github.com
+          scope: "@kyvvohq"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Aplicar migrations do zero
+        run: node -e "require('./lib/db').migrar().then(() => { console.log('migrations ok'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })"
+
+      - name: Testes
+        run: npm test
+
+  caminhos-protegidos:
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Exigir label 'revisado:infra' para mexer em caminho protegido
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          case " $LABELS " in
+            *" revisado:infra "*)
+              echo "PR carrega o selo 'revisado:infra' — liberado."
+              exit 0 ;;
+          esac
+          PROTEGIDOS='^(\.github/workflows/|\.github/dependabot\.yml|\.github/CODEOWNERS|CLAUDE\.md|Dockerfile|\.npmrc|package\.json|db/|lib/db\.js)'
+          MUDOU=$(git diff --name-only "$BASE" "$HEAD" | grep -E "$PROTEGIDOS" || true)
+          if [ -n "$MUDOU" ]; then
+            echo "::error::PR toca caminho protegido sem a label 'revisado:infra'."
+            echo "Arquivos:"
+            echo "$MUDOU" | sed 's/^/  - /'
+            echo
+            echo "Se a mudança é intencional e foi revisada por um humano,"
+            echo "aplique a label 'revisado:infra' na PR e rode o gate de novo."
+            exit 1
+          fi
+          echo "Nenhum caminho protegido tocado."

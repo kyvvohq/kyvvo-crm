@@ -1,0 +1,61 @@
+name: Deploy to EC2
+
+# TEMPLATE — ainda não wireado. Faltam: secrets do repo (NPM_PACKAGES_TOKEN,
+# EC2_HOST, EC2_USER, EC2_SSH_KEY_B64), a entrada do serviço `crm` no
+# docker-compose da EC2 (repo kyvvo-infra) e o diretório /opt/kyvvo/crm lá.
+# Ver docs/DECISOES-PENDENTES.md #3. Mesmo padrão do kyvvo-people/deploy.yml:
+# push na branch `release` -> scp -> recria o serviço `crm`.
+
+on:
+  push:
+    branches: [release]
+    paths:
+      - ".npmrc"
+      - "index.js"
+      - "package.json"
+      - "package-lock.json"
+      - "lib/**"
+      - "db/**"
+      - "public/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preparar chave SSH
+        id: sshkey
+        run: |
+          KEY="$(printf '%s' '${{ secrets.EC2_SSH_KEY_B64 }}' | base64 -d)"
+          while IFS= read -r line; do [ -n "$line" ] && echo "::add-mask::$line"; done <<< "$KEY"
+          {
+            echo 'value<<KEYEOF'
+            printf '%s\n' "$KEY"
+            echo 'KEYEOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Gravar versão do deploy
+        run: |
+          COMMIT_CURTO="${GITHUB_SHA::7}"
+          echo "{\"commit\":\"${COMMIT_CURTO}\",\"deployedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > version.json
+
+      - name: Copiar arquivos pra EC2
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ steps.sshkey.outputs.value }}
+          source: ".npmrc,index.js,package.json,package-lock.json,version.json,lib/**,db/**,public/**"
+          target: "/opt/kyvvo/crm"
+
+      - name: Regenerar env do SSM + recriar container
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ steps.sshkey.outputs.value }}
+          script: |
+            sudo /opt/kyvvo/scripts/gen-env-from-ssm.sh
+            cd /opt/kyvvo && sudo docker compose up -d --force-recreate crm

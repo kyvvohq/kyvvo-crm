@@ -1,0 +1,64 @@
+name: Agente
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: agente-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  dev:
+    if: >
+      github.event.label.name == 'agent:tests' ||
+      github.event.label.name == 'agent:app'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@kyvvohq"
+
+      - name: Instalar dependências
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
+          NPM_PACKAGES_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            ISSUE: #${{ github.event.issue.number }}
+            LABEL: ${{ github.event.label.name }}
+
+            Implemente este issue seguindo o CLAUDE.md da raiz (se existir),
+            incluindo caminhos protegidos e o fluxo obrigatório.
+
+            A label indica a categoria permitida:
+            - `agent:tests` — só arquivos em test/. Nada além disso.
+            - `agent:app` — lib/, public/ e index.js. NUNCA db/, .github/,
+              package.json, .npmrc, Dockerfile, nem lib/db.js (infra — mudança
+              lá é PR humano com a label revisado:infra).
+
+            Rode `npm test` antes e depois da sua mudança.
+
+            OBRIGATÓRIO no fim: faça commit, push da sua branch e **abra a PR
+            você mesmo** com
+            `gh pr create --base master --head <sua-branch> --title "<título>" --body "<resumo>\n\nCloses #${{ github.event.issue.number }}"`.
+            A tarefa não está concluída sem a PR aberta.
+          claude_args: |
+            --max-turns 60
+            --allowedTools Read,Glob,Grep,Edit,Write,Bash,Bash(gh pr create:*)
