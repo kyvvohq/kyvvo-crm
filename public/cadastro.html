@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Criar conta</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 16px;
+    background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
+  .card { width:100%; max-width:420px; background:#FFFFFF; border:1px solid #E7EAF2; border-radius:16px; padding:32px; }
+  .logo { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .logo img { height:22px; width:auto; }
+  .logo .nome { font-size:16px; font-weight:700; }
+  h1 { font-size:19px; margin:16px 0 4px; }
+  .sub { font-size:13px; color:#6B7086; margin:0 0 4px; }
+  label { display:block; font-size:13px; font-weight:600; color:#2B3040; margin:16px 0 7px; }
+  input { width:100%; background:#fff; border:1px solid #D7DCE8; border-radius:12px;
+    height:44px; padding:0 14px; color:#0F111A; font-size:14px; font-family:inherit; }
+  .campo-erro { color:#F04438; font-size:12px; margin-top:5px; min-height:14px; }
+  .checkbox-linha { display:flex; align-items:flex-start; gap:8px; margin-top:16px; }
+  .checkbox-linha input { width:auto; height:auto; margin-top:2px; }
+  .checkbox-linha span { font-size:12.5px; color:#4A4F63; line-height:1.5; }
+  .checkbox-linha a { color:#7C5CFC; }
+  button { width:100%; margin-top:20px; background:#7C5CFC; color:#fff; font-weight:600; border:none;
+    border-radius:12px; height:44px; font-size:14px; cursor:pointer; }
+  button:hover { background:#6344E8; }
+  button:disabled { opacity:.6; cursor:default; }
+  .erro-geral { color:#F04438; font-size:13px; margin-top:12px; min-height:16px; }
+  .rodape { text-align:center; font-size:13px; color:#6B7086; margin-top:18px; }
+  .rodape a { color:#7C5CFC; font-weight:600; text-decoration:none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><img src="/ds/logo.svg" alt="Kyvvo"><div class="nome">Kyvvo CRM</div></div>
+    <h1>Crie sua conta</h1>
+    <p class="sub">Sem cartão, sem período de teste — comece agora.</p>
+
+    <form id="form-cadastro" novalidate>
+      <label for="nome_empresa">Nome da empresa</label>
+      <input id="nome_empresa" autocomplete="organization">
+      <div class="campo-erro" id="erro-nome_empresa"></div>
+
+      <label for="nome_responsavel">Seu nome</label>
+      <input id="nome_responsavel" autocomplete="name">
+      <div class="campo-erro" id="erro-nome_responsavel"></div>
+
+      <label for="whatsapp">WhatsApp (com DDD)</label>
+      <input id="whatsapp" type="tel" inputmode="numeric" placeholder="(34) 99999-9999" autocomplete="tel">
+      <div class="campo-erro" id="erro-whatsapp"></div>
+
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="email">
+      <div class="campo-erro" id="erro-email"></div>
+
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="new-password">
+      <div class="campo-erro" id="erro-senha"></div>
+
+      <div class="checkbox-linha">
+        <input type="checkbox" id="aceite_termos">
+        <span>Li e aceito os <a href="https://kyvvo.com.br/termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="https://kyvvo.com.br/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a> do Kyvvo.</span>
+      </div>
+      <div class="campo-erro" id="erro-aceite_termos"></div>
+
+      <button type="submit" id="btn">Criar conta</button>
+      <div class="erro-geral" id="erro-geral" role="alert"></div>
+    </form>
+
+    <p class="rodape">Já tem conta? <a href="/crm/login.html">Entrar</a></p>
+  </div>
+  <script>
+    if (localStorage.getItem('crm_token')) window.location.href = '/crm/painel.html';
+
+    const form = document.getElementById('form-cadastro');
+    const btn = document.getElementById('btn');
+    const erroGeral = document.getElementById('erro-geral');
+
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const SENHA_REGEX = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+    function validarTelefone(valor) {
+      let d = (valor || '').replace(/\D/g, '');
+      if (d.startsWith('55') && d.length >= 12) d = d.slice(2);
+      if (d.length < 10 || d.length > 11) return false;
+      const ddd = parseInt(d.slice(0, 2), 10);
+      return ddd >= 11 && ddd <= 99;
+    }
+    function formatarTelefoneMascara(valor) {
+      const digitos = (valor || '').replace(/\D/g, '').slice(0, 11);
+      if (digitos.length <= 2) return digitos ? `(${digitos}` : '';
+      const ddd = digitos.slice(0, 2);
+      const resto = digitos.slice(2);
+      if (digitos.length <= 10) return resto.length > 4 ? `(${ddd}) ${resto.slice(0, 4)}-${resto.slice(4)}` : `(${ddd}) ${resto}`;
+      return `(${ddd}) ${resto.slice(0, 5)}-${resto.slice(5)}`;
+    }
+    const campoWhatsapp = document.getElementById('whatsapp');
+    campoWhatsapp.addEventListener('input', () => { campoWhatsapp.value = formatarTelefoneMascara(campoWhatsapp.value); });
+
+    const campos = {
+      nome_empresa: document.getElementById('nome_empresa'),
+      nome_responsavel: document.getElementById('nome_responsavel'),
+      whatsapp: campoWhatsapp,
+      email: document.getElementById('email'),
+      senha: document.getElementById('senha'),
+    };
+    const validadores = {
+      nome_empresa: (v) => (v.trim().length >= 2 ? '' : 'Informe o nome da empresa.'),
+      nome_responsavel: (v) => (v.trim().length >= 2 ? '' : 'Informe seu nome.'),
+      whatsapp: (v) => (validarTelefone(v) ? '' : 'Digite um WhatsApp válido com DDD.'),
+      email: (v) => (EMAIL_REGEX.test(v.trim()) ? '' : 'Digite um e-mail válido.'),
+      senha: (v) => (SENHA_REGEX.test(v) ? '' : 'Mínimo 8 caracteres, 1 número e 1 letra maiúscula.'),
+    };
+    function mostrarErroCampo(nome, mensagem) {
+      document.getElementById('erro-' + nome).textContent = mensagem;
+      return !mensagem;
+    }
+    Object.keys(campos).forEach((nome) => {
+      campos[nome].addEventListener('blur', () => mostrarErroCampo(nome, validadores[nome](campos[nome].value)));
+    });
+
+    let enviando = false;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (enviando) return;
+      erroGeral.textContent = '';
+
+      let valido = true;
+      Object.keys(campos).forEach((nome) => {
+        if (!mostrarErroCampo(nome, validadores[nome](campos[nome].value))) valido = false;
+      });
+      const aceiteTermos = document.getElementById('aceite_termos');
+      if (aceiteTermos.checked) {
+        document.getElementById('erro-aceite_termos').textContent = '';
+      } else {
+        document.getElementById('erro-aceite_termos').textContent = 'Você precisa aceitar os Termos de Uso e a Política de Privacidade.';
+        valido = false;
+      }
+      if (!valido) return;
+
+      enviando = true;
+      btn.disabled = true;
+      btn.textContent = 'Criando conta...';
+      try {
+        const res = await fetch('/crm/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nome_empresa: campos.nome_empresa.value,
+            nome_responsavel: campos.nome_responsavel.value,
+            email: campos.email.value,
+            whatsapp: campos.whatsapp.value,
+            telefone: campos.whatsapp.value,
+            senha: campos.senha.value,
+            aceite_termos: aceiteTermos.checked,
+            aceita_marketing: false,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { erroGeral.textContent = data.error || 'Erro ao criar conta. Tente novamente.'; return; }
+        localStorage.setItem('crm_token', data.token);
+        localStorage.setItem('crm_nome', data.nome || '');
+        window.location.href = '/crm/painel.html';
+      } catch (err) {
+        erroGeral.textContent = 'Erro ao processar. Tente novamente.';
+      } finally {
+        enviando = false;
+        btn.disabled = false;
+        btn.textContent = 'Criar conta';
+      }
+    });
+  </script>
+</body>
+</html>
