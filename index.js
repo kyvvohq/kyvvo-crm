@@ -144,7 +144,7 @@ async function build() {
       filtro = `and (lower(nome) like $2 or telefone like $2 or cpf like $2)`;
     }
     const { rows } = await pool.query(
-      `select id, nome, telefone, email, cidade, uf, origem, criado_em
+      `select id, nome, telefone, email, cidade, uf, origem, segmento, criado_em
        from crm_clientes where tenant_id = $1 ${filtro}
        order by nome limit 200`,
       params
@@ -154,13 +154,13 @@ async function build() {
 
   fastify.post('/crm/api/clientes', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { nome, telefone, email, cpf, cidade, uf, cep, data_nascimento, origem, observacoes } = request.body || {};
+    const { nome, telefone, email, cpf, cidade, uf, cep, data_nascimento, origem, segmento, observacoes } = request.body || {};
     if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
 
     const { rows } = await pool.query(
-      `insert into crm_clientes (tenant_id, nome, telefone, email, cpf, cidade, uf, cep, data_nascimento, origem, observacoes)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning *`,
-      [tenantId, nome, paraE164(telefone), email || null, cpf || null, cidade || null, uf || null, cep || null, data_nascimento || null, origem || null, observacoes || null]
+      `insert into crm_clientes (tenant_id, nome, telefone, email, cpf, cidade, uf, cep, data_nascimento, origem, segmento, observacoes)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning *`,
+      [tenantId, nome, paraE164(telefone), email || null, cpf || null, cidade || null, uf || null, cep || null, data_nascimento || null, origem || null, segmento || null, observacoes || null]
     );
     await pool.query(
       `insert into crm_eventos (tenant_id, cliente_id, tipo) values ($1, $2, 'criacao')`,
@@ -208,7 +208,7 @@ async function build() {
 
   fastify.patch('/crm/api/clientes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'data_nascimento', 'origem', 'observacoes'];
+    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'data_nascimento', 'origem', 'segmento', 'observacoes'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
@@ -227,20 +227,144 @@ async function build() {
     return rows[0];
   });
 
-  // --- Etapas (config do funil) ----------------------------------------------
+  // --- Etapas (config do funil, editável direto no quadro — mesmo padrão do
+  // kyvvo-people/quadro.html: renomear, criar, apagar, reordenar) -------------
   fastify.get('/crm/api/etapas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query('select * from crm_etapas where tenant_id = $1 order by ordem', [request.user.tenantId]);
     return rows;
+  });
+
+  // Nova etapa entra como a última "aberta" (antes da primeira 'ganha'/
+  // 'perdida') — quem cria e recebe pedidos nunca deve ficar depois de
+  // "Enviado/Entregue"/"Perdido" sem querer.
+  fastify.post('/crm/api/etapas', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows: etapas } = await client.query(
+        'select id, tipo from crm_etapas where tenant_id = $1 order by ordem', [tenantId]
+      );
+      const indice = etapas.findIndex((e) => e.tipo !== 'aberta');
+      const posicao = indice === -1 ? etapas.length : indice;
+      for (let i = etapas.length - 1; i >= posicao; i--) {
+        await client.query('update crm_etapas set ordem = $1 where id = $2', [i + 1, etapas[i].id]);
+      }
+      const { rows } = await client.query(
+        `insert into crm_etapas (tenant_id, nome, ordem, tipo) values ($1, $2, $3, 'aberta') returning *`,
+        [tenantId, nome, posicao]
+      );
+      await client.query('COMMIT');
+      return reply.code(201).send(rows[0]);
+    } catch (erro) {
+      await client.query('ROLLBACK');
+      throw erro;
+    } finally {
+      client.release();
+    }
+  });
+
+  fastify.patch('/crm/api/etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const { rows } = await pool.query(
+      'update crm_etapas set nome = $1 where id = $2 and tenant_id = $3 returning *',
+      [nome, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    return rows[0];
+  });
+
+  // Nunca apaga em cascata: pedido é dado demais pra sumir junto de uma
+  // etapa apagada sem querer (diferente do candidato do People, que "volta
+  // pra Nova"). Quem apagar precisa mover os pedidos primeiro.
+  fastify.delete('/crm/api/etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows: contagem } = await pool.query(
+      'select count(*)::int as total from crm_pedidos where etapa_id = $1 and tenant_id = $2',
+      [request.params.id, tenantId]
+    );
+    if (contagem[0].total > 0) {
+      return reply.code(409).send({ error: `Mova ${contagem[0].total} pedido(s) desta etapa antes de apagá-la.` });
+    }
+    const { rowCount } = await pool.query('delete from crm_etapas where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    return { ok: true };
+  });
+
+  fastify.patch('/crm/api/etapas/reordenar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const ids = request.body?.ids;
+    if (!Array.isArray(ids) || !ids.length) return reply.code(400).send({ error: 'ids é obrigatório' });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < ids.length; i++) {
+        await client.query('update crm_etapas set ordem = $1 where id = $2 and tenant_id = $3', [i, ids[i], tenantId]);
+      }
+      await client.query('COMMIT');
+    } catch (erro) {
+      await client.query('ROLLBACK');
+      throw erro;
+    } finally {
+      client.release();
+    }
+    return { ok: true };
+  });
+
+  // --- Recursos de produção ("raias" do kanban — ex: impressoras 3D) ---------
+  // Pedido sem recurso atribuído cai na raia fixa "Sem recurso" (recurso_id
+  // null) no front. Configurável por conta — nada aqui é específico da
+  // Basic (a impressora 3D é só o exemplo dela).
+  fastify.get('/crm/api/recursos', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_recursos where tenant_id = $1 and ativo order by ordem', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.post('/crm/api/recursos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const { rows: ordemRows } = await pool.query('select coalesce(max(ordem), -1) + 1 as prox from crm_recursos where tenant_id = $1', [tenantId]);
+    const { rows } = await pool.query(
+      `insert into crm_recursos (tenant_id, nome, ordem) values ($1, $2, $3) returning *`,
+      [tenantId, nome, ordemRows[0].prox]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.patch('/crm/api/recursos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const { rows } = await pool.query(
+      'update crm_recursos set nome = $1 where id = $2 and tenant_id = $3 returning *',
+      [nome, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Recurso não encontrado' });
+    return rows[0];
+  });
+
+  // Apagar um recurso não mexe nos pedidos que estavam nele — o FK
+  // (ON DELETE SET NULL) já joga eles de volta pra raia "Sem recurso".
+  fastify.delete('/crm/api/recursos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rowCount } = await pool.query('delete from crm_recursos where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Recurso não encontrado' });
+    return { ok: true };
   });
 
   // --- Pedidos / kanban --------------------------------------------------------
   fastify.get('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
     const { rows } = await pool.query(
-      `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone,
-              extract(day from now() - p.entrou_na_etapa_em)::int as dias_na_etapa
+      `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
+              extract(day from now() - p.entrou_na_etapa_em)::int as dias_na_etapa,
+              coalesce((select sum(quantidade) from crm_pedidos_itens where pedido_id = p.id), 0) as quantidade_itens
        from crm_pedidos p
        join crm_clientes c on c.id = p.cliente_id
+       left join crm_recursos r on r.id = p.recurso_id
        where p.tenant_id = $1
        order by p.criado_em desc`,
       [tenantId]
@@ -249,10 +373,11 @@ async function build() {
   });
 
   // Criação rápida (seção 7.2): telefone (acha ou cria cliente), itens ou
-  // descrição livre, valor, origem, tipo de entrega. Resto é opcional.
+  // descrição livre + quantidade, valor, origem, tipo de entrega, recurso
+  // (raia) opcional. Resto é opcional.
   fastify.post('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { telefone, nome_cliente, itens, descricao, valor_total, origem, tipo_entrega } = request.body || {};
+    const { telefone, nome_cliente, itens, descricao, quantidade, valor_total, origem, tipo_entrega, recurso_id } = request.body || {};
     if (!origem) return reply.code(400).send({ error: 'Origem é obrigatória' });
 
     const { rows: etapaRows } = await pool.query(
@@ -267,9 +392,9 @@ async function build() {
     try {
       await client.query('BEGIN');
       const { rows: pedidoRows } = await client.query(
-        `insert into crm_pedidos (tenant_id, cliente_id, etapa_id, origem, valor_total, tipo_entrega)
-         values ($1, $2, $3, $4, $5, $6) returning *`,
-        [tenantId, cliente.id, etapaRows[0].id, origem, valor_total || 0, tipo_entrega || null]
+        `insert into crm_pedidos (tenant_id, cliente_id, etapa_id, origem, valor_total, tipo_entrega, recurso_id)
+         values ($1, $2, $3, $4, $5, $6, $7) returning *`,
+        [tenantId, cliente.id, etapaRows[0].id, origem, valor_total || 0, tipo_entrega || null, recurso_id || null]
       );
       const pedido = pedidoRows[0];
 
@@ -284,8 +409,8 @@ async function build() {
       } else if (descricao) {
         await client.query(
           `insert into crm_pedidos_itens (pedido_id, descricao, quantidade, valor_unitario)
-           values ($1, $2, 1, $3)`,
-          [pedido.id, descricao, valor_total || 0]
+           values ($1, $2, $3, $4)`,
+          [pedido.id, descricao, quantidade || 1, valor_total || 0]
         );
       }
 
@@ -348,6 +473,23 @@ async function build() {
       `insert into crm_eventos (tenant_id, cliente_id, pedido_id, tipo, dados) values ($1, $2, $3, 'pagamento', $4)`,
       [tenantId, rows[0].cliente_id, rows[0].id, JSON.stringify({ status_pagamento, valor_recebido })]
     );
+    return rows[0];
+  });
+
+  // Atribuir/trocar/remover o recurso (raia) de um pedido — arrastar entre
+  // raias no quadro, ou pelo select do modal de detalhe.
+  fastify.patch('/crm/api/pedidos/:id/recurso', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { recurso_id } = request.body || {};
+    if (recurso_id) {
+      const { rows: recursoRows } = await pool.query('select 1 from crm_recursos where id = $1 and tenant_id = $2', [recurso_id, tenantId]);
+      if (!recursoRows[0]) return reply.code(400).send({ error: 'Recurso inválido' });
+    }
+    const { rows } = await pool.query(
+      `update crm_pedidos set recurso_id = $1, atualizado_em = now() where id = $2 and tenant_id = $3 returning *`,
+      [recurso_id || null, request.params.id, tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
     return rows[0];
   });
 

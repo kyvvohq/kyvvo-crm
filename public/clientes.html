@@ -93,7 +93,7 @@
       <div class="card" style="padding:0">
         <table>
           <thead>
-            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Origem</th><th>Desde</th></tr>
+            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Segmento</th><th>Origem</th><th>Desde</th></tr>
           </thead>
           <tbody id="tbody-clientes"></tbody>
         </table>
@@ -119,7 +119,7 @@
       document.getElementById('contagem-clientes').textContent = clientes.length;
       const tbody = document.getElementById('tbody-clientes');
       if (!clientes.length) {
-        tbody.innerHTML = `<tr><td colspan="5"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
         return;
       }
       tbody.innerHTML = clientes.map((c) => `
@@ -127,6 +127,7 @@
           <td>${escapeHtml(c.nome)}</td>
           <td>${escapeHtml(c.telefone || '—')}</td>
           <td>${escapeHtml([c.cidade, c.uf].filter(Boolean).join('/') || '—')}</td>
+          <td>${escapeHtml(c.segmento || '—')}</td>
           <td>${escapeHtml(c.origem || '—')}</td>
           <td>${formatarData(c.criado_em)}</td>
         </tr>
@@ -144,7 +145,7 @@
 
     function campoFormNovoCliente() {
       return `
-        <label for="f-nome">Nome</label>
+        <label for="f-nome">Nome<span class="obrigatorio">*</span></label>
         <input id="f-nome" required>
         <div class="grid2">
           <div><label for="f-telefone">Telefone (WhatsApp)</label><input id="f-telefone" placeholder="(34) 99999-9999"></div>
@@ -154,6 +155,8 @@
           <div><label for="f-cidade">Cidade</label><input id="f-cidade"></div>
           <div><label for="f-uf">UF</label><input id="f-uf" maxlength="2" style="text-transform:uppercase"></div>
         </div>
+        <label for="f-segmento">Segmento</label>
+        <input id="f-segmento" placeholder="ex.: confeitaria, loja de joias, papelaria">
         <label for="f-origem">Origem</label>
         <input id="f-origem" placeholder="ex.: whatsapp, shopee, site, indicação">
         <div class="modal-erro" id="f-erro"></div>
@@ -180,6 +183,7 @@
             email: document.getElementById('f-email').value.trim() || null,
             cidade: document.getElementById('f-cidade').value.trim() || null,
             uf: document.getElementById('f-uf').value.trim() || null,
+            segmento: document.getElementById('f-segmento').value.trim() || null,
             origem: document.getElementById('f-origem').value.trim() || null,
           }),
         });
@@ -213,6 +217,7 @@
         <div class="modal-texto" style="margin-top:4px">
           ${escapeHtml(c.telefone || 'sem telefone')} ${c.email ? `· ${escapeHtml(c.email)}` : ''}
           ${c.cidade ? `· ${escapeHtml(c.cidade)}${c.uf ? '/' + escapeHtml(c.uf) : ''}` : ''}
+          ${c.segmento ? `· ${escapeHtml(c.segmento)}` : ''}
         </div>
 
         <div class="ficha-metricas">

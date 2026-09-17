@@ -208,3 +208,20 @@ function linkWhatsapp(telefone, mensagem) {
   const digitos = String(telefone || '').replace(/\D/g, '');
   return `https://wa.me/${digitos}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
 }
+
+// --- Máscara de moeda (R$ 0,00) — digita só números, formata sozinho.
+// O valor "de verdade" pra mandar pro backend sai de valorMoedaParaNumero,
+// nunca de input.value (que é só o texto formatado).
+function aplicarMascaraMoeda(input) {
+  const formatar = () => {
+    const digitos = input.value.replace(/\D/g, '');
+    const numero = Number(digitos || 0) / 100;
+    input.value = numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+  input.addEventListener('input', formatar);
+  if (input.value) formatar();
+}
+function valorMoedaParaNumero(input) {
+  const digitos = (input.value || '').replace(/\D/g, '');
+  return Number(digitos || 0) / 100;
+}

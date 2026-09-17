@@ -14,23 +14,48 @@
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
   .painel-main { overflow-x:hidden; }
-  .quadro-scroll { overflow-x:auto; padding-bottom:12px; flex:1; }
-  .quadro-colunas { display:flex; gap:12px; align-items:flex-start; min-height:200px; }
-  .coluna { background:var(--surface-muted); border-radius:var(--radius-md); width:260px; flex-shrink:0; display:flex; flex-direction:column; }
-  .coluna-header { padding:12px 12px 8px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
-  .coluna-header .nome-etapa { font-size:13px; font-weight:700; color:var(--text); }
-  .coluna-header .contagem-coluna { font-size:11px; color:var(--muted); background:var(--card); border-radius:var(--radius-full); padding:2px 8px; }
+  .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
+  .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
+
+  .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
+    display:flex; align-items:center; z-index:3; color:var(--text); }
+
+  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
+    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; color:var(--text); cursor:grab; }
+  .coluna-header.arrastando-coluna { opacity:.4; }
+  .coluna-header.recebendo-coluna { border-color:var(--accent); }
   .coluna-header.tipo-ganha .nome-etapa { color:var(--success); }
   .coluna-header.tipo-perdida .nome-etapa { color:var(--danger); }
-  .coluna-corpo { padding:0 8px 8px; display:flex; flex-direction:column; gap:8px; min-height:60px; }
-  .coluna-corpo.arrastando-sobre { background:var(--accent-tint); border-radius:var(--radius-md); }
+  .coluna-header .nome-etapa { flex:1; cursor:text; }
+  .coluna-header .contagem-coluna { font-size:11px; font-weight:600; color:var(--muted); background:var(--surface-muted);
+    border-radius:var(--radius-full); padding:2px 8px; }
+  .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px;
+    padding:2px 6px; font-size:13px; color:var(--text); }
+  .coluna-header button { background:transparent; color:var(--muted); width:auto; height:auto; margin:0; padding:2px 6px;
+    font-size:12px; border-radius:6px; }
+  .coluna-header button:hover { background:var(--surface-muted); color:var(--danger); }
+
+  .coluna-add { display:flex; align-items:center; min-width:180px; }
+  .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
+
+  .celula { background:var(--bg); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px;
+    min-width:220px; min-height:60px; display:flex; flex-direction:column; gap:6px; }
+  .celula.arrastando-sobre { border-color:var(--accent); background:var(--accent-tint); }
+  .celula-vazia { color:var(--muted); font-size:11px; padding:10px 4px; text-align:center; }
+
   .cartao-pedido { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:grab; font-size:12.5px; }
   .cartao-pedido:active { cursor:grabbing; }
   .cartao-pedido .nome { font-weight:700; color:var(--text); margin-bottom:2px; }
   .cartao-pedido .linha { display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
   .cartao-pedido .valor { font-weight:600; color:var(--text-secondary); }
   .cartao-pedido .dias-parado { color:var(--danger); font-weight:600; }
-  .celula-vazia { color:var(--muted); font-size:11px; padding:10px 4px; text-align:center; }
+
+  .editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px; padding:2px 6px;
+    font-size:13px; color:var(--text); }
+  .linha-recurso { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13.5px; }
+  .linha-recurso:first-child { border-top:none; }
+  .linha-recurso .nome-recurso { cursor:text; flex:1; }
+  .linha-recurso .btn-remover-recurso { height:28px; padding:0 10px; font-size:12px; }
 </style>
 </head>
 <body>
@@ -82,14 +107,16 @@
       <div class="cabecalho-pagina">
         <div class="textos">
           <div class="linha-titulo"><h1>Pedidos</h1></div>
+          <p class="descricao">Arraste os cards entre etapas e raias. Clique no nome de uma etapa pra renomear.</p>
         </div>
         <div class="acoes">
+          <button type="button" class="btn-secundario" id="btn-gerenciar-recursos">Recursos</button>
           <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
         </div>
       </div>
 
       <div class="quadro-scroll">
-        <div class="quadro-colunas" id="quadro-colunas"></div>
+        <div class="quadro-grid" id="quadro-grid"></div>
       </div>
     </div>
   </div>
@@ -100,29 +127,40 @@
   <script src="/crm/shell.js"></script>
   <script>
     let etapas = [];
+    let recursos = [];
     let pedidos = [];
+    const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
 
     async function carregar() {
-      const [resEtapas, resPedidos] = await Promise.all([
+      const [resEtapas, resRecursos, resPedidos] = await Promise.all([
         apiFetch('/crm/api/etapas'),
+        apiFetch('/crm/api/recursos'),
         apiFetch('/crm/api/pedidos'),
       ]);
       etapas = await resEtapas.json();
+      recursos = await resRecursos.json();
       pedidos = await resPedidos.json();
       renderizar();
     }
 
-    function pedidosDe(etapaId) {
-      return pedidos.filter((p) => p.etapa_id === etapaId);
+    function raias() {
+      // Raia fixa "Sem recurso" (recurso_id null) sempre primeiro — pedido
+      // nunca fica "perdido" visualmente só por não ter recurso atribuído.
+      return [{ id: null, nome: 'Sem recurso', fixa: true }, ...recursos];
+    }
+
+    function pedidosDe(recursoId, etapaId) {
+      return pedidos.filter((p) => (p.recurso_id || null) === recursoId && p.etapa_id === etapaId);
     }
 
     const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
 
     function cartaoHtml(p) {
       const alerta = p.dias_na_etapa >= 3;
+      const qtd = Number(p.quantidade_itens) > 1 ? `${p.quantidade_itens}× ` : '';
       return `
         <div class="cartao-pedido" draggable="true" data-pedido="${p.id}">
-          <div class="nome">${escapeHtml(p.cliente_nome)}</div>
+          <div class="nome">${qtd}${escapeHtml(p.cliente_nome)}</div>
           <div class="linha">
             <span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span>
             <span class="valor">${formatarMoeda(p.valor_total)}</span>
@@ -136,83 +174,283 @@
     }
 
     function renderizar() {
-      const grid = document.getElementById('quadro-colunas');
-      grid.innerHTML = etapas.map((et) => `
-        <div class="coluna">
-          <div class="coluna-header tipo-${et.tipo}">
-            <span class="nome-etapa">${escapeHtml(et.nome)}</span>
-            <span class="contagem-coluna">${pedidosDe(et.id).length}</span>
+      const linhas = raias();
+      const grid = document.getElementById('quadro-grid');
+      grid.style.gridTemplateColumns = `170px repeat(${etapas.length}, minmax(230px, 1fr)) 190px`;
+
+      let html = '<div></div>';
+      etapas.forEach((et) => {
+        html += `
+          <div class="coluna-header tipo-${et.tipo}" draggable="true" data-etapa-header="${et.id}">
+            <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
+            <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
+            <button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>
           </div>
-          <div class="coluna-corpo" data-etapa="${et.id}" data-tipo="${et.tipo}">
-            ${pedidosDe(et.id).map(cartaoHtml).join('') || '<div class="celula-vazia">—</div>'}
-          </div>
-        </div>
-      `).join('');
-      ligarEventos();
+        `;
+      });
+      html += `<div class="coluna-add"><input type="text" id="input-nova-etapa" placeholder="+ Nova etapa (Enter)"></div>`;
+
+      linhas.forEach((raia) => {
+        html += `<div class="raia-label">${escapeHtml(raia.nome)}</div>`;
+        etapas.forEach((et) => {
+          const cartoes = pedidosDe(raia.id, et.id);
+          html += `
+            <div class="celula" data-raia="${raia.id || ''}" data-etapa="${et.id}" data-tipo-etapa="${et.tipo}">
+              ${cartoes.map(cartaoHtml).join('') || '<div class="celula-vazia">—</div>'}
+            </div>
+          `;
+        });
+        html += '<div></div>';
+      });
+
+      grid.innerHTML = html;
+      ligarEventosGrid();
     }
 
-    function ligarEventos() {
+    function ligarEventosGrid() {
       document.querySelectorAll('.cartao-pedido').forEach((cartao) => {
         cartao.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', cartao.dataset.pedido);
         });
         cartao.addEventListener('click', () => abrirDetalhe(cartao.dataset.pedido));
       });
-      document.querySelectorAll('.coluna-corpo').forEach((corpo) => {
-        corpo.addEventListener('dragover', (e) => {
+
+      document.querySelectorAll('.celula').forEach((celula) => {
+        celula.addEventListener('dragover', (e) => {
           if (!e.dataTransfer.types.includes('text/plain')) return;
           e.preventDefault();
-          corpo.classList.add('arrastando-sobre');
+          celula.classList.add('arrastando-sobre');
         });
-        corpo.addEventListener('dragleave', () => corpo.classList.remove('arrastando-sobre'));
-        corpo.addEventListener('drop', async (e) => {
+        celula.addEventListener('dragleave', () => celula.classList.remove('arrastando-sobre'));
+        celula.addEventListener('drop', async (e) => {
           if (!e.dataTransfer.types.includes('text/plain')) return;
           e.preventDefault();
-          corpo.classList.remove('arrastando-sobre');
+          celula.classList.remove('arrastando-sobre');
           const pedidoId = e.dataTransfer.getData('text/plain');
-          await moverPedidoEtapa(pedidoId, corpo.dataset.etapa, corpo.dataset.tipo);
+          await moverPedido(pedidoId, celula.dataset.etapa, celula.dataset.raia || null, celula.dataset.tipoEtapa);
         });
+      });
+
+      document.querySelectorAll('[data-etapa-header]').forEach((header) => {
+        header.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData(TIPO_ARRASTO_COLUNA, header.dataset.etapaHeader);
+          header.classList.add('arrastando-coluna');
+        });
+        header.addEventListener('dragend', () => header.classList.remove('arrastando-coluna'));
+        header.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
+          e.preventDefault();
+          header.classList.add('recebendo-coluna');
+        });
+        header.addEventListener('dragleave', () => header.classList.remove('recebendo-coluna'));
+        header.addEventListener('drop', async (e) => {
+          if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
+          e.preventDefault();
+          header.classList.remove('recebendo-coluna');
+          const idArrastado = e.dataTransfer.getData(TIPO_ARRASTO_COLUNA);
+          const idAlvo = header.dataset.etapaHeader;
+          if (!idArrastado || idArrastado === idAlvo) return;
+          const ids = etapas.map((et) => et.id);
+          const doIndice = ids.indexOf(idArrastado);
+          const paraIndice = ids.indexOf(idAlvo);
+          if (doIndice === -1 || paraIndice === -1) return;
+          ids.splice(doIndice, 1);
+          ids.splice(paraIndice, 0, idArrastado);
+          await apiFetch('/crm/api/etapas/reordenar', { method: 'PATCH', body: JSON.stringify({ ids }) });
+          carregar();
+        });
+      });
+
+      document.querySelectorAll('[data-editar-etapa]').forEach((span) => {
+        span.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const atual = span.textContent;
+          const input = document.createElement('input');
+          input.className = 'editar-nome';
+          input.value = atual;
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          const salvar = async () => {
+            const novo = input.value.trim();
+            if (novo && novo !== atual) {
+              await apiFetch(`/crm/api/etapas/${span.dataset.editarEtapa}`, { method: 'PATCH', body: JSON.stringify({ nome: novo }) });
+              await carregar();
+            } else {
+              input.replaceWith(span);
+            }
+          };
+          input.addEventListener('blur', salvar);
+          input.addEventListener('keydown', (e2) => { if (e2.key === 'Enter') input.blur(); });
+        });
+      });
+
+      document.querySelectorAll('[data-apagar-etapa]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          confirmarApagarEtapa(btn.dataset.apagarEtapa, btn.dataset.nomeEtapa);
+        });
+      });
+
+      const inputNova = document.getElementById('input-nova-etapa');
+      if (inputNova) {
+        inputNova.addEventListener('keydown', async (e) => {
+          if (e.key !== 'Enter') return;
+          const nome = inputNova.value.trim();
+          if (!nome) return;
+          inputNova.disabled = true;
+          await apiFetch('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+          await carregar();
+        });
+      }
+    }
+
+    function confirmarApagarEtapa(id, nome) {
+      const overlay = abrirModal('<h3>Apagar etapa?</h3>', `
+        <p class="modal-texto">Essa ação não pode ser desfeita. Se ainda houver pedidos em "${escapeHtml(nome)}", mova-os antes de apagar.</p>
+        <div class="modal-erro" id="apagar-etapa-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="cancelar-apagar-etapa">Cancelar</button>
+          <button type="button" class="btn-perigo" id="confirmar-apagar-etapa">Apagar etapa</button>
+        </div>
+      `);
+      document.getElementById('cancelar-apagar-etapa').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-apagar-etapa').addEventListener('click', async () => {
+        const res = await apiFetch(`/crm/api/etapas/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('apagar-etapa-erro').textContent = dados.error || 'Falha ao apagar etapa';
+          return;
+        }
+        fecharModal();
+        carregar();
       });
     }
 
-    async function moverPedidoEtapa(pedidoId, etapaId, tipoEtapa) {
+    async function moverPedido(pedidoId, etapaId, recursoId, tipoEtapa) {
       const pedido = pedidos.find((p) => p.id === pedidoId);
-      if (!pedido || pedido.etapa_id === etapaId) return;
+      if (!pedido) return;
+      const etapaMudou = pedido.etapa_id !== etapaId;
+      const recursoMudou = (pedido.recurso_id || null) !== (recursoId || null);
+      if (!etapaMudou && !recursoMudou) return;
 
-      let motivoPerda;
-      if (tipoEtapa === 'perdida') {
-        motivoPerda = prompt('Motivo da perda:');
-        if (!motivoPerda) return;
+      if (etapaMudou) {
+        let motivoPerda;
+        if (tipoEtapa === 'perdida') {
+          motivoPerda = prompt('Motivo da perda:');
+          if (!motivoPerda) return;
+        }
+        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/etapa`, {
+          method: 'PATCH',
+          body: JSON.stringify({ etapa_id: etapaId, motivo_perda: motivoPerda }),
+        });
+        if (!res.ok) { avisar('Erro', 'Falha ao mover pedido de etapa'); return; }
       }
-
-      const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/etapa`, {
-        method: 'PATCH',
-        body: JSON.stringify({ etapa_id: etapaId, motivo_perda: motivoPerda }),
-      });
-      if (!res.ok) { avisar('Erro', 'Falha ao mover pedido'); return; }
+      if (recursoMudou) {
+        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/recurso`, {
+          method: 'PATCH',
+          body: JSON.stringify({ recurso_id: recursoId }),
+        });
+        if (!res.ok) { avisar('Erro', 'Falha ao atribuir recurso'); return; }
+      }
       await carregar();
     }
 
+    // --- Gerenciar recursos (raias) ---------------------------------------
+    document.getElementById('btn-gerenciar-recursos').addEventListener('click', () => abrirModalRecursos());
+
+    function abrirModalRecursos() {
+      abrirModal('<h3>Recursos de produção</h3>', `
+        <p class="modal-texto">São as raias do quadro — ex.: cada impressora 3D, forno, posto de trabalho. Pedido sem recurso fica em "Sem recurso".</p>
+        <div id="lista-recursos"></div>
+        <label for="input-novo-recurso">Novo recurso</label>
+        <input type="text" id="input-novo-recurso" placeholder="ex.: Impressora 1 (Enter pra adicionar)">
+      `, 'modal-card-larga');
+      renderizarListaRecursos();
+      document.getElementById('input-novo-recurso').addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        const nome = e.target.value.trim();
+        if (!nome) return;
+        e.target.disabled = true;
+        await apiFetch('/crm/api/recursos', { method: 'POST', body: JSON.stringify({ nome }) });
+        await carregar();
+        e.target.value = '';
+        e.target.disabled = false;
+        renderizarListaRecursos();
+      });
+    }
+
+    function renderizarListaRecursos() {
+      const el = document.getElementById('lista-recursos');
+      if (!el) return;
+      el.innerHTML = recursos.length ? recursos.map((r) => `
+        <div class="linha-recurso">
+          <span class="nome-recurso" data-editar-recurso="${r.id}">${escapeHtml(r.nome)}</span>
+          <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-recurso="${r.id}">Remover</button>
+        </div>
+      `).join('') : '<p class="vazio">Nenhum recurso cadastrado ainda.</p>';
+
+      el.querySelectorAll('[data-apagar-recurso]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/recursos/${btn.dataset.apagarRecurso}`, { method: 'DELETE' });
+          await carregar();
+          renderizarListaRecursos();
+        });
+      });
+      el.querySelectorAll('[data-editar-recurso]').forEach((span) => {
+        span.addEventListener('click', () => {
+          const atual = span.textContent;
+          const input = document.createElement('input');
+          input.className = 'editar-nome';
+          input.value = atual;
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          const salvar = async () => {
+            const novo = input.value.trim();
+            if (novo && novo !== atual) {
+              await apiFetch(`/crm/api/recursos/${span.dataset.editarRecurso}`, { method: 'PATCH', body: JSON.stringify({ nome: novo }) });
+              await carregar();
+              renderizarListaRecursos();
+            } else {
+              input.replaceWith(span);
+            }
+          };
+          input.addEventListener('blur', salvar);
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+      });
+    }
+
+    // --- Novo pedido ---------------------------------------------------------
     document.getElementById('btn-novo-pedido').addEventListener('click', () => {
+      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
       const overlay = abrirModal('<h3>Novo pedido</h3>', `
         <div class="grid2">
           <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
           <div><label for="p-nome-cliente">Nome (se cliente novo)</label><input id="p-nome-cliente"></div>
         </div>
-        <label for="p-descricao">Item / descrição</label>
-        <input id="p-descricao" placeholder="ex.: Vaso decorativo P">
         <div class="grid2">
-          <div><label for="p-valor">Valor total</label><input id="p-valor" type="number" step="0.01" min="0"></div>
-          <div><label for="p-origem">Origem</label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
+          <div><label for="p-descricao">Item / descrição</label><input id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
+          <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
         </div>
-        <label for="p-entrega">Tipo de entrega</label>
-        <input id="p-entrega" placeholder="retirada, correios, uber…">
+        <div class="grid2">
+          <div><label for="p-valor">Valor total</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
+          <div><label for="p-origem">Origem<span class="obrigatorio">*</span></label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
+        </div>
+        <div class="grid2">
+          <div><label for="p-entrega">Tipo de entrega</label><input id="p-entrega" placeholder="retirada, correios, uber…"></div>
+          <div><label for="p-recurso">Recurso</label>
+            <select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
+          </div>
+        </div>
         <div class="modal-erro" id="p-erro"></div>
         <div class="modal-acoes">
           <button type="button" class="btn-secundario" id="btn-cancelar-pedido">Cancelar</button>
           <button type="button" id="btn-salvar-pedido">Criar pedido</button>
         </div>
       `);
+      aplicarMascaraMoeda(document.getElementById('p-valor'));
       document.getElementById('btn-cancelar-pedido').addEventListener('click', fecharModal);
       document.getElementById('btn-salvar-pedido').addEventListener('click', async () => {
         const origem = document.getElementById('p-origem').value.trim();
@@ -223,9 +461,11 @@
             telefone: document.getElementById('p-telefone').value.trim() || null,
             nome_cliente: document.getElementById('p-nome-cliente').value.trim() || null,
             descricao: document.getElementById('p-descricao').value.trim() || null,
-            valor_total: Number(document.getElementById('p-valor').value) || 0,
+            quantidade: Number(document.getElementById('p-quantidade').value) || 1,
+            valor_total: valorMoedaParaNumero(document.getElementById('p-valor')),
             origem,
             tipo_entrega: document.getElementById('p-entrega').value.trim() || null,
+            recurso_id: document.getElementById('p-recurso').value || null,
           }),
         });
         if (!res.ok) {
@@ -238,16 +478,24 @@
       });
     });
 
+    // --- Detalhe do pedido -----------------------------------------------------
     function abrirDetalhe(pedidoId) {
       const p = pedidos.find((x) => x.id === pedidoId);
       if (!p) return;
+      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
       const overlay = abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}</p>
+        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${p.quantidade_itens} item(ns)` : ''}</p>
 
-        <label for="d-etapa">Etapa</label>
-        <select id="d-etapa">
-          ${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}
-        </select>
+        <div class="grid2">
+          <div><label for="d-etapa">Etapa</label>
+            <select id="d-etapa">
+              ${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}
+            </select>
+          </div>
+          <div><label for="d-recurso">Recurso</label>
+            <select id="d-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
+          </div>
+        </div>
 
         <div class="grid2">
           <div><label for="d-status">Pagamento</label>
@@ -257,7 +505,7 @@
               <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
             </select>
           </div>
-          <div><label for="d-recebido">Valor recebido</label><input id="d-recebido" type="number" step="0.01" min="0" value="${p.valor_recebido}"></div>
+          <div><label for="d-recebido">Valor recebido</label><input id="d-recebido" inputmode="decimal"></div>
         </div>
         <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
 
@@ -268,10 +516,15 @@
         </div>
       `);
 
+      const campoRecebido = document.getElementById('d-recebido');
+      campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      aplicarMascaraMoeda(campoRecebido);
+
       document.getElementById('btn-salvar-detalhe').addEventListener('click', async () => {
         const novaEtapaId = document.getElementById('d-etapa').value;
+        const novoRecursoId = document.getElementById('d-recurso').value || null;
         const novoStatus = document.getElementById('d-status').value;
-        const novoRecebido = Number(document.getElementById('d-recebido').value) || 0;
+        const novoRecebido = valorMoedaParaNumero(campoRecebido);
 
         if (novaEtapaId !== p.etapa_id) {
           const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
@@ -285,6 +538,14 @@
             body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }),
           });
           if (!resEtapa.ok) { document.getElementById('d-erro').textContent = 'Falha ao mover etapa'; return; }
+        }
+
+        if (novoRecursoId !== (p.recurso_id || null)) {
+          const resRecurso = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, {
+            method: 'PATCH',
+            body: JSON.stringify({ recurso_id: novoRecursoId }),
+          });
+          if (!resRecurso.ok) { document.getElementById('d-erro').textContent = 'Falha ao atribuir recurso'; return; }
         }
 
         const resPagamento = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, {

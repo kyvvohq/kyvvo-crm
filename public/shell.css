@@ -168,3 +168,6 @@ a.acao:hover { color:var(--accent-dark); }
 .msg.erro { color:var(--danger); }
 .msg.ok { color:var(--success); }
 .vazio { color:var(--muted); font-size:13px; padding:12px 0; }
+
+/* Indicador de campo obrigatório — asterisco vermelho junto do label. */
+.obrigatorio { color:var(--danger); margin-left:2px; }
