@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Login</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
+  .card { width:100%; max-width:360px; background:#FFFFFF; border:1px solid #E7EAF2; border-radius:16px; padding:32px; }
+  .logo { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
+  .logo img { height:22px; width:auto; }
+  .logo .nome { font-size:16px; font-weight:700; }
+  label { display:block; font-size:13px; font-weight:600; color:#2B3040; margin:16px 0 7px; }
+  input { width:100%; box-sizing:border-box; background:#fff; border:1px solid #D7DCE8; border-radius:12px;
+    height:44px; padding:0 14px; color:#0F111A; font-size:14px; font-family:inherit; }
+  button { width:100%; margin-top:24px; background:#7C5CFC; color:#fff; font-weight:600; border:none;
+    border-radius:12px; height:44px; font-size:14px; cursor:pointer; }
+  button:hover { background:#6344E8; }
+  button:disabled { opacity:.6; cursor:default; }
+  .erro { color:#F04438; font-size:13px; margin-top:12px; min-height:16px; }
+</style>
+</head>
+<body>
+  <form class="card" id="form">
+    <div class="logo"><img src="/ds/logo.svg" alt="Kyvvo"><div class="nome">Kyvvo CRM</div></div>
+    <label for="email">E-mail</label>
+    <input id="email" type="email" required autocomplete="username">
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" required autocomplete="current-password">
+    <div class="erro" id="erro"></div>
+    <button type="submit" id="btn">Entrar</button>
+  </form>
+  <script>
+    const form = document.getElementById('form');
+    const erro = document.getElementById('erro');
+    const btn = document.getElementById('btn');
+
+    if (localStorage.getItem('crm_token')) {
+      window.location.href = '/crm/painel.html';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      erro.textContent = '';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/crm/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            senha: document.getElementById('senha').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha no login');
+        localStorage.setItem('crm_token', data.token);
+        localStorage.setItem('crm_nome', data.nome || '');
+        window.location.href = '/crm/painel.html';
+      } catch (err) {
+        erro.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

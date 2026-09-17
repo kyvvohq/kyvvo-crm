@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Painel Hoje</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .painel-hoje-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-5); }
+  @media(max-width:860px) { .painel-hoje-grid { grid-template-columns:1fr; } }
+  .secao-titulo { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--text); margin:0 0 14px; }
+  .secao-titulo svg { color:var(--muted-strong); }
+  .item-hoje { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0;
+    border-top:1px solid var(--border); }
+  .item-hoje:first-of-type { border-top:none; }
+  .item-hoje .info { min-width:0; }
+  .item-hoje .nome { font-size:13.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .item-hoje .meta { font-size:12px; color:var(--muted); margin-top:2px; }
+  .item-hoje .btn-whats { flex-shrink:0; height:32px; padding:0 12px; font-size:12.5px; background:#25D366; }
+  .item-hoje .btn-whats:hover { background:#1DA851; }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Kyvvo CRM</div>
+        <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
+        <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
+        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="kanban"></span><span class="rotulo">Pedidos</span></a>
+      </nav>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1 id="saudacao">Painel Hoje</h1></div>
+          <p class="descricao">O que produzir, quem cobrar, quem avisar — sem abrir o WhatsApp pra procurar.</p>
+        </div>
+      </div>
+
+      <div class="painel-hoje-grid">
+        <div class="card">
+          <h2 class="secao-titulo"><span data-icon="circle-alert" data-size="17"></span>Orçamentos parados</h2>
+          <div id="lista-orcamentos"><p class="vazio">Carregando…</p></div>
+        </div>
+        <div class="card">
+          <h2 class="secao-titulo"><span data-icon="circle-dollar-sign" data-size="17"></span>Pagamentos pendentes</h2>
+          <div id="lista-pagamentos"><p class="vazio">Carregando…</p></div>
+        </div>
+        <div class="card">
+          <h2 class="secao-titulo"><span data-icon="package-check" data-size="17"></span>Prontos pra envio/retirada</h2>
+          <div id="lista-prontos"><p class="vazio">Carregando…</p></div>
+        </div>
+        <div class="card">
+          <h2 class="secao-titulo"><span data-icon="cake" data-size="17"></span>Aniversariantes de hoje</h2>
+          <div id="lista-aniversariantes"><p class="vazio">Carregando…</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    document.getElementById('saudacao').textContent = `Olá, ${(localStorage.getItem('crm_nome') || '').split(' ')[0] || ''}`;
+
+    function itemHtml({ nome, telefone, meta, mensagem }) {
+      return `
+        <div class="item-hoje">
+          <div class="info">
+            <div class="nome">${escapeHtml(nome)}</div>
+            <div class="meta">${escapeHtml(meta)}</div>
+          </div>
+          ${telefone ? `<a class="btn btn-whats" href="${linkWhatsapp(telefone, mensagem)}" target="_blank" rel="noopener">${icon('message-circle', 14)} WhatsApp</a>` : ''}
+        </div>
+      `;
+    }
+
+    function renderLista(elId, itens, vazioMsg) {
+      const el = document.getElementById(elId);
+      el.innerHTML = itens.length ? itens.join('') : `<p class="vazio">${vazioMsg}</p>`;
+    }
+
+    async function carregar() {
+      const res = await apiFetch('/crm/api/painel-hoje');
+      const dados = await res.json();
+
+      renderLista('lista-orcamentos', dados.orcamentos_parados.map((o) => itemHtml({
+        nome: o.cliente_nome,
+        telefone: o.cliente_telefone,
+        meta: `${o.etapa_nome} há ${o.dias_parado} dia${o.dias_parado === 1 ? '' : 's'}`,
+        mensagem: `Oi ${o.cliente_nome.split(' ')[0]}! Passando pra saber se você já viu o orçamento — posso ajudar em algo?`,
+      })), 'Nenhum orçamento parado. 🎉');
+
+      renderLista('lista-pagamentos', dados.pagamentos_pendentes.map((p) => itemHtml({
+        nome: p.cliente_nome,
+        telefone: p.cliente_telefone,
+        meta: `${formatarMoeda(p.valor_total - p.valor_recebido)} pendente`,
+        mensagem: `Oi ${p.cliente_nome.split(' ')[0]}! Seu pedido está confirmado — só falta acertar o pagamento, posso te enviar o Pix?`,
+      })), 'Nenhum pagamento pendente.');
+
+      renderLista('lista-prontos', dados.prontos_para_envio.map((p) => itemHtml({
+        nome: p.cliente_nome,
+        telefone: p.cliente_telefone,
+        meta: p.tipo_entrega ? `Entrega: ${p.tipo_entrega}` : 'Pronto',
+        mensagem: `Oi ${p.cliente_nome.split(' ')[0]}! Seu pedido está pronto — combinamos a retirada/entrega?`,
+      })), 'Nada pronto pra envio agora.');
+
+      renderLista('lista-aniversariantes', dados.aniversariantes.map((a) => itemHtml({
+        nome: a.nome,
+        telefone: a.telefone,
+        meta: 'Aniversário hoje 🎂',
+        mensagem: `Parabéns, ${a.nome.split(' ')[0]}! Desejamos um dia incrível. 🎉`,
+      })), 'Nenhum aniversariante hoje.');
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

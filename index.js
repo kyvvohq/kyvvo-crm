@@ -100,6 +100,39 @@ async function build() {
     return { token, nome };
   });
 
+  // Cadastro self-service (mesmo padrão do kyvvo-people): repassa pro
+  // kyvvo-platform com produto:'crm'. Sem tela pública ainda (seção 7 do
+  // doc não pede uma — Fase 1 é onboarding manual da Basic pelo Bruno) —
+  // existe só pra permitir criar contas de teste via API.
+  fastify.post('/crm/api/register', async (request, reply) => {
+    let platformRes;
+    try {
+      platformRes = await fetch(`${PLATFORM_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...request.body, produto: 'crm' }),
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (err) {
+      request.log.error(`Falha ao registrar no kyvvo-platform: ${err.message}`);
+      return reply.code(502).send({ error: 'Não foi possível criar sua conta agora. Tente novamente em instantes.' });
+    }
+    const dados = await platformRes.json().catch(() => ({}));
+    if (!platformRes.ok) return reply.code(platformRes.status).send(dados);
+
+    let tenantId;
+    try {
+      tenantId = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8')).tenantId;
+    } catch (err) {
+      request.log.error(`Conta criada no platform mas não consegui ler o tenantId do token: ${err.message}`);
+      return reply.code(502).send({ error: 'Conta criada, mas não foi possível iniciar sua sessão. Faça login manualmente.' });
+    }
+
+    await inicializarEtapasPadrao(pool, tenantId);
+    const token = fastify.jwt.sign({ tenantId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
+    return reply.code(201).send({ token, nome: dados.nome });
+  });
+
   // --- Clientes --------------------------------------------------------------
   fastify.get('/crm/api/clientes', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
