@@ -27,6 +27,16 @@ precisa da própria tabela `assinaturas` (como o People tem) — hoje o CRM não
 tem nenhum controle de billing, todo tenant com o módulo ativo tem acesso
 completo.
 
+## 3a. `package-lock.json` ainda não existe — gate.yml não passa até isso ser resolvido
+
+Não tenho `NPM_PACKAGES_TOKEN` neste ambiente (bloqueado por design — é
+credencial), então não consigo rodar `npm install`/`npm ci` aqui pra gerar o
+lockfile, nem localmente nem antes do commit. **Ação necessária:** com o
+token configurado (`.npmrc` já aponta pro GitHub Packages), rodar `npm
+install` na raiz do repo e commitar o `package-lock.json` resultante. Sem
+isso, `npm ci` no `gate.yml` falha (não há lockfile pra instalar a partir
+dele) mesmo depois do secret `NPM_PACKAGES_TOKEN` do repo estar configurado.
+
 ## 3. Infra de deploy (EC2)
 
 - `crm.kyvvo.com.br` não existe — falta DNS + vhost nginx.
