@@ -73,13 +73,19 @@ funcionar de verdade.
 Fase 1 (MVP, ver seção 7 do doc): clientes, pedidos em kanban, importação
 (UpSeller/NF-e/CSV), formulário de captação, segmentos + sorteio, Painel Hoje.
 
-**Implementado neste scaffold:** auth, clientes (CRUD + busca + métricas +
-timeline), pedidos (criação rápida, mover etapa, pagamento), Painel Hoje
-(orçamentos parados, pagamentos pendentes, prontos pra envio, aniversariantes).
+**Implementado:** auth (login + cadastro self-service), landing pública,
+clientes (CRUD + busca + segmento + métricas + timeline), pedidos em kanban
+2D — raia = recurso de produção (`crm_recursos`, ex.: impressoras 3D; raia
+fixa "Sem recurso") × coluna = etapa, ambas arrastáveis; etapas totalmente
+editáveis pelo próprio quadro (criar/renomear/apagar/reordenar, mesmo padrão
+do `kyvvo-people/quadro.html`); quantidade de item na criação rápida; máscara
+de moeda e asterisco vermelho nos campos obrigatórios; Painel Hoje.
 
 **Não implementado ainda** (ver `docs/backlog-fase1.md`): importação de
-arquivos, formulário público, segmentos salvos, sorteio, e todo o frontend
-(hoje só a API existe — não há `public/*.html` além do placeholder).
+arquivos, formulário de captação público, segmentos salvos, sorteio, CRUD de
+produtos/tags/campos customizados. `pedidos.html` ainda usa `window.prompt()`
+nativo pro motivo de perda — travou testes de automação de browser, trocar
+por modal é o próximo ajuste óbvio de UX.
 
 Ao propor funcionalidade nova, indique a fase (1/2/3) e qual das três
 perguntas do produto ela responde (quem são meus clientes / em que pé está
