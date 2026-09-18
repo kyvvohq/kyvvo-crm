@@ -92,9 +92,8 @@
         const nome = e.target.value.trim();
         if (!nome) return;
         e.target.disabled = true;
-        const res = await api('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
-        const nova = await res.json();
-        etapas.push(nova);
+        await api('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+        etapas = await (await api('/crm/api/etapas')).json();
         e.target.value = '';
         e.target.disabled = false;
         renderizarLista();
