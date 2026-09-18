@@ -27,6 +27,13 @@ precisa da própria tabela `assinaturas` (como o People tem) — hoje o CRM não
 tem nenhum controle de billing, todo tenant com o módulo ativo tem acesso
 completo.
 
+**2026-09-18 — 3 planos placeholder cadastrados** (kyvvo-platform#009_crm_planos:
+`crm_start` R$97, `crm_professional` R$197, `crm_business` R$297) pra
+destravar **Produtos > CRM** no admin (kyvvo-admin#19) — Bruno edita
+nome/descrição/preço/ativo por lá quando a precificação real for decidida.
+Ainda não tem: trial, limites por plano, tabela `assinaturas`/cobrança de
+fato — os planos hoje são só catálogo, não controlam acesso.
+
 ## 3a. `package-lock.json` ainda não existe — gate.yml não passa até isso ser resolvido
 
 Não tenho `NPM_PACKAGES_TOKEN` neste ambiente (bloqueado por design — é
