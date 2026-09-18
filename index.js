@@ -13,7 +13,7 @@ const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
-const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe } = require('./lib/importacoes');
+const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 
 const PORT = process.env.PORT || 3005;
@@ -308,8 +308,6 @@ async function build() {
   });
 
   // --- Importações (US21) -------------------------------------------------
-  // UpSeller (Excel) fica de fora por ora: mapeamento de colunas ainda não
-  // confirmado com um arquivo real da conta (docs/DECISOES-PENDENTES.md #6).
   fastify.get('/crm/api/importacoes', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query('select * from crm_importacoes where tenant_id = $1 order by criado_em desc limit 50', [request.user.tenantId]);
     return rows;
@@ -366,6 +364,28 @@ async function build() {
       [tenantId, arquivos.length === 1 ? arquivos[0].nome : `${arquivos.length} arquivos`, criados, atualizados, comErro, notas.join(' | ') || null]
     );
     return reply.code(201).send(rows[0]);
+  });
+
+  // Relatório de pedidos da UpSeller (Excel) — colunas fixas, sem tela de
+  // mapeamento (schema confirmado com arquivo real, ver lib/importacoes.js).
+  fastify.post('/crm/api/importacoes/upseller', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    let arquivoBuffer = null, nomeArquivo = null;
+    for await (const part of request.parts()) {
+      if (part.type === 'file') {
+        arquivoBuffer = await part.toBuffer();
+        nomeArquivo = part.filename;
+      }
+    }
+    if (!arquivoBuffer) return reply.code(400).send({ error: 'Arquivo é obrigatório' });
+
+    let resultado;
+    try {
+      resultado = await importarRelatorioUpseller(pool, tenantId, arquivoBuffer, nomeArquivo || 'relatorio.xlsx');
+    } catch (erro) {
+      return reply.code(400).send({ error: erro.message });
+    }
+    return reply.code(201).send(resultado);
   });
 
   // --- Campos customizados (US16) -----------------------------------------------
