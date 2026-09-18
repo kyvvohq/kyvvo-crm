@@ -114,6 +114,7 @@
           <p class="descricao">Arraste os cards entre etapas e raias. Clique no nome de uma etapa pra renomear.</p>
         </div>
         <div class="acoes">
+          <button type="button" class="btn-secundario" id="btn-importar-nfe">Importar NF-e</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-produtos">Produtos</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-recursos">Recursos</button>
           <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
@@ -418,6 +419,47 @@
       }
       await carregar();
     }
+
+    // --- Importar NF-e (US21) -----------------------------------------------
+    document.getElementById('btn-importar-nfe').addEventListener('click', () => {
+      abrirModal('<h3>Importar NF-e (XML)</h3>', `
+        <p class="modal-texto">Selecione um ou mais arquivos XML de NF-e. Concilia automaticamente com um pedido existente pelo número do pedido citado nas informações complementares da nota — se não achar, cria um pedido novo.</p>
+        <input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple>
+        <div id="nfe-resultado" style="margin-top:12px"></div>
+        <div class="modal-erro" id="nfe-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" id="nfe-importar" disabled>Importar</button>
+        </div>
+      `, 'modal-card-larga');
+
+      document.getElementById('nfe-arquivos').addEventListener('change', (e) => {
+        document.getElementById('nfe-importar').disabled = !e.target.files.length;
+      });
+
+      document.getElementById('nfe-importar').addEventListener('click', async () => {
+        const arquivos = document.getElementById('nfe-arquivos').files;
+        if (!arquivos.length) return;
+        const btn = document.getElementById('nfe-importar');
+        btn.disabled = true;
+        btn.textContent = 'Importando…';
+        const formData = new FormData();
+        Array.from(arquivos).forEach((a) => formData.append('arquivo', a));
+        const res = await apiFetch('/crm/api/importacoes/nfe', { method: 'POST', body: formData });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          document.getElementById('nfe-erro').textContent = dados.error || 'Falha ao importar';
+          btn.disabled = false;
+          btn.textContent = 'Importar';
+          return;
+        }
+        document.getElementById('nfe-resultado').innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
+        `;
+        btn.hidden = true;
+        await carregar();
+      });
+    });
 
     // --- Gerenciar recursos (raias) ---------------------------------------
     document.getElementById('btn-gerenciar-recursos').addEventListener('click', () => abrirModalRecursos());

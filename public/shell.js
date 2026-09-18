@@ -12,7 +12,7 @@ if (!token) window.location.href = '/crm/login.html';
 
 async function apiFetch(url, opts = {}) {
   const headers = { Authorization: `Bearer ${token}`, ...(opts.headers || {}) };
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (opts.body !== undefined && !(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const res = await fetch(url, { ...opts, headers });
   if (res.status === 401) {
     localStorage.removeItem('crm_token');

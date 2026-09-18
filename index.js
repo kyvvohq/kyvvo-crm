@@ -13,6 +13,7 @@ const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
+const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe } = require('./lib/importacoes');
 
 const PORT = process.env.PORT || 3005;
 
@@ -47,7 +48,7 @@ async function build() {
   });
 
   fastify.register(fastifyMultipart, {
-    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+    limits: { fileSize: 10 * 1024 * 1024, files: 20 },
   });
 
   fastify.get('/', async (request, reply) => reply.sendFile('index.html'));
@@ -301,6 +302,67 @@ async function build() {
     const resultado = await mesclarClientes(pool, request.user.tenantId, manter_id, descartar_id);
     if (!resultado) return reply.code(404).send({ error: 'Cliente não encontrado' });
     return resultado;
+  });
+
+  // --- Importações (US21) -------------------------------------------------
+  // UpSeller (Excel) fica de fora por ora: mapeamento de colunas ainda não
+  // confirmado com um arquivo real da conta (docs/DECISOES-PENDENTES.md #6).
+  fastify.get('/crm/api/importacoes', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_importacoes where tenant_id = $1 order by criado_em desc limit 50', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.post('/crm/api/importacoes/csv', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    let arquivoBuffer = null, nomeArquivo = null, mapeamento = null;
+    for await (const part of request.parts()) {
+      if (part.type === 'file') {
+        arquivoBuffer = await part.toBuffer();
+        nomeArquivo = part.filename;
+      } else if (part.fieldname === 'mapeamento') {
+        try { mapeamento = JSON.parse(part.value || '{}'); } catch { mapeamento = null; }
+      }
+    }
+    if (!arquivoBuffer) return reply.code(400).send({ error: 'Arquivo é obrigatório' });
+    if (!mapeamento || !mapeamento.nome) return reply.code(400).send({ error: 'Mapeamento precisa incluir pelo menos o campo "nome"' });
+
+    const todasLinhas = parseCsv(arquivoBuffer.toString('utf8'));
+    if (todasLinhas.length < 2) return reply.code(400).send({ error: 'CSV vazio ou sem linhas de dados' });
+    const [cabecalho, ...linhas] = todasLinhas;
+
+    const resultado = await importarClientesCsv(pool, tenantId, { cabecalho, linhas, mapeamento, nomeArquivo: nomeArquivo || 'arquivo.csv' });
+    return reply.code(201).send(resultado);
+  });
+
+  fastify.post('/crm/api/importacoes/nfe', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const arquivos = [];
+    for await (const part of request.parts()) {
+      if (part.type === 'file') arquivos.push({ nome: part.filename, buffer: await part.toBuffer() });
+    }
+    if (!arquivos.length) return reply.code(400).send({ error: 'Envie ao menos um arquivo XML' });
+
+    let criados = 0, atualizados = 0, comErro = 0;
+    const notas = [];
+    for (const arquivo of arquivos) {
+      try {
+        const nfeData = parseNfeXml(arquivo.buffer.toString('utf8'));
+        const resultado = await importarNfe(pool, tenantId, nfeData, arquivo.nome);
+        if (resultado.status === 'criado') criados++;
+        else if (resultado.status === 'conciliado') atualizados++;
+        notas.push(`${arquivo.nome}: ${resultado.status}`);
+      } catch (erro) {
+        comErro++;
+        notas.push(`${arquivo.nome}: erro — ${erro.message}`);
+      }
+    }
+
+    const { rows } = await pool.query(
+      `insert into crm_importacoes (tenant_id, tipo, arquivo, status, criados, atualizados, com_erro, erro, concluido_em)
+       values ($1, 'nfe_xml', $2, 'concluido', $3, $4, $5, $6, now()) returning *`,
+      [tenantId, arquivos.length === 1 ? arquivos[0].nome : `${arquivos.length} arquivos`, criados, atualizados, comErro, notas.join(' | ') || null]
+    );
+    return reply.code(201).send(rows[0]);
   });
 
   // --- Campos customizados (US16) -----------------------------------------------
