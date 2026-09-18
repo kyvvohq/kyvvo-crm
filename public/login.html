@@ -63,7 +63,7 @@
         if (!res.ok) throw new Error(data.error || 'Falha no login');
         localStorage.setItem('crm_token', data.token);
         localStorage.setItem('crm_nome', data.nome || '');
-        window.location.href = '/crm/painel.html';
+        window.location.href = data.onboarding_pendente ? '/crm/onboarding.html' : '/crm/painel.html';
       } catch (err) {
         erro.textContent = err.message;
       } finally {

@@ -14,6 +14,7 @@ const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe } = require('./lib/importacoes');
+const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 
 const PORT = process.env.PORT || 3005;
 
@@ -111,9 +112,10 @@ async function build() {
 
     await inicializarEtapasPadrao(pool, tenantId);
     await inicializarModelosPadrao(pool, tenantId);
+    const onboardingPendente = await tenantPrecisaOnboarding(pool, tenantId);
 
     const token = fastify.jwt.sign({ tenantId, userId, email, nome }, { expiresIn: '12h' });
-    return { token, nome };
+    return { token, nome, onboarding_pendente: onboardingPendente };
   });
 
   // Cadastro self-service (mesmo padrão do kyvvo-people): repassa pro
@@ -149,8 +151,9 @@ async function build() {
 
     await inicializarEtapasPadrao(pool, tenantId);
     await inicializarModelosPadrao(pool, tenantId);
+    const onboardingPendente = await tenantPrecisaOnboarding(pool, tenantId);
     const token = fastify.jwt.sign({ tenantId, userId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
-    return reply.code(201).send({ token, nome: dados.nome });
+    return reply.code(201).send({ token, nome: dados.nome, onboarding_pendente: onboardingPendente });
   });
 
   // --- Clientes --------------------------------------------------------------
@@ -442,6 +445,20 @@ async function build() {
 
   // --- Etapas (config do funil, editável direto no quadro — mesmo padrão do
   // kyvvo-people/quadro.html: renomear, criar, apagar, reordenar) -------------
+  // --- Onboarding visível (US26) -------------------------------------------
+  // A criação do funil padrão continua automática (inicializarEtapasPadrao,
+  // já rodou no login/register) — isto só controla se a tela de revisão já
+  // foi confirmada.
+  fastify.get('/crm/api/onboarding/estado', { preHandler: fastify.authenticate }, async (request) => {
+    const pendente = await tenantPrecisaOnboarding(pool, request.user.tenantId);
+    return { pendente, modelo: 'Produção sob encomenda' };
+  });
+
+  fastify.post('/crm/api/onboarding/confirmar', { preHandler: fastify.authenticate }, async (request) => {
+    await confirmarOnboarding(pool, request.user.tenantId);
+    return { ok: true };
+  });
+
   fastify.get('/crm/api/etapas', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query('select * from crm_etapas where tenant_id = $1 order by ordem', [request.user.tenantId]);
     return rows;

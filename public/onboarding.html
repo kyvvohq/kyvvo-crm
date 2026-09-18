@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Bem-vindo</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 16px;
+    background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
+  .card { width:100%; max-width:520px; background:#FFFFFF; border:1px solid #E7EAF2; border-radius:16px; padding:32px; }
+  .logo { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .logo img { height:22px; width:auto; }
+  h1 { font-size:20px; margin:16px 0 4px; }
+  .sub { font-size:13.5px; color:#6B7086; margin:0 0 20px; line-height:1.5; }
+  .modelo-badge { display:inline-block; background:#F1EEFF; color:#6344E8; font-size:12px; font-weight:600;
+    padding:4px 10px; border-radius:999px; margin-bottom:18px; }
+  .linha-etapa { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid #EDEFF5; }
+  .linha-etapa:first-child { border-top:none; }
+  .linha-etapa .nome { flex:1; font-size:14px; }
+  .linha-etapa .nome input { width:100%; border:1px solid #D7DCE8; border-radius:8px; height:34px; padding:0 10px; font-size:14px; font-family:inherit; }
+  .linha-etapa .tag { font-size:11px; color:#6B7086; background:#F4F5F9; padding:2px 8px; border-radius:999px; }
+  .linha-etapa button { background:none; border:none; color:#F04438; font-size:12.5px; cursor:pointer; padding:4px 6px; }
+  #nova-etapa { width:100%; border:1px dashed #D7DCE8; border-radius:8px; height:38px; padding:0 12px; font-size:13.5px;
+    font-family:inherit; margin-top:10px; background:#fff; }
+  .acoes { margin-top:24px; display:flex; gap:10px; }
+  button.primario { flex:1; background:#7C5CFC; color:#fff; font-weight:600; border:none; border-radius:12px;
+    height:46px; font-size:14px; cursor:pointer; }
+  button.primario:hover { background:#6344E8; }
+  button.primario:disabled { opacity:.6; cursor:default; }
+  .carregando, .erro { text-align:center; font-size:13.5px; color:#6B7086; padding:20px 0; }
+  .erro { color:#F04438; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="logo"><img src="/ds/logo.svg" alt="Kyvvo"></div>
+    <p class="carregando">Carregando…</p>
+  </div>
+  <script>
+    const token = localStorage.getItem('crm_token');
+    if (!token) window.location.href = '/crm/login.html';
+
+    async function api(url, opts = {}) {
+      const headers = { Authorization: `Bearer ${token}`, ...(opts.headers || {}) };
+      if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+      return fetch(url, { ...opts, headers });
+    }
+
+    function escapeHtmlLocal(valor) {
+      return String(valor ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[c]));
+    }
+
+    const card = document.getElementById('card');
+    let etapas = [];
+
+    async function iniciar() {
+      const resEstado = await api('/crm/api/onboarding/estado');
+      const estado = await resEstado.json();
+      if (!estado.pendente) { window.location.href = '/crm/painel.html'; return; }
+
+      const resEtapas = await api('/crm/api/etapas');
+      etapas = await resEtapas.json();
+      renderizar(estado.modelo);
+    }
+
+    const ROTULO_TIPO = { aberta: '', ganha: 'fecha o pedido', perdida: 'fecha o pedido' };
+
+    function renderizar(modelo) {
+      card.innerHTML = `
+        <div class="logo"><img src="/ds/logo.svg" alt="Kyvvo"></div>
+        <h1>Bem-vindo ao Kyvvo CRM 👋</h1>
+        <p class="sub">Já montamos um funil de partida pro seu negócio. Dá uma olhada, renomeie ou ajuste o que quiser — dá pra mudar tudo depois também, direto no quadro de Pedidos.</p>
+        <div class="modelo-badge">Modelo: ${escapeHtmlLocal(modelo)}</div>
+        <div id="lista-etapas"></div>
+        <input type="text" id="nova-etapa" placeholder="+ Nova etapa (Enter)">
+        <div class="erro" id="onb-erro" style="text-align:left;padding:0;margin-top:8px"></div>
+        <div class="acoes">
+          <button type="button" class="primario" id="btn-confirmar">Começar a usar o Kyvvo CRM</button>
+        </div>
+      `;
+      renderizarLista();
+      document.getElementById('nova-etapa').addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        const nome = e.target.value.trim();
+        if (!nome) return;
+        e.target.disabled = true;
+        const res = await api('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+        const nova = await res.json();
+        etapas.push(nova);
+        e.target.value = '';
+        e.target.disabled = false;
+        renderizarLista();
+      });
+      document.getElementById('btn-confirmar').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-confirmar');
+        btn.disabled = true;
+        btn.textContent = 'Preparando seu CRM…';
+        await api('/crm/api/onboarding/confirmar', { method: 'POST' });
+        window.location.href = '/crm/painel.html';
+      });
+    }
+
+    function renderizarLista() {
+      const el = document.getElementById('lista-etapas');
+      el.innerHTML = etapas.map((et) => `
+        <div class="linha-etapa" data-id="${et.id}">
+          <span class="nome" data-nome-etapa="${et.id}">${escapeHtmlLocal(et.nome)}</span>
+          ${ROTULO_TIPO[et.tipo] ? `<span class="tag">${ROTULO_TIPO[et.tipo]}</span>` : ''}
+          <button type="button" data-remover-etapa="${et.id}">Remover</button>
+        </div>
+      `).join('');
+
+      el.querySelectorAll('[data-nome-etapa]').forEach((span) => {
+        span.addEventListener('click', () => {
+          const atual = span.textContent;
+          const input = document.createElement('input');
+          input.value = atual;
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          const salvar = async () => {
+            const novo = input.value.trim();
+            if (novo && novo !== atual) {
+              await api(`/crm/api/etapas/${span.dataset.nomeEtapa}`, { method: 'PATCH', body: JSON.stringify({ nome: novo }) });
+              const etapa = etapas.find((e) => e.id === span.dataset.nomeEtapa);
+              if (etapa) etapa.nome = novo;
+            }
+            renderizarLista();
+          };
+          input.addEventListener('blur', salvar);
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+      });
+      el.querySelectorAll('[data-remover-etapa]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const res = await api(`/crm/api/etapas/${btn.dataset.removerEtapa}`, { method: 'DELETE' });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            document.getElementById('onb-erro').textContent = d.error || 'Não foi possível remover essa etapa.';
+            return;
+          }
+          document.getElementById('onb-erro').textContent = '';
+          etapas = etapas.filter((e) => e.id !== btn.dataset.removerEtapa);
+          renderizarLista();
+        });
+      });
+    }
+
+    iniciar().catch(() => {
+      card.innerHTML = `<div class="logo"><img src="/ds/logo.svg" alt="Kyvvo"></div><p class="erro">Não foi possível carregar o onboarding. <a href="/crm/painel.html">Ir pro painel</a></p>`;
+    });
+  </script>
+</body>
+</html>
