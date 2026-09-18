@@ -74,9 +74,14 @@ escolhida.
 
 ## 6. Fatos externos não verificados nesta sessão
 
-- Colunas exatas da exportação de pedidos do UpSeller (CPF, cidade, produtos)
-  e onde o número do pedido aparece no XML da NF-e — precisa de um arquivo
-  real da Basic (seção 9/11 do doc).
+- ~~Colunas exatas da exportação de pedidos do UpSeller~~ **Resolvido em
+  2026-09-18**: Bruno compartilhou um relatório real (NF-e_Report_excel).
+  Colunas: Nº de Pedido, Nº de Pedido da Plataforma, Chave, Cliente,
+  Destinatário (=UF), CEP, Valor da Nota Fiscal, Tipo (normal/return), Data.
+  Número do pedido no XML da NF-e vem da tag `<xPed>` de cada item (não do
+  `infCpl` como eu tinha assumido antes). 14 de 1010 notas eram devolução de
+  mercadoria (`tpNF=0`) — decisão do Bruno: ignorar devolução na importação
+  por enquanto. Implementado em `lib/importacoes.js` + `lib/xlsx-lite.js`.
 - Regras do TikTok Shop sobre material no pacote e contato fora da
   plataforma (a proibição da Shopee já está documentada no doc; TikTok não).
 - Nome comercial definitivo do produto — usei "Kyvvo CRM" (nome do repo e do
