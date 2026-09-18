@@ -83,6 +83,7 @@
           <div class="linha-titulo"><h1>Clientes</h1><span class="contagem" id="contagem-clientes">—</span></div>
         </div>
         <div class="acoes">
+          <button type="button" class="btn-secundario" id="btn-duplicados">Duplicados</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-formularios">Formulários</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-campos">Campos customizados</button>
           <button type="button" id="btn-novo-cliente"><span data-icon="plus" data-size="16"></span>Novo cliente</button>
@@ -314,6 +315,53 @@
       });
     }
 
+    // --- Duplicados (US17) ---------------------------------------------------
+    document.getElementById('btn-duplicados').addEventListener('click', () => abrirModalDuplicados());
+
+    async function abrirModalDuplicados() {
+      abrirModal('<h3>Possíveis duplicados</h3>', `
+        <p class="modal-texto">Sugestões por CPF igual ou nome + cidade parecidos. A mesclagem nunca é automática — escolha qual ficha fica e confirme.</p>
+        <div id="lista-duplicados"><p class="vazio">Carregando…</p></div>
+      `, 'modal-card-larga');
+      await renderizarListaDuplicados();
+    }
+
+    async function renderizarListaDuplicados() {
+      const el = document.getElementById('lista-duplicados');
+      if (!el) return;
+      const res = await apiFetch('/crm/api/clientes/duplicados');
+      const grupos = await res.json();
+      const ROTULO_MOTIVO = { cpf: 'Mesmo CPF', nome_cidade: 'Nome e cidade parecidos' };
+      el.innerHTML = grupos.length ? grupos.map((g, i) => `
+        <div class="linha-recurso" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">${ROTULO_MOTIVO[g.motivo] || g.motivo}</div>
+          ${g.clientes.map((c, j) => `
+            <label style="display:flex;align-items:center;gap:8px;width:100%;font-size:13.5px">
+              <input type="radio" name="grupo-dup-${i}" value="${c.id}" ${j === 0 ? 'checked' : ''}>
+              <span>${escapeHtml(c.nome)}${c.telefone ? ' · ' + escapeHtml(c.telefone) : ''}${c.quantidade_pedidos ? ' · ' + c.quantidade_pedidos + ' pedido(s)' : ''}</span>
+            </label>
+          `).join('')}
+          <button type="button" class="btn-secundario" data-mesclar-grupo="${i}">Mesclar — mantém a ficha marcada</button>
+        </div>
+      `).join('') : '<p class="vazio">Nenhum duplicado encontrado.</p>';
+
+      el.querySelectorAll('[data-mesclar-grupo]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const i = btn.dataset.mesclarGrupo;
+          const grupo = grupos[i];
+          const manterId = el.querySelector(`input[name="grupo-dup-${i}"]:checked`).value;
+          btn.disabled = true;
+          btn.textContent = 'Mesclando…';
+          for (const c of grupo.clientes) {
+            if (c.id === manterId) continue;
+            await apiFetch('/crm/api/clientes/mesclar', { method: 'POST', body: JSON.stringify({ manter_id: manterId, descartar_id: c.id }) });
+          }
+          await carregar();
+          await renderizarListaDuplicados();
+        });
+      });
+    }
+
     function campoFormNovoCliente() {
       return `
         <label for="f-nome">Nome<span class="obrigatorio">*</span></label>
@@ -376,6 +424,7 @@
       formulario: 'Respondeu formulário',
       sorteio: 'Participou de sorteio',
       mensagem_enviada: 'Mensagem enviada',
+      mesclagem: 'Mesclado com outro cadastro',
     };
 
     async function abrirFicha(id) {

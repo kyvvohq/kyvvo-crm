@@ -12,6 +12,7 @@ const { encontrarOuCriarPorTelefone, buscarMetricas } = require('./lib/clientes'
 const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
+const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 
 const PORT = process.env.PORT || 3005;
 
@@ -286,6 +287,20 @@ async function build() {
       [request.params.id, request.params.tagId, request.user.tenantId]
     );
     return { ok: true };
+  });
+
+  // --- Mesclagem de duplicados (US17) -------------------------------------
+  fastify.get('/crm/api/clientes/duplicados', { preHandler: fastify.authenticate }, async (request) => {
+    return buscarSugestoesDuplicados(pool, request.user.tenantId);
+  });
+
+  fastify.post('/crm/api/clientes/mesclar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { manter_id, descartar_id } = request.body || {};
+    if (!manter_id || !descartar_id) return reply.code(400).send({ error: 'manter_id e descartar_id são obrigatórios' });
+    if (manter_id === descartar_id) return reply.code(400).send({ error: 'Escolha duas fichas diferentes' });
+    const resultado = await mesclarClientes(pool, request.user.tenantId, manter_id, descartar_id);
+    if (!resultado) return reply.code(404).send({ error: 'Cliente não encontrado' });
+    return resultado;
   });
 
   // --- Campos customizados (US16) -----------------------------------------------
