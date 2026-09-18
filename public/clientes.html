@@ -83,6 +83,7 @@
           <div class="linha-titulo"><h1>Clientes</h1><span class="contagem" id="contagem-clientes">—</span></div>
         </div>
         <div class="acoes">
+          <button type="button" class="btn-secundario" id="btn-gerenciar-formularios">Formulários</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-campos">Campos customizados</button>
           <button type="button" id="btn-novo-cliente"><span data-icon="plus" data-size="16"></span>Novo cliente</button>
         </div>
@@ -110,15 +111,21 @@
   <script>
     let clientes = [];
     let camposCustomizados = [];
+    let tags = [];
+    let formularios = [];
 
     async function carregar(busca) {
       const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
-      const [resClientes, resCampos] = await Promise.all([
+      const [resClientes, resCampos, resTags, resFormularios] = await Promise.all([
         apiFetch(`/crm/api/clientes${qs}`),
         apiFetch('/crm/api/campos-customizados'),
+        apiFetch('/crm/api/tags'),
+        apiFetch('/crm/api/formularios'),
       ]);
       clientes = await resClientes.json();
       camposCustomizados = await resCampos.json();
+      tags = await resTags.json();
+      formularios = await resFormularios.json();
       renderizar();
     }
 
@@ -218,6 +225,91 @@
           await apiFetch(`/crm/api/campos-customizados/${btn.dataset.apagarCampo}`, { method: 'DELETE' });
           await carregar();
           renderizarListaCampos();
+        });
+      });
+    }
+
+    // --- Formulário de captação (US22) --------------------------------------
+    document.getElementById('btn-gerenciar-formularios').addEventListener('click', () => abrirModalFormularios());
+
+    function abrirModalFormularios() {
+      const opcoesTag = tags.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
+      abrirModal('<h3>Formulários de captação</h3>', `
+        <p class="modal-texto">Link público pra pessoa se cadastrar sozinha (ex.: grupo VIP) — substitui Google Forms e já cai na sua base.</p>
+        <div id="lista-formularios"></div>
+        <label for="fm-nome">Novo formulário</label>
+        <input type="text" id="fm-nome" placeholder="ex.: Sorteio VIP 200">
+        <label for="fm-tag">Aplica a tag (opcional)</label>
+        <select id="fm-tag"><option value="">Nenhuma</option>${opcoesTag}</select>
+        <label for="fm-perguntas">Perguntas extras (uma por linha, além de nome/WhatsApp/e-mail)</label>
+        <textarea id="fm-perguntas" placeholder="ex.: Quantas peças por mês você revende?"></textarea>
+        <div class="modal-erro" id="fm-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" id="fm-adicionar">Criar formulário</button>
+        </div>
+      `, 'modal-card-larga');
+      renderizarListaFormularios();
+      document.getElementById('fm-adicionar').addEventListener('click', async () => {
+        const nome = document.getElementById('fm-nome').value.trim();
+        if (!nome) { document.getElementById('fm-erro').textContent = 'Nome é obrigatório'; return; }
+        const campos = document.getElementById('fm-perguntas').value.split('\n').map((s) => s.trim()).filter(Boolean);
+        const res = await apiFetch('/crm/api/formularios', {
+          method: 'POST',
+          body: JSON.stringify({ nome, campos, tag_id: document.getElementById('fm-tag').value || null }),
+        });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('fm-erro').textContent = dados.error || 'Falha ao criar formulário';
+          return;
+        }
+        document.getElementById('fm-nome').value = '';
+        document.getElementById('fm-perguntas').value = '';
+        await carregar();
+        renderizarListaFormularios();
+      });
+    }
+
+    function renderizarListaFormularios() {
+      const el = document.getElementById('lista-formularios');
+      if (!el) return;
+      el.innerHTML = formularios.length ? formularios.map((f) => {
+        const link = `${window.location.origin}/crm/formulario.html?id=${f.id}`;
+        return `
+          <div class="linha-recurso" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+              <span>${escapeHtml(f.nome)} ${f.ativo ? '<span class="badge sucesso">ativo</span>' : '<span class="badge neutro">desativado</span>'}</span>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="btn-secundario btn-remover-recurso" data-copiar-link="${link}">Copiar link</button>
+                <button type="button" class="btn-secundario btn-remover-recurso" data-alternar-formulario="${f.id}" data-ativo="${!f.ativo}">${f.ativo ? 'Desativar' : 'Ativar'}</button>
+                <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-formulario="${f.id}">Remover</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('') : '<p class="vazio">Nenhum formulário ainda.</p>';
+
+      el.querySelectorAll('[data-copiar-link]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await navigator.clipboard.writeText(btn.dataset.copiarLink).catch(() => {});
+          btn.textContent = 'Copiado!';
+          setTimeout(() => { btn.textContent = 'Copiar link'; }, 1500);
+        });
+      });
+      el.querySelectorAll('[data-alternar-formulario]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/formularios/${btn.dataset.alternarFormulario}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ ativo: btn.dataset.ativo === 'true' }),
+          });
+          await carregar();
+          renderizarListaFormularios();
+        });
+      });
+      el.querySelectorAll('[data-apagar-formulario]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/formularios/${btn.dataset.apagarFormulario}`, { method: 'DELETE' });
+          await carregar();
+          renderizarListaFormularios();
         });
       });
     }

@@ -715,6 +715,95 @@ async function build() {
     return rows[0];
   });
 
+  // --- Formulário de captação (US22) ---------------------------------------------
+  // Campos são só perguntas extras em texto livre (além de nome/telefone/
+  // e-mail, que são fixos) — cobre "campos escolhidos pela conta" sem
+  // precisar de um construtor de formulário genérico completo.
+  fastify.get('/crm/api/formularios', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select * from crm_formularios where tenant_id = $1 order by criado_em desc', [request.user.tenantId]);
+    return rows;
+  });
+
+  fastify.post('/crm/api/formularios', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { nome, campos, tag_id } = request.body || {};
+    if (!nome || !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
+
+    const base = slugificar(nome);
+    let slug = base;
+    let contador = 2;
+    for (;;) {
+      const { rows: existe } = await pool.query('select 1 from crm_formularios where tenant_id = $1 and slug = $2', [tenantId, slug]);
+      if (!existe[0]) break;
+      slug = `${base}_${contador++}`;
+    }
+
+    const { rows } = await pool.query(
+      `insert into crm_formularios (tenant_id, nome, slug, campos, tag_id) values ($1, $2, $3, $4, $5) returning *`,
+      [tenantId, nome.trim(), slug, JSON.stringify(Array.isArray(campos) ? campos : []), tag_id || null]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.patch('/crm/api/formularios/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { ativo } = request.body || {};
+    if (ativo === undefined) return reply.code(400).send({ error: 'Nada pra atualizar' });
+    const { rows } = await pool.query(
+      'update crm_formularios set ativo = $1 where id = $2 and tenant_id = $3 returning *',
+      [ativo, request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Formulário não encontrado' });
+    return rows[0];
+  });
+
+  fastify.delete('/crm/api/formularios/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rowCount } = await pool.query('delete from crm_formularios where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rowCount) return reply.code(404).send({ error: 'Formulário não encontrado' });
+    return { ok: true };
+  });
+
+  // Rota PÚBLICA (sem preHandler de auth) — usa o id (UUID) como
+  // identificador na URL em vez do slug, pra não precisar resolver o tenant
+  // a partir de um slug que só é único DENTRO da conta.
+  fastify.get('/crm/api/formularios/publico/:id', async (request, reply) => {
+    const { rows } = await pool.query('select id, nome, campos from crm_formularios where id = $1 and ativo = true', [request.params.id]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Formulário não encontrado ou desativado.' });
+    return rows[0];
+  });
+
+  fastify.post('/crm/api/formularios/publico/:id/responder', async (request, reply) => {
+    const { rows: formRows } = await pool.query('select * from crm_formularios where id = $1 and ativo = true', [request.params.id]);
+    if (!formRows[0]) return reply.code(404).send({ error: 'Formulário não encontrado ou desativado.' });
+    const formulario = formRows[0];
+
+    const { nome, telefone, email, aceite_comunicacao, extras } = request.body || {};
+    if (!nome || !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    if (!aceite_comunicacao) return reply.code(422).send({ error: 'É preciso aceitar receber comunicação pra enviar o formulário.' });
+
+    const cliente = await encontrarOuCriarPorTelefone(pool, formulario.tenant_id, {
+      telefone, nome, origem: `formulário: ${formulario.nome}`,
+    });
+    await pool.query(
+      `update crm_clientes set email = coalesce(email, $1), consentimento_data = now(),
+              consentimento_canal = 'formulario', consentimento_texto = $2
+       where id = $3`,
+      [email || null, `Aceite no formulário "${formulario.nome}"`, cliente.id]
+    );
+    if (formulario.tag_id) {
+      await pool.query('insert into crm_clientes_tags (cliente_id, tag_id) values ($1, $2) on conflict do nothing', [cliente.id, formulario.tag_id]);
+    }
+    await pool.query(
+      'insert into crm_formularios_respostas (formulario_id, cliente_id, respostas) values ($1, $2, $3)',
+      [formulario.id, cliente.id, JSON.stringify({ nome, telefone, email, extras: extras || {} })]
+    );
+    await pool.query(
+      `insert into crm_eventos (tenant_id, cliente_id, tipo, dados) values ($1, $2, 'formulario', $3)`,
+      [formulario.tenant_id, cliente.id, JSON.stringify({ formulario: formulario.nome })]
+    );
+
+    return reply.code(201).send({ ok: true });
+  });
+
   // --- Segmentos e sorteio (US23/US24) --------------------------------------------
   fastify.post('/crm/api/segmentos/preview', { preHandler: fastify.authenticate }, async (request) => {
     const clientes = await resolverSegmento(pool, request.user.tenantId, request.body?.filtros);
