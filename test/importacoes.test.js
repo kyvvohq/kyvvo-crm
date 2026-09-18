@@ -1,6 +1,23 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCsv, parseNfeXml } = require('../lib/importacoes');
+const { parseCsv, parseNfeXml, importarNfe } = require('../lib/importacoes');
+
+// Pool falso: decide a resposta pelo texto da query, o bastante pra exercitar
+// os três caminhos de importarNfe sem precisar de Postgres de verdade.
+function poolFalsoComPedido(pedidoExistente) {
+  const chamadas = [];
+  const client = {
+    query: async (sql, params) => {
+      chamadas.push({ sql, params });
+      if (/chave_nfe = \$2/.test(sql) && /select id from crm_pedidos/.test(sql)) return { rows: [] };
+      if (/identificador_externo = \$2 and chave_nfe is null/.test(sql)) return { rows: pedidoExistente ? [pedidoExistente] : [] };
+      if (/update crm_pedidos set chave_nfe/.test(sql)) return { rows: [] };
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  return { pool: { connect: async () => client }, chamadas };
+}
 
 test('parseCsv: delimitador vírgula, com aspas e campo com vírgula dentro', () => {
   const texto = 'nome,cidade\n"Ana, Confeitaria",Uberlândia\nJoão,"Belo Horizonte"';
@@ -51,4 +68,20 @@ test('parseNfeXml: extrai chave, cliente, itens e valor total', () => {
 
 test('parseNfeXml: sem chave de acesso lança erro', () => {
   assert.throws(() => parseNfeXml('<nfeProc></nfeProc>'), /Chave de acesso/);
+});
+
+test('importarNfe: concilia com pedido existente pelo número do pedido, não cria cliente novo', async () => {
+  const { pool, chamadas } = poolFalsoComPedido({ id: 'pedido-existente-1' });
+  const nfeData = {
+    chave_nfe: '11111111111111111111111111111111111111111111',
+    numero_nota: '1',
+    cliente: { nome: 'X', cpf: null, cnpj: null, telefone: null, cidade: null, uf: null },
+    valor_total: 100,
+    identificador_externo_ref: 'PED-777',
+    itens: [],
+  };
+  const resultado = await importarNfe(pool, 'tenant-1', nfeData, 'nota.xml');
+  assert.deepEqual(resultado, { status: 'conciliado', pedido_id: 'pedido-existente-1' });
+  assert.ok(chamadas.some((c) => /update crm_pedidos set chave_nfe/.test(c.sql) && c.params[1] === 'pedido-existente-1'));
+  assert.ok(!chamadas.some((c) => /insert into crm_pedidos /.test(c.sql)), 'não deveria criar pedido novo quando concilia');
 });
