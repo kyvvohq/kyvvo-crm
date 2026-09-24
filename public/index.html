@@ -69,6 +69,14 @@
   .cta-final { padding:20px 24px 90px; text-align:center; }
   .cta-final h2 { font-size:24px; margin:0 0 10px; }
   .cta-final p { color:var(--muted-strong); font-size:14.5px; margin:0 0 26px; }
+
+  /* kyvvo-claro.svg é o wordmark horizontal (522x240, com retângulo branco
+     de fundo embutido no próprio SVG) — o slot do DS é 1:1 com
+     object-fit:cover, pensado pra uma foto real de post do Instagram; com
+     "cover" o logo fica cortado (mesmo bug corrigido no rodapé do Studio,
+     People e institucional). "contain" mostra o logo inteiro até ter uma
+     foto de verdade pra trocar. */
+  .ds-rodape-publico-imagem img { object-fit:contain; }
 </style>
 </head>
 <body>
@@ -145,7 +153,60 @@
     </div>
   </section>
 
-  <footer data-ds-rodape></footer>
+  <!-- Rodapé público (.ds-rodape-publico) — era data-ds-rodape (o de área
+       LOGADA, "© {ano} Kyvvo powered by..."), errado numa landing pública.
+       Mesma marcação já usada em kyvvo-studio e kyvvo-people. -->
+  <footer class="ds-rodape-publico">
+    <div class="ds-rodape-publico-conteudo">
+      <figure class="ds-rodape-publico-social">
+        <a class="ds-rodape-publico-imagem" href="https://www.instagram.com/somoskyvvo" tabindex="-1" aria-hidden="true">
+          <img src="/crm/images/kyvvo-claro.svg" alt="">
+        </a>
+        <figcaption class="ds-rodape-publico-texto">Siga a Kyvvo no <a href="https://www.instagram.com/somoskyvvo">Instagram</a></figcaption>
+      </figure>
+      <div class="ds-rodape-publico-produtos">
+        <h2 class="ds-rodape-publico-titulo" id="rp-produtos">Nossos produtos</h2>
+        <div class="ds-carrossel" data-ds-carrossel aria-labelledby="rp-produtos">
+          <div class="ds-carrossel-trilho">
+            <div class="ds-carrossel-slide">
+              <div class="ds-rodape-publico-produto">
+                <h3 class="ds-rodape-publico-produto-nome"><a href="https://www.studio.kyvvo.com.br">Studio</a></h3>
+                <p class="ds-rodape-publico-produto-texto">Agenda e WhatsApp inteligente pra salões e clínicas.</p>
+                <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+              </div>
+            </div>
+            <div class="ds-carrossel-slide">
+              <div class="ds-rodape-publico-produto">
+                <h3 class="ds-rodape-publico-produto-nome"><a href="https://www.people.kyvvo.com.br">People</a></h3>
+                <p class="ds-rodape-publico-produto-texto">Recrutamento e seleção com avaliação comportamental.</p>
+                <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+              </div>
+            </div>
+            <div class="ds-carrossel-slide">
+              <div class="ds-rodape-publico-produto">
+                <h3 class="ds-rodape-publico-produto-nome"><a href="/">CRM</a></h3>
+                <p class="ds-rodape-publico-produto-texto">Gestão de clientes e vendas em um só lugar.</p>
+                <span class="ds-rodape-publico-produto-ir" aria-hidden="true">Conhecer &rarr;</span>
+              </div>
+            </div>
+          </div>
+          <div class="ds-carrossel-controles">
+            <button type="button" class="ds-carrossel-btn ds-carrossel-ant" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+            <div class="ds-carrossel-pontos"></div>
+            <button type="button" class="ds-carrossel-btn ds-carrossel-prox" aria-label="Próximo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <nav class="ds-rodape-publico-links" aria-label="Informações legais e ajuda">
+        <ul class="ds-rodape-publico-lista">
+          <li><a href="https://studio.kyvvo.com.br/privacidade.html">LGPD</a></li>
+          <li><a href="https://wa.me/553484285182?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20a%20Kyvvo%20CRM.">Ajuda</a></li>
+          <li><a href="https://studio.kyvvo.com.br/privacidade.html">Política de Privacidade</a></li>
+          <li><a href="https://studio.kyvvo.com.br/termos.html">Termos de Uso</a></li>
+        </ul>
+      </nav>
+    </div>
+  </footer>
   <script src="/ds/components.js"></script>
 </body>
 </html>
