@@ -49,8 +49,13 @@ jobs:
       - name: Atualizar npm
         run: npm install -g npm@latest
 
+      # `npm ci` (mesmo já em Node 22 + npm@latest) ainda 401 ao baixar
+      # tarball do GitHub Packages — reenvia Authorization no redirect pro
+      # Azure Blob. `npm install` (mesmo lockfile, caminho de código
+      # diferente) não tem esse problema — confirmado local (Node 24 +
+      # npm 12, `npm install` funcionou).
       - name: Instalar dependências
-        run: npm ci
+        run: npm install
 
       - name: Aplicar migrations do zero
         run: node -e "require('./lib/db').migrar().then(() => { console.log('migrations ok'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })"
