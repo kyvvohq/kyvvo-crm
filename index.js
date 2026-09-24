@@ -15,6 +15,8 @@ const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
+const { processarMensagem } = require('./lib/bot-whatsapp');
+const { enviarTexto } = require('@kyvvohq/whatsapp');
 
 const PORT = process.env.PORT || 3005;
 
@@ -55,6 +57,46 @@ async function build() {
   fastify.get('/', async (request, reply) => reply.sendFile('index.html'));
 
   fastify.get('/crm/api/saude', async () => ({ ok: true }));
+
+  // --- Bot de atendimento por WhatsApp (US pedida pelo Bruno, 2026-09-24:
+  // agente exclusivo da Basic 3D Print) ---------------------------------
+  // Encaminhado pelo kyvvo-platform (único destino cadastrado na Meta pra
+  // Kyvvo inteira, ver kyvvo-platform/routes/webhook-whatsapp.js) — nunca
+  // aberto pra Meta direto, por isso o segredo em vez de handshake próprio.
+  // Resolve o tenant pelo phone_number_id (crm_whatsapp_numeros) em vez de
+  // um único tenant fixo — permite mais de um CRM com bot dedicado sem
+  // redeploy. Sempre 200 pra Meta, mesmo em erro (mesmo padrão de
+  // People/Studio): a Meta desativa o webhook depois de falhas repetidas.
+  fastify.post('/crm/api/webhook/whatsapp', async (request, reply) => {
+    if (!process.env.WEBHOOK_INTERNAL_SECRET || request.headers['x-webhook-internal-secret'] !== process.env.WEBHOOK_INTERNAL_SECRET) {
+      return reply.code(401).send({ error: 'Segredo interno inválido' });
+    }
+    try {
+      const body = request.body || {};
+      const change = (((body.entry || [])[0] || {}).changes || [])[0];
+      const value = change ? change.value : null;
+      const phoneNumberId = value && value.metadata && value.metadata.phone_number_id;
+      const msg = value && (value.messages || [])[0];
+
+      if (msg && msg.type === 'text' && phoneNumberId) {
+        const { rows } = await pool.query('select tenant_id from crm_whatsapp_numeros where phone_number_id = $1', [phoneNumberId]);
+        const tenantId = rows[0] && rows[0].tenant_id;
+        const telefoneE164 = tenantId ? paraE164(msg.from) : null;
+
+        if (!tenantId) {
+          request.log.warn(`[bot-whatsapp] phone_number_id ${phoneNumberId} sem tenant vinculado (crm_whatsapp_numeros) — mensagem ignorada`);
+        } else if (telefoneE164) {
+          const respostas = await processarMensagem(pool, { tenantId, telefoneE164, texto: (msg.text || {}).body });
+          for (const texto of respostas) {
+            await enviarTexto({ to: telefoneE164, texto, phoneNumberId });
+          }
+        }
+      }
+    } catch (err) {
+      request.log.error(`[bot-whatsapp] Falha ao processar: ${err.message}`);
+    }
+    return reply.code(200).send({ ok: true });
+  });
 
   // --- Auth ----------------------------------------------------------------
   // POST /api/auth/crm/acesso ainda não existe no kyvvo-platform — precisa
