@@ -37,6 +37,15 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@kyvvohq"
 
+      # npm 10.8.2 (bundlado no Node 20) reenvia o header Authorization no
+      # redirect 302 do GitHub Packages pro blob storage do Azure — o Azure
+      # rejeita esse header (401), mesmo o token sendo válido e com acesso
+      # ao pacote. Achado 2026-09-24 testando @kyvvohq/whatsapp@1.3.0 (antes
+      # não aparecia porque nada precisava baixar uma versão nova de
+      # kyvvo-integrations). `npm install -g npm@latest` corrige.
+      - name: Atualizar npm (bug de redirect com o GitHub Packages)
+        run: npm install -g npm@latest
+
       - name: Instalar dependências
         run: npm ci
 
