@@ -16,7 +16,7 @@ const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados
 const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem } = require('./lib/bot-whatsapp');
-const { enviarTexto } = require('@kyvvohq/whatsapp');
+const { enviarTexto, enviarBotoes } = require('@kyvvohq/whatsapp');
 
 const PORT = process.env.PORT || 3005;
 
@@ -67,6 +67,23 @@ async function build() {
   // um único tenant fixo — permite mais de um CRM com bot dedicado sem
   // redeploy. Sempre 200 pra Meta, mesmo em erro (mesmo padrão de
   // People/Studio): a Meta desativa o webhook depois de falhas repetidas.
+  // Traduz o shape de mensagem da Meta pra entrada do bot — null quando o
+  // tipo não é suportado no fluxo (áudio, figurinha, localização etc.),
+  // que o handler simplesmente ignora em vez de travar a conversa.
+  function extrairEntradaBot(msg) {
+    if (msg.type === 'text') return { tipo: 'texto', texto: (msg.text || {}).body || '' };
+    if (msg.type === 'interactive' && msg.interactive && msg.interactive.type === 'button_reply') {
+      return { tipo: 'botao', id: msg.interactive.button_reply.id };
+    }
+    if (msg.type === 'document' && msg.document) {
+      return { tipo: 'arquivo', mediaId: msg.document.id, nomeArquivo: msg.document.filename || null };
+    }
+    if (msg.type === 'image' && msg.image) {
+      return { tipo: 'arquivo', mediaId: msg.image.id, nomeArquivo: null };
+    }
+    return null;
+  }
+
   fastify.post('/crm/api/webhook/whatsapp', async (request, reply) => {
     if (!process.env.WEBHOOK_INTERNAL_SECRET || request.headers['x-webhook-internal-secret'] !== process.env.WEBHOOK_INTERNAL_SECRET) {
       return reply.code(401).send({ error: 'Segredo interno inválido' });
@@ -77,8 +94,9 @@ async function build() {
       const value = change ? change.value : null;
       const phoneNumberId = value && value.metadata && value.metadata.phone_number_id;
       const msg = value && (value.messages || [])[0];
+      const entrada = msg ? extrairEntradaBot(msg) : null;
 
-      if (msg && msg.type === 'text' && phoneNumberId) {
+      if (entrada && phoneNumberId) {
         const { rows } = await pool.query('select tenant_id from crm_whatsapp_numeros where phone_number_id = $1', [phoneNumberId]);
         const tenantId = rows[0] && rows[0].tenant_id;
         const telefoneE164 = tenantId ? paraE164(msg.from) : null;
@@ -86,9 +104,13 @@ async function build() {
         if (!tenantId) {
           request.log.warn(`[bot-whatsapp] phone_number_id ${phoneNumberId} sem tenant vinculado (crm_whatsapp_numeros) — mensagem ignorada`);
         } else if (telefoneE164) {
-          const respostas = await processarMensagem(pool, { tenantId, telefoneE164, texto: (msg.text || {}).body });
-          for (const texto of respostas) {
-            await enviarTexto({ to: telefoneE164, texto, phoneNumberId });
+          const envios = await processarMensagem(pool, { tenantId, telefoneE164, entrada });
+          for (const envio of envios) {
+            if (envio.tipo === 'botoes') {
+              await enviarBotoes({ to: telefoneE164, texto: envio.texto, botoes: envio.botoes, phoneNumberId });
+            } else {
+              await enviarTexto({ to: telefoneE164, texto: envio.texto, phoneNumberId });
+            }
           }
         }
       }

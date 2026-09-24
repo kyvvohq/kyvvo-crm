@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { processarMensagem, SAUDACAO, PERGUNTAS } = require('../lib/bot-whatsapp');
+const { processarMensagem, SAUDACAO_TEXTO, SAUDACAO_BOTOES, PERGUNTAS } = require('../lib/bot-whatsapp');
 
 function poolFalso({ semEtapa } = {}) {
   const conversas = new Map();
@@ -69,61 +69,101 @@ function poolFalso({ semEtapa } = {}) {
 
 const TENANT = 'tenant-basic';
 const TELEFONE = '+5534999998888';
+const texto = (t) => ({ tipo: 'texto', texto: t });
+const botao = (id) => ({ tipo: 'botao', id });
+const arquivo = (nomeArquivo, mediaId = 'media-1') => ({ tipo: 'arquivo', mediaId, nomeArquivo });
 
-test('primeira mensagem: manda a saudação e cria conversa em aguardando_opcao', async () => {
+test('primeira mensagem: manda a saudação com botões e cria conversa em aguardando_opcao', async () => {
   const { pool, conversas } = poolFalso();
-  const respostas = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: 'oi' });
-  assert.deepEqual(respostas, [SAUDACAO]);
+  const envios = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  assert.deepEqual(envios, [{ tipo: 'botoes', texto: SAUDACAO_TEXTO, botoes: SAUDACAO_BOTOES }]);
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
 });
 
-test('opção 2: agradece e encerra a conversa (sem criar pedido)', async () => {
+test('botão "ver_lojas": manda o texto das lojas e encerra a conversa', async () => {
   const { pool, conversas, pedidos } = poolFalso();
-  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: 'oi' });
-  const respostas = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: '2️⃣' });
-  assert.ok(respostas[0].includes('Que bom que você já encontrou'));
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  const envios = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('ver_lojas') });
+  assert.equal(envios.length, 1);
+  assert.equal(envios[0].tipo, 'texto');
+  assert.ok(envios[0].texto.includes('Shopee'));
   assert.equal(conversas.has(`${TENANT}|${TELEFONE}`), false);
   assert.equal(pedidos.length, 0);
 });
 
-test('opção inválida: pede pra responder 1 ou 2, sem sair de aguardando_opcao', async () => {
+test('entrada inesperada em aguardando_opcao: reenvia os mesmos botões', async () => {
   const { pool, conversas } = poolFalso();
-  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: 'oi' });
-  const respostas = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: 'blabla' });
-  assert.ok(respostas[0].includes('Não entendi'));
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  const envios = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('blabla') });
+  assert.deepEqual(envios, [{ tipo: 'botoes', texto: SAUDACAO_TEXTO, botoes: SAUDACAO_BOTOES }]);
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
 });
 
-test('opção 1: percorre as 7 perguntas e cria cliente + pedido no fim', async () => {
+test('botão "fazer_pedido" -> "sem_arquivo": percorre as 7 perguntas e cria cliente + pedido', async () => {
   const { pool, conversas, clientes, pedidos, itens } = poolFalso();
-  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: 'oi' });
-  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: '1️⃣' });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('fazer_pedido') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('sem_arquivo') });
 
   const valores = ['Vaso', '15', '20', '15', 'redondo', 'sem borda', 'azul'];
-  let ultimaResposta;
+  let ultimoEnvio;
   for (const valor of valores) {
-    ultimaResposta = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: valor });
+    [ultimoEnvio] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto(valor) });
   }
 
-  assert.equal(ultimaResposta.length, 1);
-  assert.ok(ultimaResposta[0].includes('Vaso'));
-  assert.ok(ultimaResposta[0].includes('15 x 20 x 15 cm'));
-  assert.equal(conversas.has(`${TENANT}|${TELEFONE}`), false, 'conversa deve ser encerrada ao final');
+  assert.equal(ultimoEnvio.tipo, 'texto');
+  assert.ok(ultimoEnvio.texto.includes('Vaso'));
+  assert.ok(ultimoEnvio.texto.includes('15 x 20 x 15 cm'));
+  assert.equal(conversas.has(`${TENANT}|${TELEFONE}`), false);
   assert.equal(clientes.size, 1);
   assert.equal(pedidos.length, 1);
-  assert.equal(itens.length, 1);
   assert.equal(itens[0].descricao, 'Vaso — 15x20x15cm, formato redondo, sem borda, cor azul');
 });
 
-test('opção 1 sem etapa configurada: ainda responde ao cliente, mas não cria pedido', async () => {
+test('botão "fazer_pedido" -> "tem_arquivo": pede o arquivo, depois cor e quantidade, cria pedido', async () => {
+  const { pool, conversas, clientes, pedidos, itens } = poolFalso();
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('fazer_pedido') });
+  const [pedeArquivo] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('tem_arquivo') });
+  assert.ok(pedeArquivo.texto.includes('mandar o arquivo'));
+
+  const [pedeCor] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: arquivo('peca.stl') });
+  assert.ok(pedeCor.texto.includes('cor'));
+
+  const [pedeQuantidade] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('vermelho') });
+  assert.ok(pedeQuantidade.texto.includes('quantidade'));
+
+  const [confirmacao] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('3') });
+  assert.ok(confirmacao.texto.includes('peca.stl'));
+  assert.ok(confirmacao.texto.includes('vermelho'));
+  assert.ok(confirmacao.texto.includes('3'));
+
+  assert.equal(conversas.has(`${TENANT}|${TELEFONE}`), false);
+  assert.equal(clientes.size, 1);
+  assert.equal(pedidos.length, 1);
+  assert.equal(itens[0].descricao, 'Arquivo: peca.stl — cor vermelho, quantidade 3');
+});
+
+test('aguardando arquivo: texto solto não avança, pede o arquivo de novo', async () => {
+  const { pool, conversas } = poolFalso();
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('fazer_pedido') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('tem_arquivo') });
+  const [envio] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi de novo') });
+  assert.ok(envio.texto.includes('Ainda não recebi'));
+  assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_envio_arquivo');
+});
+
+test('fluxo sem arquivo sem etapa configurada: ainda responde ao cliente, mas não cria pedido', async () => {
   const { pool, pedidos } = poolFalso({ semEtapa: true });
-  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: 'oi' });
-  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: '1' });
-  let ultimaResposta;
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto('oi') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('fazer_pedido') });
+  await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: botao('sem_arquivo') });
+  let ultimoEnvio;
   for (const valor of ['Vaso', '15', '20', '15', 'redondo', 'sem borda', 'azul']) {
-    ultimaResposta = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, texto: valor });
+    [ultimoEnvio] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: texto(valor) });
   }
-  assert.ok(ultimaResposta[0].includes('Já registrei seu pedido'));
+  assert.ok(ultimoEnvio.texto.includes('Já registrei seu pedido'));
   assert.equal(pedidos.length, 0);
 });
 
