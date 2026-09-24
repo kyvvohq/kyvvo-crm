@@ -31,22 +31,23 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Node 20 (independente da versão do npm — testado com 10.8.2 e 11.20.0,
+      # ambos falharam) reenvia o header Authorization no redirect 302 do
+      # GitHub Packages pro blob storage do Azure — o Azure rejeita esse
+      # header (401), mesmo o token sendo válido e com acesso ao pacote.
+      # Achado 2026-09-24 testando @kyvvohq/whatsapp@1.3.0 (antes não
+      # aparecia porque nada precisava baixar uma versão nova de
+      # kyvvo-integrations). Confirmado que Node 22+ corrige (também remove
+      # o warning EBADENGINE de content-disposition@3.0.0, que já exige
+      # Node >=22).
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://npm.pkg.github.com
           scope: "@kyvvohq"
 
-      # npm 10.8.2 (bundlado no Node 20) reenvia o header Authorization no
-      # redirect 302 do GitHub Packages pro blob storage do Azure — o Azure
-      # rejeita esse header (401), mesmo o token sendo válido e com acesso
-      # ao pacote. Achado 2026-09-24 testando @kyvvohq/whatsapp@1.3.0 (antes
-      # não aparecia porque nada precisava baixar uma versão nova de
-      # kyvvo-integrations). `npm@latest` (12.x) exige Node >=22 — pinado em
-      # 11 (última major compatível com Node 20) só pra ganhar o fix do
-      # redirect.
-      - name: Atualizar npm (bug de redirect com o GitHub Packages)
-        run: npm install -g npm@11
+      - name: Atualizar npm
+        run: npm install -g npm@latest
 
       - name: Instalar dependências
         run: npm ci
