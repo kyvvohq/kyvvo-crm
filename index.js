@@ -314,7 +314,7 @@ async function build() {
 
   fastify.patch('/crm/api/clientes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'numero', 'complemento', 'endereco_completo', 'data_nascimento', 'origem', 'segmento', 'observacoes'];
+    const campos = ['nome', 'telefone', 'email', 'cpf', 'cnpj', 'cidade', 'uf', 'cep', 'numero', 'complemento', 'endereco_completo', 'data_nascimento', 'origem', 'segmento', 'observacoes', 'bloqueado'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
@@ -846,6 +846,55 @@ async function build() {
       [recurso_id || null, request.params.id, tenantId]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+    return rows[0];
+  });
+
+  // Prioridade do pedido (combo Altíssima/Alta/Média/Baixa, pedido do
+  // Bruno 2026-09-25) — "Altíssima" isola o pedido numa raia própria no
+  // Quadro (ver telas em desenho, GitHub issue), fundo vermelho 40%.
+  const PRIORIDADES_VALIDAS = ['altissima', 'alta', 'media', 'baixa'];
+  fastify.patch('/crm/api/pedidos/:id/prioridade', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { prioridade } = request.body || {};
+    if (prioridade !== null && !PRIORIDADES_VALIDAS.includes(prioridade)) {
+      return reply.code(400).send({ error: `Prioridade inválida. Válidas: ${PRIORIDADES_VALIDAS.join(', ')}, ou null pra limpar.` });
+    }
+    const { rows } = await pool.query(
+      `update crm_pedidos set prioridade = $1, atualizado_em = now() where id = $2 and tenant_id = $3 returning *`,
+      [prioridade || null, request.params.id, tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+    return rows[0];
+  });
+
+  // Cancelamento de pedido — kebab menu da lista de Pedidos pede confirmação
+  // no front antes de chamar isto (ver GitHub issue da tela de lista).
+  // Reaproveita a etapa tipo 'perdida' já existente (mesmo conceito do
+  // drag-and-drop no Quadro) em vez de um status novo — motivo obrigatório,
+  // mesma regra de PATCH /pedidos/:id/etapa.
+  fastify.post('/crm/api/pedidos/:id/cancelar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, userId } = request.user;
+    const { motivo } = request.body || {};
+    if (!motivo) return reply.code(400).send({ error: 'Motivo é obrigatório pra cancelar um pedido' });
+
+    const { rows: etapaRows } = await pool.query(
+      `select id from crm_etapas where tenant_id = $1 and tipo = 'perdida' order by ordem asc limit 1`,
+      [tenantId]
+    );
+    if (!etapaRows[0]) return reply.code(409).send({ error: 'Conta sem etapa do tipo "perdida" configurada' });
+
+    const { rows } = await pool.query(
+      `update crm_pedidos set etapa_id = $1, entrou_na_etapa_em = now(), atualizado_em = now(), motivo_perda = $4
+       where id = $2 and tenant_id = $3 returning *`,
+      [etapaRows[0].id, request.params.id, tenantId, motivo]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+
+    await pool.query(
+      `insert into crm_eventos (tenant_id, cliente_id, pedido_id, tipo, dados, ator_id)
+       values ($1, $2, $3, 'mudanca_etapa', $4, $5)`,
+      [tenantId, rows[0].cliente_id, rows[0].id, JSON.stringify({ etapa_id: etapaRows[0].id, motivo_perda: motivo, origem: 'cancelamento_lista' }), userId || null]
+    );
     return rows[0];
   });
 
