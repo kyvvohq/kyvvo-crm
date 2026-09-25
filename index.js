@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const path = require('path');
+const fs = require('fs');
 const Fastify = require('fastify');
 const fastifyJwt = require('@fastify/jwt');
 const fastifyStatic = require('@fastify/static');
@@ -16,6 +17,7 @@ const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados
 const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem } = require('./lib/bot-whatsapp');
+const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes } = require('@kyvvohq/whatsapp');
 
 const PORT = process.env.PORT || 3005;
@@ -95,6 +97,10 @@ async function build() {
       const phoneNumberId = value && value.metadata && value.metadata.phone_number_id;
       const msg = value && (value.messages || [])[0];
       const entrada = msg ? extrairEntradaBot(msg) : null;
+      // Meta manda o nome do perfil do contato em quase toda mensagem — só é
+      // usado se o cliente ainda não tiver cadastro (ver encontrarOuCriarPorTelefone).
+      const nomeWhatsapp = value && Array.isArray(value.contacts) && value.contacts[0] && value.contacts[0].profile
+        ? value.contacts[0].profile.name : null;
 
       if (entrada && phoneNumberId) {
         const { rows } = await pool.query('select tenant_id from crm_whatsapp_numeros where phone_number_id = $1', [phoneNumberId]);
@@ -104,7 +110,7 @@ async function build() {
         if (!tenantId) {
           request.log.warn(`[bot-whatsapp] phone_number_id ${phoneNumberId} sem tenant vinculado (crm_whatsapp_numeros) — mensagem ignorada`);
         } else if (telefoneE164) {
-          const envios = await processarMensagem(pool, { tenantId, telefoneE164, entrada });
+          const envios = await processarMensagem(pool, { tenantId, telefoneE164, entrada, nomeWhatsapp });
           for (const envio of envios) {
             if (envio.tipo === 'botoes') {
               await enviarBotoes({ to: telefoneE164, texto: envio.texto, botoes: envio.botoes, phoneNumberId });
@@ -274,7 +280,12 @@ async function build() {
         [rows[0].id, tenantId]
       ),
       pool.query(
-        `select p.*, e.nome as etapa_nome from crm_pedidos p
+        `select p.*, e.nome as etapa_nome,
+                coalesce((
+                  select json_agg(json_build_object('id', a.id, 'nome_arquivo', a.nome_arquivo, 'tipo_mime', a.tipo_mime) order by a.criado_em)
+                  from crm_pedidos_arquivos a where a.pedido_id = p.id
+                ), '[]') as arquivos
+         from crm_pedidos p
          join crm_etapas e on e.id = p.etapa_id
          where p.cliente_id = $1 order by p.criado_em desc`,
         [rows[0].id]
@@ -295,7 +306,7 @@ async function build() {
 
   fastify.patch('/crm/api/clientes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'data_nascimento', 'origem', 'segmento', 'observacoes'];
+    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'numero', 'complemento', 'data_nascimento', 'origem', 'segmento', 'observacoes'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
@@ -828,6 +839,27 @@ async function build() {
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
     return rows[0];
+  });
+
+  // Download de um arquivo anexado a um pedido (STL/foto enviada pelo
+  // cliente via bot de WhatsApp, ver lib/whatsapp-media.js) — nunca público,
+  // sempre autenticado; o join com tenant_id garante isolamento (nunca
+  // confiar em ids vindos do client sem esse filtro).
+  fastify.get('/crm/api/pedidos/:id/arquivos/:arquivoId', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query(
+      `select a.nome_arquivo, a.caminho_arquivo, a.tipo_mime
+       from crm_pedidos_arquivos a
+       join crm_pedidos p on p.id = a.pedido_id
+       where a.id = $1 and a.pedido_id = $2 and p.tenant_id = $3`,
+      [request.params.arquivoId, request.params.id, tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Arquivo não encontrado' });
+    const caminhoAbsoluto = path.join(DIR_UPLOADS, rows[0].caminho_arquivo);
+    return reply
+      .header('Content-Disposition', `attachment; filename="${rows[0].nome_arquivo}"`)
+      .type(rows[0].tipo_mime || 'application/octet-stream')
+      .send(fs.createReadStream(caminhoAbsoluto));
   });
 
   // --- Produtos (US18) -----------------------------------------------------------
