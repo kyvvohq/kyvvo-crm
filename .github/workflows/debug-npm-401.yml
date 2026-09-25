@@ -1,0 +1,33 @@
+name: Debug 401 GitHub Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Metadados do pacote
+        run: |
+          curl -s -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" \
+            https://npm.pkg.github.com/@kyvvohq/whatsapp -o /tmp/meta.json
+          echo "--- status da chamada de metadados ---"
+          curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" \
+            https://npm.pkg.github.com/@kyvvohq/whatsapp
+          node -e "const j=require('/tmp/meta.json'); console.log('tarball 1.4.0:', j.versions['1.4.0'].dist.tarball)"
+
+      - name: Download direto do tarball (sem npm)
+        run: |
+          TARBALL_URL=$(node -e "const j=require('/tmp/meta.json'); console.log(j.versions['1.4.0'].dist.tarball)")
+          echo "URL: $TARBALL_URL"
+          echo "--- sem seguir redirect (-D-, sem -L) ---"
+          curl -sD- -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" "$TARBALL_URL" -o /tmp/sem-redirect.bin
+          echo "--- seguindo redirect (-D-, -L) ---"
+          curl -sD- -L -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" "$TARBALL_URL" -o /tmp/com-redirect.bin
+          echo "--- tamanhos dos arquivos baixados ---"
+          ls -la /tmp/sem-redirect.bin /tmp/com-redirect.bin
+          echo "--- primeiras linhas do corpo (se for erro, é JSON legível) ---"
+          head -c 300 /tmp/com-redirect.bin; echo
+
+      - name: IP público deste runner
+        run: curl -s https://api.ipify.org; echo
