@@ -33,15 +33,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # TENTATIVA (2026-09-25): não passar registry-url/scope pro
-      # actions/setup-node. Essa opção gera um .npmrc temporário
-      # (NPM_CONFIG_USERCONFIG) com always-auth, que força o Authorization a
-      # ser reenviado no redirect 302 do GitHub Packages pro blob storage do
-      # Azure — o Azure rejeita (401), mesmo com token válido. Sem essa
-      # opção, o npm usa o .npmrc do próprio repo (sem always-auth) — o
-      # mesmo que já funciona no container da EC2. Se confirmar, aplicar
-      # nos outros repos e reverter o pin de Node 22/`npm install` (que
-      # tentavam contornar o sintoma, não a causa).
+      # Achado 2026-09-24/25: `npm ci`/`npm install` do runner do GitHub
+      # Actions falha com 401 ao baixar pacotes do kyvvo-integrations
+      # (redirect 302 pro Azure Blob rejeita o Authorization reenviado no
+      # redirect) — reproduzido com qualquer versão de Node (20/22/24) e
+      # npm (10/11/12), com/sem `always-auth`, com `npm ci` e `npm install`,
+      # com/sem registry-url no actions/setup-node. NÃO reproduz fora do
+      # runner do Actions (curl direto, npm local, container na EC2 com o
+      # mesmo token/.npmrc) — é um problema isolado desse ambiente
+      # específico, sem causa raiz identificada até agora. Sem workaround
+      # conhecido: PRs que tocam dependências passam por revisão/teste
+      # local (ver descrição da PR) e são mergeadas com este check vermelho.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
