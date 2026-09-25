@@ -28,6 +28,7 @@ const ICON_PATHS = {
   'layout-dashboard': '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/>',
   kanban: '<path d="M5 3v14"/><path d="M12 3v8"/><path d="M19 3v18"/>',
+  list: '<path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/>',
   funnel: '<path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/>',
   settings: '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
@@ -55,38 +56,21 @@ document.querySelectorAll('[data-icon]').forEach((el) => {
   el.innerHTML = icon(el.dataset.icon, Number(el.dataset.size) || 18);
 });
 
-// --- Sidebar colapsável ---
+// --- Sidebar (componente data-ds-menu do @kyvvohq/design-system) ---
+// O recolher/expandir e os grupos colapsáveis (Configurações > Automações)
+// são hidratados pelo próprio /ds/components.js a partir de `data-ds-menu`
+// no <nav> — aqui só persiste a escolha de recolhido e marca o item ativo
+// (mesmo padrão do kyvvo-people/public/shell.js).
 const painelSidebar = document.getElementById('painel-sidebar');
-const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
-function aplicarSidebarOculta(oculta) {
-  painelSidebar.classList.toggle('sidebar-oculta', oculta);
-  btnToggleSidebar.textContent = oculta ? '>' : '<';
-  const rotulo = oculta ? 'Exibir menu' : 'Ocultar menu';
-  btnToggleSidebar.setAttribute('aria-label', rotulo);
-  btnToggleSidebar.title = rotulo;
+if (localStorage.getItem('crm_sidebar_oculta') === '1') {
+  painelSidebar.setAttribute('data-ds-menu-recolhido', '');
 }
-aplicarSidebarOculta(localStorage.getItem('crm_sidebar_oculta') === '1');
-btnToggleSidebar.addEventListener('click', () => {
-  const oculta = !painelSidebar.classList.contains('sidebar-oculta');
-  aplicarSidebarOculta(oculta);
-  localStorage.setItem('crm_sidebar_oculta', oculta ? '1' : '0');
+painelSidebar.addEventListener('ds-menu-alternar', (e) => {
+  localStorage.setItem('crm_sidebar_oculta', e.detail.recolhido ? '1' : '0');
 });
-
-document.querySelectorAll('.menu-item[href]').forEach((item) => {
-  if (item.getAttribute('href') === window.location.pathname) item.classList.add('active');
-});
-
-// --- Grupo colapsável do menu (Configurações > Automações etc.) ---
-document.querySelectorAll('.ds-menu-sublink[href]').forEach((item) => {
-  if (item.getAttribute('href') === window.location.pathname) item.classList.add('ds-menu-sublink-ativo');
-});
-document.querySelectorAll('.ds-menu-grupo-botao').forEach((botao) => {
-  const grupo = botao.closest('.ds-menu-grupo');
-  const jaTemAtivo = !!(grupo && grupo.querySelector('.ds-menu-sublink-ativo'));
-  botao.setAttribute('aria-expanded', String(jaTemAtivo));
-  botao.addEventListener('click', () => {
-    botao.setAttribute('aria-expanded', String(botao.getAttribute('aria-expanded') !== 'true'));
-  });
+document.querySelectorAll('.ds-menu-link[href], .ds-menu-sublink[href]').forEach((item) => {
+  if (item.getAttribute('href') !== window.location.pathname) return;
+  item.classList.add(item.classList.contains('ds-menu-sublink') ? 'ds-menu-sublink-ativo' : 'ds-menu-link-ativo');
 });
 
 // --- Tema claro/escuro ---

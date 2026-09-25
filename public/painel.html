@@ -60,28 +60,30 @@
     </div>
   </header>
   <div class="app-shell">
-    <div class="sidebar-wrap">
-      <aside class="painel-sidebar" id="painel-sidebar">
-      <nav class="grupo-menu">
-        <div class="grupo-titulo">Kyvvo CRM</div>
-        <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
-        <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
-        <a class="menu-item" href="/crm/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
-        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="list"></span><span class="rotulo">Pedidos</span></a>
-        <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Campanhas</span></a>
-        <div class="ds-menu-grupo">
-          <button type="button" class="menu-item ds-menu-grupo-botao" aria-expanded="false" style="width:100%;border:none;background:transparent;font:inherit;cursor:pointer;text-align:left">
-            <span data-icon="settings"></span><span class="rotulo">Configurações</span>
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <div class="ds-menu-topo">
+        <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
-          <div class="ds-menu-sub">
-            <a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a>
-          </div>
-        </div>
-      </nav>
-      </aside>
-      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
-    </div>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
 
     <div class="painel-main">
       <div class="cabecalho-pagina">

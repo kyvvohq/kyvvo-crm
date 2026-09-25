@@ -55,28 +55,8 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 
 .app-shell { display:flex; flex:1; gap:var(--space-5); padding:var(--space-5); align-items:flex-start; }
 
-.sidebar-wrap { position:relative; flex-shrink:0; }
-.painel-sidebar { width:264px; flex-shrink:0; background:var(--card); border:1px solid var(--border);
-  border-radius:var(--radius-lg); padding:18px 14px; display:flex; flex-direction:column; gap:22px; }
-.painel-sidebar.sidebar-oculta { display:none; }
-
-.grupo-menu { display:flex; flex-direction:column; gap:3px; }
-.grupo-titulo { font-size:10px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px;
-  padding:0 12px; margin-bottom:5px; }
-.menu-item { display:flex; align-items:center; gap:11px; height:40px; padding:0 12px; border-radius:var(--radius-md);
-  color:var(--muted-strong); font-size:14px; font-weight:500; text-decoration:none; }
-.menu-item:hover { background:var(--surface-muted); }
-.menu-item.active { background:var(--accent-tint); color:var(--accent-strong); font-weight:600; }
-.menu-item svg { flex-shrink:0; color:inherit; }
-.menu-item .rotulo { flex:1; min-width:0; }
-.menu-item .contador { height:20px; padding:0 7px; border-radius:var(--radius-full); background:var(--border);
-  color:var(--muted-strong); font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; }
-
-.btn-toggle-sidebar { position:absolute; top:22px; right:-11px; width:22px; height:22px;
-  display:flex; align-items:center; justify-content:center; background:var(--card);
-  border:1px solid var(--border-strong); border-radius:var(--radius-full); color:var(--muted); font-size:12px;
-  cursor:pointer; z-index:10; }
-.btn-toggle-sidebar:hover { background:var(--surface-muted); color:var(--text); }
+/* Sidebar (nav.ds-menu, data-ds-menu) vem inteira do design system —
+   ver /ds/components.css. Nada de sidebar/menu fica aqui. */
 
 .painel-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--space-5); }
 
