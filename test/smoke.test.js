@@ -22,3 +22,12 @@ test('rotas autenticadas exigem token', async () => {
   assert.equal(res.statusCode, 401);
   await app.close();
 });
+
+test('rotas novas de prioridade/cancelamento de pedido também exigem token', async () => {
+  const app = await build();
+  const prioridade = await app.inject({ method: 'PATCH', url: '/crm/api/pedidos/qualquer-id/prioridade', payload: { prioridade: 'altissima' } });
+  assert.equal(prioridade.statusCode, 401);
+  const cancelar = await app.inject({ method: 'POST', url: '/crm/api/pedidos/qualquer-id/cancelar', payload: { motivo: 'teste' } });
+  assert.equal(cancelar.statusCode, 401);
+  await app.close();
+});
