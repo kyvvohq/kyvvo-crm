@@ -135,6 +135,52 @@ async function build() {
     return reply.code(200).send({ ok: true });
   });
 
+  // --- Vínculo phone_number_id -> tenant, gerenciado pelo kyvvo-admin ------
+  // Até aqui (2026-09-25) esse vínculo só existia via INSERT manual direto
+  // no banco (ver docs/DECISOES-PENDENTES.md #3 e o comentário em
+  // db/005_whatsapp_bot.sql) — pedido do Bruno pra ter uma tela em vez disso.
+  // Protegido por segredo compartilhado (ADMIN_INTERNAL_TOKEN, mesmo valor
+  // cadastrado no kyvvo-admin/kyvvo-people), não por fastify.authenticate —
+  // mesmo padrão de People (`/people/admin-interno/*`), nunca exposto
+  // publicamente, só alcançável dentro da rede Docker/EC2.
+  function autenticarAdminInterno(request, reply) {
+    const token = (request.headers['x-admin-internal-token'] || '').trim();
+    if (!process.env.ADMIN_INTERNAL_TOKEN || token !== process.env.ADMIN_INTERNAL_TOKEN) {
+      reply.code(401).send({ error: 'Não autorizado' });
+      return false;
+    }
+    return true;
+  }
+
+  fastify.get('/crm/admin-interno/whatsapp-numeros', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { rows } = await pool.query('select phone_number_id, tenant_id, numero_exibido, criado_em from crm_whatsapp_numeros order by criado_em desc');
+    return { numeros: rows };
+  });
+
+  fastify.post('/crm/admin-interno/whatsapp-numeros', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { phone_number_id: phoneNumberId, tenant_id: tenantId, numero_exibido: numeroExibido } = request.body || {};
+    if (!phoneNumberId || !tenantId) {
+      return reply.code(400).send({ error: 'phone_number_id e tenant_id são obrigatórios' });
+    }
+    const { rows } = await pool.query(
+      `insert into crm_whatsapp_numeros (phone_number_id, tenant_id, numero_exibido)
+       values ($1, $2, $3)
+       on conflict (phone_number_id) do update set tenant_id = excluded.tenant_id,
+         numero_exibido = coalesce(excluded.numero_exibido, crm_whatsapp_numeros.numero_exibido)
+       returning *`,
+      [phoneNumberId, tenantId, numeroExibido || null]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.delete('/crm/admin-interno/whatsapp-numeros/:phoneNumberId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    await pool.query('delete from crm_whatsapp_numeros where phone_number_id = $1', [request.params.phoneNumberId]);
+    return { ok: true };
+  });
+
   // --- Auth ----------------------------------------------------------------
   // POST /api/auth/crm/acesso ainda não existe no kyvvo-platform — precisa
   // do módulo 'crm' cadastrado lá (ver PR companion em kyvvo-platform e

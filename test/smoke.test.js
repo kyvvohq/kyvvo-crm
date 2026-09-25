@@ -31,3 +31,54 @@ test('rotas novas de prioridade/cancelamento de pedido também exigem token', as
   assert.equal(cancelar.statusCode, 401);
   await app.close();
 });
+
+test('admin-interno de whatsapp-numeros: exige ADMIN_INTERNAL_TOKEN, não JWT', async () => {
+  const app = await build();
+  const semToken = await app.inject({ method: 'GET', url: '/crm/admin-interno/whatsapp-numeros' });
+  assert.equal(semToken.statusCode, 401);
+
+  process.env.ADMIN_INTERNAL_TOKEN = 'segredo-admin-interno-teste';
+  const tokenErrado = await app.inject({
+    method: 'GET', url: '/crm/admin-interno/whatsapp-numeros', headers: { 'x-admin-internal-token': 'errado' },
+  });
+  assert.equal(tokenErrado.statusCode, 401);
+  delete process.env.ADMIN_INTERNAL_TOKEN;
+  await app.close();
+});
+
+test('admin-interno de whatsapp-numeros: vincular, trocar tenant e desvincular', async () => {
+  process.env.ADMIN_INTERNAL_TOKEN = 'segredo-admin-interno-teste';
+  const app = await build();
+  const headers = { 'x-admin-internal-token': 'segredo-admin-interno-teste' };
+  const phoneNumberId = `teste-${Date.now()}`;
+  const tenantA = '11111111-1111-1111-1111-111111111111';
+  const tenantB = '22222222-2222-2222-2222-222222222222';
+
+  const criar = await app.inject({
+    method: 'POST', url: '/crm/admin-interno/whatsapp-numeros', headers,
+    payload: { phone_number_id: phoneNumberId, tenant_id: tenantA, numero_exibido: '+55 34 90000-0000' },
+  });
+  assert.equal(criar.statusCode, 201);
+  assert.equal(criar.json().tenant_id, tenantA);
+
+  // "alterar": mesmo phone_number_id, tenant diferente — upsert, não duplica linha.
+  const trocar = await app.inject({
+    method: 'POST', url: '/crm/admin-interno/whatsapp-numeros', headers,
+    payload: { phone_number_id: phoneNumberId, tenant_id: tenantB },
+  });
+  assert.equal(trocar.statusCode, 201);
+  assert.equal(trocar.json().tenant_id, tenantB);
+  assert.equal(trocar.json().numero_exibido, '+55 34 90000-0000'); // preservado, não veio no body
+
+  const listar = await app.inject({ method: 'GET', url: '/crm/admin-interno/whatsapp-numeros', headers });
+  assert.equal(listar.statusCode, 200);
+  assert.ok(listar.json().numeros.some((n) => n.phone_number_id === phoneNumberId && n.tenant_id === tenantB));
+
+  const apagar = await app.inject({ method: 'DELETE', url: `/crm/admin-interno/whatsapp-numeros/${phoneNumberId}`, headers });
+  assert.equal(apagar.statusCode, 200);
+  const listarDepois = await app.inject({ method: 'GET', url: '/crm/admin-interno/whatsapp-numeros', headers });
+  assert.ok(!listarDepois.json().numeros.some((n) => n.phone_number_id === phoneNumberId));
+
+  delete process.env.ADMIN_INTERNAL_TOKEN;
+  await app.close();
+});
