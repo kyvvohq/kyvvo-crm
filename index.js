@@ -10,6 +10,7 @@ const fastifyMultipart = require('@fastify/multipart');
 const { pool, migrar } = require('./lib/db');
 const { paraE164 } = require('./lib/telefone');
 const { encontrarOuCriarPorTelefone, buscarMetricas } = require('./lib/clientes');
+const { proximoNumeroPedido } = require('./lib/pedidos');
 const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
@@ -333,10 +334,14 @@ async function build() {
                 coalesce((
                   select json_agg(json_build_object('id', a.id, 'nome_arquivo', a.nome_arquivo, 'tipo_mime', a.tipo_mime) order by a.criado_em)
                   from crm_pedidos_arquivos a where a.pedido_id = p.id
-                ), '[]') as arquivos
+                ), '[]') as arquivos,
+                coalesce((
+                  select json_agg(json_build_object('descricao', coalesce(pr.nome, i.descricao), 'quantidade', i.quantidade))
+                  from crm_pedidos_itens i left join crm_produtos pr on pr.id = i.produto_id where i.pedido_id = p.id
+                ), '[]') as itens
          from crm_pedidos p
          join crm_etapas e on e.id = p.etapa_id
-         where p.cliente_id = $1 order by p.criado_em desc`,
+         where p.cliente_id = $1 order by p.numero desc`,
         [rows[0].id]
       ),
       pool.query('select * from crm_eventos where cliente_id = $1 order by criado_em desc limit 100', [rows[0].id]),
@@ -371,6 +376,60 @@ async function build() {
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
     return rows[0];
+  });
+
+  // --- Opções de cadastro (Segmento/Origem do cliente viram combobox,
+  // pedido do Bruno 2026-09-25) — CRUD gerenciado em Configurações >
+  // Cadastro. `tipo` é sempre 'segmento' ou 'origem' (mesma tabela pros
+  // dois, ver db/011_opcoes_cadastro.sql).
+  const TIPOS_OPCAO_CADASTRO = ['segmento', 'origem'];
+  fastify.get('/crm/api/opcoes-cadastro', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tipo } = request.query || {};
+    if (!TIPOS_OPCAO_CADASTRO.includes(tipo)) return reply.code(400).send({ error: `tipo inválido. Válidos: ${TIPOS_OPCAO_CADASTRO.join(', ')}` });
+    const { rows } = await pool.query(
+      'select * from crm_opcoes_cadastro where tenant_id = $1 and tipo = $2 order by valor',
+      [request.user.tenantId, tipo]
+    );
+    return rows;
+  });
+
+  fastify.post('/crm/api/opcoes-cadastro', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { tipo, valor } = request.body || {};
+    if (!TIPOS_OPCAO_CADASTRO.includes(tipo)) return reply.code(400).send({ error: `tipo inválido. Válidos: ${TIPOS_OPCAO_CADASTRO.join(', ')}` });
+    if (!valor || !valor.trim()) return reply.code(400).send({ error: 'Valor é obrigatório' });
+    const { rows } = await pool.query(
+      `insert into crm_opcoes_cadastro (tenant_id, tipo, valor) values ($1, $2, $3)
+       on conflict (tenant_id, tipo, lower(valor)) do update set ativo = true
+       returning *`,
+      [tenantId, tipo, valor.trim()]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.patch('/crm/api/opcoes-cadastro/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const campos = ['valor', 'ativo'];
+    const body = request.body || {};
+    const sets = [];
+    const params = [request.params.id, tenantId];
+    for (const campo of campos) {
+      if (body[campo] === undefined) continue;
+      params.push(body[campo]);
+      sets.push(`${campo} = $${params.length}`);
+    }
+    if (sets.length === 0) return reply.code(400).send({ error: 'Nenhum campo pra atualizar' });
+    const { rows } = await pool.query(
+      `update crm_opcoes_cadastro set ${sets.join(', ')} where id = $1 and tenant_id = $2 returning *`,
+      params
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Opção não encontrada' });
+    return rows[0];
+  });
+
+  fastify.delete('/crm/api/opcoes-cadastro/:id', { preHandler: fastify.authenticate }, async (request) => {
+    await pool.query('delete from crm_opcoes_cadastro where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    return { ok: true };
   });
 
   // --- Tags (US15) -------------------------------------------------------------
@@ -725,10 +784,11 @@ async function build() {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      const numero = await proximoNumeroPedido(client, tenantId);
       const { rows: pedidoRows } = await client.query(
-        `insert into crm_pedidos (tenant_id, cliente_id, etapa_id, origem, valor_total, tipo_entrega, recurso_id)
-         values ($1, $2, $3, $4, $5, $6, $7) returning *`,
-        [tenantId, cliente.id, etapaRows[0].id, origem, valor_total || 0, tipo_entrega || null, recurso_id || null]
+        `insert into crm_pedidos (tenant_id, cliente_id, etapa_id, origem, valor_total, tipo_entrega, recurso_id, numero)
+         values ($1, $2, $3, $4, $5, $6, $7, $8) returning *`,
+        [tenantId, cliente.id, etapaRows[0].id, origem, valor_total || 0, tipo_entrega || null, recurso_id || null, numero]
       );
       const pedido = pedidoRows[0];
 
@@ -824,6 +884,20 @@ async function build() {
       `insert into crm_eventos (tenant_id, cliente_id, pedido_id, tipo, dados) values ($1, $2, $3, 'pagamento', $4)`,
       [tenantId, rows[0].cliente_id, rows[0].id, JSON.stringify({ status_pagamento, valor_recebido })]
     );
+    return rows[0];
+  });
+
+  // Data de entrega (pedido do Bruno, 2026-09-25 — mostrada no histórico de
+  // pedidos da ficha do cliente). Sem evento próprio — não é uma mudança de
+  // etapa nem de pagamento, é só um dado informativo.
+  fastify.patch('/crm/api/pedidos/:id/entrega', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { data_entrega: dataEntrega } = request.body || {};
+    const { rows } = await pool.query(
+      `update crm_pedidos set data_entrega = $1, atualizado_em = now() where id = $2 and tenant_id = $3 returning *`,
+      [dataEntrega || null, request.params.id, tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
     return rows[0];
   });
 

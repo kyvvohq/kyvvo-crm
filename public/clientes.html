@@ -81,6 +81,7 @@
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
           <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
           </ul>
         </li>
@@ -90,7 +91,7 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Clientes</h1><span class="contagem" id="contagem-clientes">—</span></div>
+          <div class="linha-titulo"><h1>Clientes</h1></div>
         </div>
         <div class="acoes">
           <button type="button" class="btn-secundario" id="btn-importar">Importar CSV</button>
@@ -138,7 +139,6 @@
     }
 
     function renderizar() {
-      document.getElementById('contagem-clientes').textContent = clientes.length;
       const tbody = document.getElementById('tbody-clientes');
       if (!clientes.length) {
         tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;

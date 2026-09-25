@@ -74,6 +74,7 @@
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
           <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
           </ul>
         </li>
@@ -83,8 +84,7 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Automações</h1><span class="contagem" id="contagem-automacoes">—</span></div>
-          <p class="descricao">Dispara uma mensagem de WhatsApp sozinho quando um pedido muda de etapa, é criado, fica parado ou no aniversário do cliente. V1: só funciona pra quem já tem um número de WhatsApp vinculado (Configurações no admin).</p>
+          <div class="linha-titulo"><h1>Automações</h1></div>
         </div>
         <div class="acoes">
           <button type="button" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
@@ -126,7 +126,6 @@
     }
 
     function renderizar() {
-      document.getElementById('contagem-automacoes').textContent = automacoes.length;
       const el = document.getElementById('lista-automacoes');
       if (!automacoes.length) {
         el.innerHTML = '<div class="vazio">Nenhuma automação configurada ainda.</div>';

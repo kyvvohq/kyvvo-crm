@@ -82,6 +82,7 @@
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
           <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
           </ul>
         </li>
@@ -91,8 +92,7 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Pedidos</h1><span class="contagem" id="contagem-pedidos">—</span></div>
-          <p class="descricao">Lista com filtros — pra mexer no fluxo visual (arrastar entre etapas), use o Quadro.</p>
+          <div class="linha-titulo"><h1>Pedidos</h1></div>
           <p class="descricao" id="aviso-filtro-cliente" hidden>Mostrando só os pedidos deste cliente — <a href="/crm/pedidos.html">ver todos</a>.</p>
         </div>
         <div class="acoes">
@@ -182,7 +182,6 @@
     const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
 
     function renderizar() {
-      document.getElementById('contagem-pedidos').textContent = pedidos.length;
       const tbody = document.getElementById('tbody-pedidos');
       if (!pedidos.length) {
         tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">Nenhum pedido com esses filtros.</div></td></tr>`;
@@ -349,7 +348,10 @@
             </select>
           </div>
         </div>
-        <label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal">
+        <div class="grid2">
+          <div><label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal"></div>
+          <div><label for="e-entrega">Data de entrega</label><input id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
+        </div>
         <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
         <div class="modal-erro" id="e-erro"></div>
         <div class="modal-acoes">
@@ -388,6 +390,12 @@
         }
         const res = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }) });
         if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar pagamento'; return; }
+
+        const novaEntrega = document.getElementById('e-entrega').value || null;
+        if (novaEntrega !== (p.data_entrega ? p.data_entrega.slice(0, 10) : null)) {
+          const resEntrega = await apiFetch(`/crm/api/pedidos/${p.id}/entrega`, { method: 'PATCH', body: JSON.stringify({ data_entrega: novaEntrega }) });
+          if (!resEntrega.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar data de entrega'; return; }
+        }
 
         fecharModal();
         carregar();

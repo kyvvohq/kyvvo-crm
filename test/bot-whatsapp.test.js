@@ -59,8 +59,11 @@ function poolFalso({ semEtapa, clienteExistente } = {}) {
     connect: async () => ({
       query: async (sql, params) => {
         if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return {};
+        if (/^select coalesce\(max\(numero\)/.test(sql)) {
+          return { rows: [{ proximo: pedidos.length + 1 }] };
+        }
         if (/^insert into crm_pedidos \(/.test(sql)) {
-          const pedido = { id: `pedido-${pedidos.length + 1}`, tenant_id: params[0], cliente_id: params[1], etapa_id: params[2] };
+          const pedido = { id: `pedido-${pedidos.length + 1}`, tenant_id: params[0], cliente_id: params[1], etapa_id: params[2], numero: params[3] };
           pedidos.push(pedido);
           return { rows: [pedido] };
         }
