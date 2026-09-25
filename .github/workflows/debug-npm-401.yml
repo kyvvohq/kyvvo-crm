@@ -7,27 +7,26 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - name: Metadados do pacote
+      - name: Metadados do pacote (com token)
         run: |
-          curl -s -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" \
-            https://npm.pkg.github.com/@kyvvohq/whatsapp -o /tmp/meta.json
-          echo "--- status da chamada de metadados ---"
+          echo "--- status com Authorization ---"
           curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" \
             https://npm.pkg.github.com/@kyvvohq/whatsapp
-          node -e "const j=require('/tmp/meta.json'); console.log('tarball 1.4.0:', j.versions['1.4.0'].dist.tarball)"
 
-      - name: Download direto do tarball (sem npm)
+      - name: Metadados de um pacote PÚBLICO do mesmo jeito (sanity check)
         run: |
-          TARBALL_URL=$(node -e "const j=require('/tmp/meta.json'); console.log(j.versions['1.4.0'].dist.tarball)")
-          echo "URL: $TARBALL_URL"
-          echo "--- sem seguir redirect (-D-, sem -L) ---"
-          curl -sD- -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" "$TARBALL_URL" -o /tmp/sem-redirect.bin
-          echo "--- seguindo redirect (-D-, -L) ---"
-          curl -sD- -L -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" "$TARBALL_URL" -o /tmp/com-redirect.bin
-          echo "--- tamanhos dos arquivos baixados ---"
-          ls -la /tmp/sem-redirect.bin /tmp/com-redirect.bin
-          echo "--- primeiras linhas do corpo (se for erro, é JSON legível) ---"
-          head -c 300 /tmp/com-redirect.bin; echo
+          echo "--- status sem token, pacote npmjs público (deve ser 200) ---"
+          curl -s -o /dev/null -w "%{http_code}\n" https://registry.npmjs.org/left-pad
+
+      - name: Testar a API normal do GitHub com o mesmo token (não é o registry de pacotes)
+        run: |
+          echo "--- GET /user com o mesmo token ---"
+          curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" \
+            https://api.github.com/user
+          echo "--- GET /orgs/kyvvohq/packages com o mesmo token ---"
+          curl -s -H "Authorization: Bearer ${{ secrets.NPM_PACKAGES_TOKEN }}" \
+            "https://api.github.com/orgs/kyvvohq/packages?package_type=npm" | head -c 500
+          echo
 
       - name: IP público deste runner
         run: curl -s https://api.ipify.org; echo
