@@ -1,0 +1,32 @@
+name: Temp - bump design-system lockfile
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/design-system-v2.10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: npm install com o token real (secret do repo)
+        env:
+          NPM_PACKAGES_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
+        run: |
+          npm install @kyvvohq/design-system@2.10.0 --save-exact
+
+      - name: Commit e push do lockfile atualizado
+        run: |
+          git config user.name "kyvvo-bot"
+          git config user.email "bot@kyvvo.com.br"
+          git add package.json package-lock.json
+          git commit -m "chore: bump @kyvvohq/design-system para 2.10.0 (workflow temporário)"
+          git push origin HEAD:fix/design-system-v2.10
