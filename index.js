@@ -275,17 +275,11 @@ async function build() {
     const { rows } = await pool.query('select * from crm_clientes where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
     if (!rows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
 
-    const [tags, campos, pedidos, eventos, metricas] = await Promise.all([
+    const [tags, pedidos, eventos, metricas] = await Promise.all([
       pool.query(
         `select t.id, t.nome from crm_tags t
          join crm_clientes_tags ct on ct.tag_id = t.id where ct.cliente_id = $1`,
         [rows[0].id]
-      ),
-      pool.query(
-        `select cc.id, cc.chave, cc.label, cc.tipo, cc.opcoes, cv.valor from crm_campos_customizados cc
-         left join crm_clientes_valores cv on cv.campo_id = cc.id and cv.cliente_id = $1
-         where cc.tenant_id = $2 order by cc.ordem`,
-        [rows[0].id, tenantId]
       ),
       pool.query(
         `select p.*, e.nome as etapa_nome,
@@ -305,7 +299,6 @@ async function build() {
     return {
       ...rows[0],
       tags: tags.rows,
-      campos_customizados: campos.rows,
       pedidos: pedidos.rows,
       eventos: eventos.rows,
       metricas,
@@ -469,81 +462,6 @@ async function build() {
       return reply.code(400).send({ error: erro.message });
     }
     return reply.code(201).send(resultado);
-  });
-
-  // --- Campos customizados (US16) -----------------------------------------------
-  function slugificar(texto) {
-    return String(texto)
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'campo';
-  }
-
-  fastify.get('/crm/api/campos-customizados', { preHandler: fastify.authenticate }, async (request) => {
-    const { rows } = await pool.query('select * from crm_campos_customizados where tenant_id = $1 order by ordem', [request.user.tenantId]);
-    return rows;
-  });
-
-  const TIPOS_CAMPO_CUSTOMIZADO = ['texto', 'numero', 'booleano', 'data', 'selecao'];
-
-  fastify.post('/crm/api/campos-customizados', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { tenantId } = request.user;
-    const { label, tipo, opcoes } = request.body || {};
-    if (!label || !label.trim()) return reply.code(400).send({ error: 'Label é obrigatório' });
-    if (!TIPOS_CAMPO_CUSTOMIZADO.includes(tipo)) return reply.code(400).send({ error: 'Tipo inválido' });
-
-    const base = slugificar(label);
-    let chave = base;
-    let contador = 2;
-    // Chave é derivada do label (o backend não pede pro usuário digitar as
-    // duas coisas) — precisa ser única por conta.
-    for (;;) {
-      const { rows: existe } = await pool.query('select 1 from crm_campos_customizados where tenant_id = $1 and chave = $2', [tenantId, chave]);
-      if (!existe[0]) break;
-      chave = `${base}_${contador++}`;
-    }
-
-    const { rows: ordemRows } = await pool.query('select coalesce(max(ordem), -1) + 1 as prox from crm_campos_customizados where tenant_id = $1', [tenantId]);
-    const { rows } = await pool.query(
-      `insert into crm_campos_customizados (tenant_id, chave, label, tipo, opcoes, ordem) values ($1, $2, $3, $4, $5, $6) returning *`,
-      [tenantId, chave, label.trim(), tipo, Array.isArray(opcoes) ? JSON.stringify(opcoes) : null, ordemRows[0].prox]
-    );
-    return reply.code(201).send(rows[0]);
-  });
-
-  fastify.delete('/crm/api/campos-customizados/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { rowCount } = await pool.query('delete from crm_campos_customizados where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
-    if (!rowCount) return reply.code(404).send({ error: 'Campo não encontrado' });
-    return { ok: true };
-  });
-
-  // Upsert em lote dos valores dos campos customizados de um cliente.
-  fastify.put('/crm/api/clientes/:id/campos', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { tenantId } = request.user;
-    const valores = request.body?.valores;
-    if (!Array.isArray(valores)) return reply.code(400).send({ error: 'valores deve ser uma lista' });
-
-    const { rows: clienteRows } = await pool.query('select 1 from crm_clientes where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
-    if (!clienteRows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      for (const item of valores) {
-        const valor = item.valor === undefined || item.valor === '' ? null : String(item.valor);
-        await client.query(
-          `insert into crm_clientes_valores (cliente_id, campo_id, valor) values ($1, $2, $3)
-           on conflict (cliente_id, campo_id) do update set valor = excluded.valor`,
-          [request.params.id, item.campo_id, valor]
-        );
-      }
-      await client.query('COMMIT');
-    } catch (erro) {
-      await client.query('ROLLBACK');
-      throw erro;
-    } finally {
-      client.release();
-    }
-    return { ok: true };
   });
 
   // --- Etapas (config do funil, editável direto no quadro — mesmo padrão do
@@ -981,6 +899,14 @@ async function build() {
     if (!rows[0]) return reply.code(404).send({ error: 'Modelo não encontrado' });
     return rows[0];
   });
+
+  // Usado só pelo slug de Formulários agora (Campos customizados, que também
+  // usava isto, foi removido — pedido do Bruno, 2026-09-25).
+  function slugificar(texto) {
+    return String(texto)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'campo';
+  }
 
   // --- Formulário de captação (US22) ---------------------------------------------
   // Campos são só perguntas extras em texto livre (além de nome/telefone/

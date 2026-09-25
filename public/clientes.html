@@ -86,7 +86,6 @@
           <button type="button" class="btn-secundario" id="btn-importar">Importar CSV</button>
           <button type="button" class="btn-secundario" id="btn-duplicados">Duplicados</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-formularios">Formulários</button>
-          <button type="button" class="btn-secundario" id="btn-gerenciar-campos">Campos customizados</button>
           <button type="button" id="btn-novo-cliente"><span data-icon="plus" data-size="16"></span>Novo cliente</button>
         </div>
       </div>
@@ -112,20 +111,17 @@
   <script src="/crm/shell.js"></script>
   <script>
     let clientes = [];
-    let camposCustomizados = [];
     let tags = [];
     let formularios = [];
 
     async function carregar(busca) {
       const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
-      const [resClientes, resCampos, resTags, resFormularios] = await Promise.all([
+      const [resClientes, resTags, resFormularios] = await Promise.all([
         apiFetch(`/crm/api/clientes${qs}`),
-        apiFetch('/crm/api/campos-customizados'),
         apiFetch('/crm/api/tags'),
         apiFetch('/crm/api/formularios'),
       ]);
       clientes = await resClientes.json();
-      camposCustomizados = await resCampos.json();
       tags = await resTags.json();
       formularios = await resFormularios.json();
       renderizar();
@@ -158,78 +154,6 @@
       clearTimeout(debounceBusca);
       debounceBusca = setTimeout(() => carregar(e.target.value.trim()), 300);
     });
-
-    // --- Campos customizados (US16) -----------------------------------------
-    const ROTULO_TIPO_CAMPO = { texto: 'Texto', numero: 'Número', booleano: 'Sim/não', data: 'Data', selecao: 'Seleção' };
-
-    document.getElementById('btn-gerenciar-campos').addEventListener('click', () => abrirModalCampos());
-
-    function abrirModalCampos() {
-      abrirModal('<h3>Campos customizados</h3>', `
-        <p class="modal-texto">Campos extras do cliente, do jeito que o seu negócio precisa (ex.: "É confeiteira?").</p>
-        <div id="lista-campos"></div>
-        <div class="grid2">
-          <div><label for="cc-label">Novo campo</label><input type="text" id="cc-label" placeholder="ex.: É confeiteira?"></div>
-          <div><label for="cc-tipo">Tipo</label>
-            <select id="cc-tipo">
-              <option value="texto">Texto</option>
-              <option value="numero">Número</option>
-              <option value="booleano">Sim/não</option>
-              <option value="data">Data</option>
-              <option value="selecao">Seleção</option>
-            </select>
-          </div>
-        </div>
-        <div id="cc-opcoes-wrap" hidden>
-          <label for="cc-opcoes">Opções (separadas por vírgula)</label>
-          <input type="text" id="cc-opcoes" placeholder="ex.: Pequeno, Médio, Grande">
-        </div>
-        <div class="modal-erro" id="cc-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="cc-adicionar">Adicionar campo</button>
-        </div>
-      `, 'modal-card-larga');
-      renderizarListaCampos();
-      document.getElementById('cc-tipo').addEventListener('change', (e) => {
-        document.getElementById('cc-opcoes-wrap').hidden = e.target.value !== 'selecao';
-      });
-      document.getElementById('cc-adicionar').addEventListener('click', async () => {
-        const label = document.getElementById('cc-label').value.trim();
-        const tipo = document.getElementById('cc-tipo').value;
-        if (!label) { document.getElementById('cc-erro').textContent = 'Digite o nome do campo'; return; }
-        const opcoesTexto = document.getElementById('cc-opcoes').value.trim();
-        const opcoes = tipo === 'selecao' && opcoesTexto ? opcoesTexto.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
-        const res = await apiFetch('/crm/api/campos-customizados', { method: 'POST', body: JSON.stringify({ label, tipo, opcoes }) });
-        if (!res.ok) {
-          const dados = await res.json().catch(() => ({}));
-          document.getElementById('cc-erro').textContent = dados.error || 'Falha ao criar campo';
-          return;
-        }
-        document.getElementById('cc-label').value = '';
-        document.getElementById('cc-opcoes').value = '';
-        await carregar();
-        renderizarListaCampos();
-      });
-    }
-
-    function renderizarListaCampos() {
-      const el = document.getElementById('lista-campos');
-      if (!el) return;
-      el.innerHTML = camposCustomizados.length ? camposCustomizados.map((c) => `
-        <div class="linha-recurso">
-          <span>${escapeHtml(c.label)} <span style="color:var(--muted);font-size:12px">(${ROTULO_TIPO_CAMPO[c.tipo] || c.tipo})</span></span>
-          <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-campo="${c.id}">Remover</button>
-        </div>
-      `).join('') : '<p class="vazio">Nenhum campo customizado ainda.</p>';
-
-      el.querySelectorAll('[data-apagar-campo]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/campos-customizados/${btn.dataset.apagarCampo}`, { method: 'DELETE' });
-          await carregar();
-          renderizarListaCampos();
-        });
-      });
-    }
 
     // --- Formulário de captação (US22) --------------------------------------
     document.getElementById('btn-gerenciar-formularios').addEventListener('click', () => abrirModalFormularios());
@@ -562,15 +486,6 @@
           <input type="text" id="ficha-nova-tag" placeholder="+ Nova tag (Enter)" style="margin-top:8px;max-width:220px">
         </div>
 
-        ${c.campos_customizados && c.campos_customizados.length ? `
-        <div class="ficha-secao">
-          <h4>Campos customizados</h4>
-          ${c.campos_customizados.map(campoValorInputHtml).join('')}
-          <div class="modal-acoes">
-            <button type="button" id="btn-salvar-campos">Salvar campos</button>
-          </div>
-        </div>` : ''}
-
         <div class="ficha-secao">
           <h4>Pedidos (${c.pedidos.length})</h4>
           ${c.pedidos.length ? c.pedidos.map((p) => `
@@ -614,48 +529,6 @@
         carregar();
         abrirFicha(id);
       });
-
-      const btnSalvarCampos = document.getElementById('btn-salvar-campos');
-      if (btnSalvarCampos) {
-        btnSalvarCampos.addEventListener('click', async () => {
-          const valores = [...overlay.querySelectorAll('[data-campo-id]')].map((el) => ({
-            campo_id: el.dataset.campoId,
-            valor: el.dataset.tipo === 'booleano' ? String(el.checked) : el.value,
-          }));
-          const res = await apiFetch(`/crm/api/clientes/${id}/campos`, { method: 'PUT', body: JSON.stringify({ valores }) });
-          btnSalvarCampos.textContent = res.ok ? 'Salvo!' : 'Falha ao salvar';
-          setTimeout(() => { btnSalvarCampos.textContent = 'Salvar campos'; }, 1500);
-        });
-      }
-    }
-
-    // Um <label>+input por campo customizado, tipo de input de acordo com
-    // cc.tipo. `campo.valor` já vem preenchido pelo GET (LEFT JOIN com os
-    // valores desse cliente específico).
-    function campoValorInputHtml(campo) {
-      const id = `cc-valor-${campo.id}`;
-      const valor = campo.valor;
-      if (campo.tipo === 'booleano') {
-        return `<label for="${id}" style="display:flex;align-items:center;gap:8px;margin-top:14px">
-          <input type="checkbox" id="${id}" data-campo-id="${campo.id}" data-tipo="booleano" style="width:auto" ${valor === 'true' ? 'checked' : ''}>
-          ${escapeHtml(campo.label)}
-        </label>`;
-      }
-      if (campo.tipo === 'selecao') {
-        const opcoes = Array.isArray(campo.opcoes) ? campo.opcoes : [];
-        return `<label for="${id}">${escapeHtml(campo.label)}</label>
-          <select id="${id}" data-campo-id="${campo.id}" data-tipo="selecao">
-            <option value="">—</option>
-            ${opcoes.map((o) => `<option value="${escapeHtml(o)}" ${valor === o ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}
-          </select>`;
-      }
-      if (campo.tipo === 'data') {
-        return `<label for="${id}">${escapeHtml(campo.label)}</label><input type="date" id="${id}" data-campo-id="${campo.id}" data-tipo="data" value="${valor || ''}">`;
-      }
-      if (campo.tipo === 'numero') {
-        return `<label for="${id}">${escapeHtml(campo.label)}</label><input type="number" step="any" id="${id}" data-campo-id="${campo.id}" data-tipo="numero" value="${valor ?? ''}">`;
-      }
-      return `<label for="${id}">${escapeHtml(campo.label)}</label><input type="text" id="${id}" data-campo-id="${campo.id}" data-tipo="texto" value="${escapeHtml(valor || '')}">`;
     }
 
     carregar();
