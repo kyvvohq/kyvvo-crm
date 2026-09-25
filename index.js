@@ -630,8 +630,19 @@ async function build() {
   });
 
   // --- Pedidos / kanban --------------------------------------------------------
+  // Filtros opcionais via querystring (etapa_id/recurso_id/status_pagamento/
+  // prioridade) — usados pela tela de lista de Pedidos (o Quadro carrega
+  // tudo de uma vez, sem filtro, pra desenhar o kanban inteiro).
   fastify.get('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
+    const { etapa_id, recurso_id, status_pagamento, prioridade } = request.query || {};
+    const condicoes = ['p.tenant_id = $1'];
+    const params = [tenantId];
+    if (etapa_id) { params.push(etapa_id); condicoes.push(`p.etapa_id = $${params.length}`); }
+    if (recurso_id) { params.push(recurso_id); condicoes.push(`p.recurso_id = $${params.length}`); }
+    if (status_pagamento) { params.push(status_pagamento); condicoes.push(`p.status_pagamento = $${params.length}`); }
+    if (prioridade) { params.push(prioridade); condicoes.push(`p.prioridade = $${params.length}`); }
+
     const { rows } = await pool.query(
       `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
               extract(day from now() - p.entrou_na_etapa_em)::int as dias_na_etapa,
@@ -639,9 +650,9 @@ async function build() {
        from crm_pedidos p
        join crm_clientes c on c.id = p.cliente_id
        left join crm_recursos r on r.id = p.recurso_id
-       where p.tenant_id = $1
+       where ${condicoes.join(' and ')}
        order by p.criado_em desc`,
-      [tenantId]
+      params
     );
     return rows;
   });

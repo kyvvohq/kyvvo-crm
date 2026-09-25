@@ -13,48 +13,17 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .painel-main { overflow-x:hidden; }
-  .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
-  .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
-
-  .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
-    display:flex; align-items:center; z-index:3; color:var(--text); }
-
-  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
-    display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; color:var(--text); cursor:grab; }
-  .coluna-header.arrastando-coluna { opacity:.4; }
-  .coluna-header.recebendo-coluna { border-color:var(--accent); }
-  .coluna-header.tipo-ganha .nome-etapa { color:var(--success); }
-  .coluna-header.tipo-perdida .nome-etapa { color:var(--danger); }
-  .coluna-header .nome-etapa { flex:1; cursor:text; }
-  .coluna-header .contagem-coluna { font-size:11px; font-weight:600; color:var(--muted); background:var(--surface-muted);
-    border-radius:var(--radius-full); padding:2px 8px; }
-  .coluna-header input.editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px;
-    padding:2px 6px; font-size:13px; color:var(--text); }
-  .coluna-header button { background:transparent; color:var(--muted); width:auto; height:auto; margin:0; padding:2px 6px;
-    font-size:12px; border-radius:6px; }
-  .coluna-header button:hover { background:var(--surface-muted); color:var(--danger); }
-  .coluna-header .btn-pronto { display:flex; }
-  .coluna-header .btn-pronto:hover { color:var(--accent); }
-  .coluna-header .btn-pronto.ativo { color:var(--accent-strong); }
-
-  .coluna-add { display:flex; align-items:center; min-width:180px; }
-  .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
-
-  .celula { background:var(--bg); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px;
-    min-width:220px; min-height:60px; display:flex; flex-direction:column; gap:6px; }
-  .celula.arrastando-sobre { border-color:var(--accent); background:var(--accent-tint); }
-  .celula-vazia { color:var(--muted); font-size:11px; padding:10px 4px; text-align:center; }
-
-  .cartao-pedido { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:grab; font-size:12.5px; }
-  .cartao-pedido:active { cursor:grabbing; }
-  .cartao-pedido .nome { font-weight:700; color:var(--text); margin-bottom:2px; }
-  .cartao-pedido .linha { display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
-  .cartao-pedido .valor { font-weight:600; color:var(--text-secondary); }
-  .cartao-pedido .dias-parado { color:var(--danger); font-weight:600; }
-
-  .editar-nome { width:100%; background:transparent; border:1px solid var(--accent); border-radius:6px; padding:2px 6px;
-    font-size:13px; color:var(--text); }
+  .filtros { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+  .filtros select { height:38px; font-size:13px; min-width:150px; }
+  tr.linha-pedido td { position:relative; }
+  .menu-acoes-wrap { position:relative; display:inline-block; }
+  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
+  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
+    box-shadow:var(--shadow-md); min-width:190px; z-index:20; padding:6px; }
+  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
+  .menu-acoes button:hover { background:var(--surface-muted); }
+  .menu-acoes button.perigo { color:var(--danger); }
   .linha-recurso { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13.5px; }
   .linha-recurso:first-child { border-top:none; }
   .linha-recurso .nome-recurso { cursor:text; flex:1; }
@@ -100,7 +69,8 @@
         <div class="grupo-titulo">Kyvvo CRM</div>
         <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
         <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
-        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="kanban"></span><span class="rotulo">Pedidos</span></a>
+        <a class="menu-item" href="/crm/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="list"></span><span class="rotulo">Pedidos</span></a>
         <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Campanhas</span></a>
       </nav>
       </aside>
@@ -110,20 +80,42 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Pedidos</h1></div>
-          <p class="descricao">Arraste os cards entre etapas e raias. Clique no nome de uma etapa pra renomear.</p>
+          <div class="linha-titulo"><h1>Pedidos</h1><span class="contagem" id="contagem-pedidos">—</span></div>
+          <p class="descricao">Lista com filtros — pra mexer no fluxo visual (arrastar entre etapas), use o Quadro.</p>
         </div>
         <div class="acoes">
           <button type="button" class="btn-secundario" id="btn-importar-upseller">Importar UpSeller</button>
           <button type="button" class="btn-secundario" id="btn-importar-nfe">Importar NF-e</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-produtos">Produtos</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-recursos">Recursos</button>
-          <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
         </div>
       </div>
 
-      <div class="quadro-scroll">
-        <div class="quadro-grid" id="quadro-grid"></div>
+      <div class="filtros">
+        <select id="f-etapa"><option value="">Etapa — qualquer</option></select>
+        <select id="f-recurso"><option value="">Recurso — qualquer</option></select>
+        <select id="f-pagamento">
+          <option value="">Pagamento — qualquer</option>
+          <option value="pendente">Pendente</option>
+          <option value="parcial">Parcial</option>
+          <option value="pago">Pago</option>
+        </select>
+        <select id="f-prioridade">
+          <option value="">Prioridade — qualquer</option>
+          <option value="altissima">Altíssima</option>
+          <option value="alta">Alta</option>
+          <option value="media">Média</option>
+          <option value="baixa">Baixa</option>
+        </select>
+      </div>
+
+      <div class="card" style="padding:0">
+        <table>
+          <thead>
+            <tr><th>Cliente</th><th>Etapa</th><th>Prioridade</th><th>Pagamento</th><th>Valor</th><th>Data</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-pedidos"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -133,220 +125,138 @@
   <script src="/ds/components.js"></script>
   <script src="/crm/shell.js"></script>
   <script>
+    let pedidos = [];
     let etapas = [];
     let recursos = [];
-    let pedidos = [];
     let produtos = [];
-    const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
 
     async function carregar() {
-      const [resEtapas, resRecursos, resPedidos, resProdutos] = await Promise.all([
+      const params = new URLSearchParams();
+      if (document.getElementById('f-etapa').value) params.set('etapa_id', document.getElementById('f-etapa').value);
+      if (document.getElementById('f-recurso').value) params.set('recurso_id', document.getElementById('f-recurso').value);
+      if (document.getElementById('f-pagamento').value) params.set('status_pagamento', document.getElementById('f-pagamento').value);
+      if (document.getElementById('f-prioridade').value) params.set('prioridade', document.getElementById('f-prioridade').value);
+      const qs = params.toString();
+
+      const [resPedidos, resEtapas, resRecursos, resProdutos] = await Promise.all([
+        apiFetch(`/crm/api/pedidos${qs ? '?' + qs : ''}`),
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
-        apiFetch('/crm/api/pedidos'),
         apiFetch('/crm/api/produtos'),
       ]);
+      pedidos = await resPedidos.json();
       etapas = await resEtapas.json();
       recursos = await resRecursos.json();
-      pedidos = await resPedidos.json();
       produtos = await resProdutos.json();
+
+      document.getElementById('f-etapa').innerHTML = '<option value="">Etapa — qualquer</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
+      document.getElementById('f-recurso').innerHTML = '<option value="">Recurso — qualquer</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
+
       renderizar();
     }
 
-    function raias() {
-      // Raia fixa "Sem recurso" (recurso_id null) sempre primeiro — pedido
-      // nunca fica "perdido" visualmente só por não ter recurso atribuído.
-      return [{ id: null, nome: 'Sem recurso', fixa: true }, ...recursos];
-    }
+    ['f-etapa', 'f-recurso', 'f-pagamento', 'f-prioridade'].forEach((id) => {
+      document.getElementById(id).addEventListener('change', carregar);
+    });
 
-    function pedidosDe(recursoId, etapaId) {
-      return pedidos.filter((p) => (p.recurso_id || null) === recursoId && p.etapa_id === etapaId);
-    }
-
+    const ROTULO_PRIORIDADE = { altissima: 'Altíssima', alta: 'Alta', media: 'Média', baixa: 'Baixa' };
     const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
 
-    function cartaoHtml(p) {
-      // Usa o prazo real configurado na etapa (US19) — não um limiar fixo.
-      // Etapa sem prazo configurado nunca alerta.
-      const etapaDoCartao = etapas.find((et) => et.id === p.etapa_id);
-      const prazo = etapaDoCartao ? etapaDoCartao.prazo_alerta_dias : null;
-      const alerta = prazo != null && p.dias_na_etapa >= prazo;
-      const numQtd = Number(p.quantidade_itens);
-      const qtd = numQtd > 1 ? `${Number.isInteger(numQtd) ? numQtd : numQtd.toLocaleString('pt-BR')}× ` : '';
-      return `
-        <div class="cartao-pedido" draggable="true" data-pedido="${p.id}">
-          <div class="nome">${qtd}${escapeHtml(p.cliente_nome)}</div>
-          <div class="linha">
-            <span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span>
-            <span class="valor">${formatarMoeda(p.valor_total)}</span>
-          </div>
-          <div class="linha">
-            <span style="color:var(--muted)">${escapeHtml(p.origem)}</span>
-            <span class="${alerta ? 'dias-parado' : ''}" style="font-size:11px">${p.dias_na_etapa}d</span>
-          </div>
-        </div>
-      `;
-    }
-
     function renderizar() {
-      const linhas = raias();
-      const grid = document.getElementById('quadro-grid');
-      grid.style.gridTemplateColumns = `170px repeat(${etapas.length}, minmax(230px, 1fr)) 190px`;
-
-      let html = '<div></div>';
-      etapas.forEach((et) => {
-        html += `
-          <div class="coluna-header tipo-${et.tipo}" draggable="true" data-etapa-header="${et.id}">
-            <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
-            <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
-            <button type="button" class="btn-pronto${et.eh_pronto ? ' ativo' : ''}" data-marcar-pronto="${et.id}" data-valor-pronto="${!et.eh_pronto}" title="${et.eh_pronto ? 'Esta é a etapa de pronto pra envio/retirada (clique pra desmarcar)' : 'Marcar como etapa de pronto pra envio/retirada'}">${icon('package-check', 14)}</button>
-            <button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>
-          </div>
-        `;
-      });
-      html += `<div class="coluna-add"><input type="text" id="input-nova-etapa" placeholder="+ Nova etapa (Enter)"></div>`;
-
-      linhas.forEach((raia) => {
-        html += `<div class="raia-label">${escapeHtml(raia.nome)}</div>`;
-        etapas.forEach((et) => {
-          const cartoes = pedidosDe(raia.id, et.id);
-          html += `
-            <div class="celula" data-raia="${raia.id || ''}" data-etapa="${et.id}" data-tipo-etapa="${et.tipo}">
-              ${cartoes.map(cartaoHtml).join('') || '<div class="celula-vazia">—</div>'}
+      document.getElementById('contagem-pedidos').textContent = pedidos.length;
+      const tbody = document.getElementById('tbody-pedidos');
+      if (!pedidos.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">Nenhum pedido com esses filtros.</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = pedidos.map((p) => {
+        const etapa = etapas.find((e) => e.id === p.etapa_id);
+        return `
+        <tr class="linha-pedido" data-id="${p.id}">
+          <td>${escapeHtml(p.cliente_nome)}</td>
+          <td>${escapeHtml(etapa ? etapa.nome : '—')}</td>
+          <td>${p.prioridade ? `<span class="badge${p.prioridade === 'altissima' ? ' badge-prioridade-altissima' : ''}">${ROTULO_PRIORIDADE[p.prioridade]}</span>` : '—'}</td>
+          <td><span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span></td>
+          <td>${formatarMoeda(p.valor_total)}</td>
+          <td>${formatarData(p.criado_em)}</td>
+          <td>
+            <div class="menu-acoes-wrap">
+              <button type="button" class="btn-acoes" data-abrir-menu="${p.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
+              <div class="menu-acoes" data-menu="${p.id}" hidden>
+                <button type="button" data-editar-pedido="${p.id}">Editar pedido</button>
+                <button type="button" data-pagamento-confirmado="${p.id}">Pagamento confirmado</button>
+                <button type="button" data-acionar-cliente="${p.id}">Acionar cliente</button>
+                <button type="button" class="perigo" data-cancelar-pedido="${p.id}">Cancelar pedido</button>
+              </div>
             </div>
-          `;
-        });
-        html += '<div></div>';
-      });
-
-      grid.innerHTML = html;
-      ligarEventosGrid();
+          </td>
+        </tr>
+      `;
+      }).join('');
+      ligarEventosLinhas();
     }
 
-    function ligarEventosGrid() {
-      document.querySelectorAll('.cartao-pedido').forEach((cartao) => {
-        cartao.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData('text/plain', cartao.dataset.pedido);
-        });
-        cartao.addEventListener('click', () => abrirDetalhe(cartao.dataset.pedido));
-      });
+    function fecharMenusAbertos() {
+      document.querySelectorAll('.menu-acoes').forEach((m) => { m.hidden = true; });
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.menu-acoes-wrap')) fecharMenusAbertos();
+    });
 
-      document.querySelectorAll('.celula').forEach((celula) => {
-        celula.addEventListener('dragover', (e) => {
-          if (!e.dataTransfer.types.includes('text/plain')) return;
-          e.preventDefault();
-          celula.classList.add('arrastando-sobre');
-        });
-        celula.addEventListener('dragleave', () => celula.classList.remove('arrastando-sobre'));
-        celula.addEventListener('drop', async (e) => {
-          if (!e.dataTransfer.types.includes('text/plain')) return;
-          e.preventDefault();
-          celula.classList.remove('arrastando-sobre');
-          const pedidoId = e.dataTransfer.getData('text/plain');
-          await moverPedido(pedidoId, celula.dataset.etapa, celula.dataset.raia || null, celula.dataset.tipoEtapa);
-        });
-      });
-
-      document.querySelectorAll('[data-etapa-header]').forEach((header) => {
-        header.addEventListener('dragstart', (e) => {
-          e.dataTransfer.setData(TIPO_ARRASTO_COLUNA, header.dataset.etapaHeader);
-          header.classList.add('arrastando-coluna');
-        });
-        header.addEventListener('dragend', () => header.classList.remove('arrastando-coluna'));
-        header.addEventListener('dragover', (e) => {
-          if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
-          e.preventDefault();
-          header.classList.add('recebendo-coluna');
-        });
-        header.addEventListener('dragleave', () => header.classList.remove('recebendo-coluna'));
-        header.addEventListener('drop', async (e) => {
-          if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
-          e.preventDefault();
-          header.classList.remove('recebendo-coluna');
-          const idArrastado = e.dataTransfer.getData(TIPO_ARRASTO_COLUNA);
-          const idAlvo = header.dataset.etapaHeader;
-          if (!idArrastado || idArrastado === idAlvo) return;
-          const ids = etapas.map((et) => et.id);
-          const doIndice = ids.indexOf(idArrastado);
-          const paraIndice = ids.indexOf(idAlvo);
-          if (doIndice === -1 || paraIndice === -1) return;
-          ids.splice(doIndice, 1);
-          ids.splice(paraIndice, 0, idArrastado);
-          await apiFetch('/crm/api/etapas/reordenar', { method: 'PATCH', body: JSON.stringify({ ids }) });
-          carregar();
-        });
-      });
-
-      document.querySelectorAll('[data-editar-etapa]').forEach((span) => {
-        span.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const atual = span.textContent;
-          const input = document.createElement('input');
-          input.className = 'editar-nome';
-          input.value = atual;
-          span.replaceWith(input);
-          input.focus();
-          input.select();
-          const salvar = async () => {
-            const novo = input.value.trim();
-            if (novo && novo !== atual) {
-              await apiFetch(`/crm/api/etapas/${span.dataset.editarEtapa}`, { method: 'PATCH', body: JSON.stringify({ nome: novo }) });
-              await carregar();
-            } else {
-              input.replaceWith(span);
-            }
-          };
-          input.addEventListener('blur', salvar);
-          input.addEventListener('keydown', (e2) => { if (e2.key === 'Enter') input.blur(); });
-        });
-      });
-
-      document.querySelectorAll('[data-apagar-etapa]').forEach((btn) => {
+    function ligarEventosLinhas() {
+      document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          confirmarApagarEtapa(btn.dataset.apagarEtapa, btn.dataset.nomeEtapa);
+          const menu = document.querySelector(`[data-menu="${btn.dataset.abrirMenu}"]`);
+          const jaAberto = !menu.hidden;
+          fecharMenusAbertos();
+          menu.hidden = jaAberto;
         });
       });
-
-      document.querySelectorAll('[data-marcar-pronto]').forEach((btn) => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          await apiFetch(`/crm/api/etapas/${btn.dataset.marcarPronto}`, {
+      document.querySelectorAll('[data-editar-pedido]').forEach((btn) => {
+        btn.addEventListener('click', () => { fecharMenusAbertos(); abrirEdicaoPedido(btn.dataset.editarPedido); });
+      });
+      document.querySelectorAll('[data-pagamento-confirmado]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          fecharMenusAbertos();
+          await apiFetch(`/crm/api/pedidos/${btn.dataset.pagamentoConfirmado}/pagamento`, {
             method: 'PATCH',
-            body: JSON.stringify({ eh_pronto: btn.dataset.valorPronto === 'true' }),
+            body: JSON.stringify({ status_pagamento: 'pago' }),
           });
           carregar();
         });
       });
-
-      const inputNova = document.getElementById('input-nova-etapa');
-      if (inputNova) {
-        inputNova.addEventListener('keydown', async (e) => {
-          if (e.key !== 'Enter') return;
-          const nome = inputNova.value.trim();
-          if (!nome) return;
-          inputNova.disabled = true;
-          await apiFetch('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
-          await carregar();
+      document.querySelectorAll('[data-acionar-cliente]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          fecharMenusAbertos();
+          const p = pedidos.find((x) => x.id === btn.dataset.acionarCliente);
+          if (p && p.cliente_telefone) window.open(linkWhatsapp(p.cliente_telefone), '_blank', 'noopener');
         });
-      }
+      });
+      document.querySelectorAll('[data-cancelar-pedido]').forEach((btn) => {
+        btn.addEventListener('click', () => { fecharMenusAbertos(); confirmarCancelarPedido(btn.dataset.cancelarPedido); });
+      });
     }
 
-    function confirmarApagarEtapa(id, nome) {
-      const overlay = abrirModal('<h3>Apagar etapa?</h3>', `
-        <p class="modal-texto">Essa ação não pode ser desfeita. Se ainda houver pedidos em "${escapeHtml(nome)}", mova-os antes de apagar.</p>
-        <div class="modal-erro" id="apagar-etapa-erro"></div>
+    function confirmarCancelarPedido(pedidoId) {
+      const overlay = abrirModal('<h3>Cancelar pedido?</h3>', `
+        <p class="modal-texto">Essa ação não pode ser desfeita. O pedido vai pra etapa de "perdido".</p>
+        <label for="cancelar-motivo">Motivo</label>
+        <textarea id="cancelar-motivo" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
+        <div class="modal-erro" id="cancelar-erro"></div>
         <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="cancelar-apagar-etapa">Cancelar</button>
-          <button type="button" class="btn-perigo" id="confirmar-apagar-etapa">Apagar etapa</button>
+          <button type="button" class="btn-secundario" id="cancelar-voltar">Voltar</button>
+          <button type="button" class="btn-perigo" id="cancelar-confirmar">Cancelar pedido</button>
         </div>
       `);
-      document.getElementById('cancelar-apagar-etapa').addEventListener('click', fecharModal);
-      document.getElementById('confirmar-apagar-etapa').addEventListener('click', async () => {
-        const res = await apiFetch(`/crm/api/etapas/${id}`, { method: 'DELETE' });
+      document.getElementById('cancelar-voltar').addEventListener('click', fecharModal);
+      document.getElementById('cancelar-confirmar').addEventListener('click', async () => {
+        const motivo = document.getElementById('cancelar-motivo').value.trim();
+        if (!motivo) { document.getElementById('cancelar-erro').textContent = 'Motivo é obrigatório'; return; }
+        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/cancelar`, { method: 'POST', body: JSON.stringify({ motivo }) });
         if (!res.ok) {
           const dados = await res.json().catch(() => ({}));
-          document.getElementById('apagar-etapa-erro').textContent = dados.error || 'Falha ao apagar etapa';
+          document.getElementById('cancelar-erro').textContent = dados.error || 'Falha ao cancelar pedido';
           return;
         }
         fecharModal();
@@ -354,9 +264,14 @@
       });
     }
 
-    // Modal próprio no lugar do prompt() nativo (US27) — window.prompt trava
-    // automação de browser e destoa do resto da UI, que já usa abrirModal em
-    // todo canto. Resolve com o texto digitado, ou null se cancelado/fechado.
+    // --- Editar pedido (etapa/recurso/prioridade/pagamento, mesmo shape do
+    // modal de detalhe do Quadro) ---------------------------------------------
+    const ORIGENS_MARKETPLACE = ['shopee', 'tiktok', 'mercado livre', 'mercadolivre', ' ml'];
+    function ehOrigemPropria(origem) {
+      const o = ` ${(origem || '').toLowerCase()}`;
+      return !ORIGENS_MARKETPLACE.some((m) => o.includes(m));
+    }
+
     function pedirMotivoPerda() {
       return new Promise((resolve) => {
         const overlay = abrirModal('<h3>Motivo da perda</h3>', `
@@ -369,11 +284,7 @@
           </div>
         `);
         let resolvido = false;
-        const finalizar = (valor) => {
-          if (resolvido) return;
-          resolvido = true;
-          resolve(valor);
-        };
+        const finalizar = (valor) => { if (!resolvido) { resolvido = true; resolve(valor); } };
         document.getElementById('motivo-perda-cancelar').addEventListener('click', () => { finalizar(null); fecharModal(); });
         document.getElementById('motivo-perda-confirmar').addEventListener('click', () => {
           const texto = document.getElementById('motivo-perda-texto').value.trim();
@@ -381,44 +292,87 @@
           finalizar(texto);
           fecharModal();
         });
-        // Fechar pelo X, clique fora ou Esc conta como cancelar.
         overlay.querySelector('#modal-close').addEventListener('click', () => finalizar(null));
         overlay.addEventListener('click', (e) => { if (e.target === overlay) finalizar(null); });
-        document.addEventListener('keydown', function escHandler(e) {
-          if (e.key !== 'Escape') return;
-          finalizar(null);
-          document.removeEventListener('keydown', escHandler);
-        });
       });
     }
 
-    async function moverPedido(pedidoId, etapaId, recursoId, tipoEtapa) {
-      const pedido = pedidos.find((p) => p.id === pedidoId);
-      if (!pedido) return;
-      const etapaMudou = pedido.etapa_id !== etapaId;
-      const recursoMudou = (pedido.recurso_id || null) !== (recursoId || null);
-      if (!etapaMudou && !recursoMudou) return;
+    function abrirEdicaoPedido(pedidoId) {
+      const p = pedidos.find((x) => x.id === pedidoId);
+      if (!p) return;
+      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
+      abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
+        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}</p>
+        ${ehOrigemPropria(p.origem) ? `<div class="banner-assinatura" style="margin-top:12px"><span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span></div>` : ''}
+        <div class="grid2">
+          <div><label for="e-etapa">Etapa</label>
+            <select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>
+          </div>
+          <div><label for="e-recurso">Recurso</label>
+            <select id="e-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div><label for="e-prioridade">Prioridade</label>
+            <select id="e-prioridade">
+              <option value="">Nenhuma</option>
+              <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
+              <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
+              <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
+              <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
+            </select>
+          </div>
+          <div><label for="e-status">Pagamento</label>
+            <select id="e-status">
+              <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
+              <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
+              <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
+            </select>
+          </div>
+        </div>
+        <label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal">
+        <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
+        <div class="modal-erro" id="e-erro"></div>
+        <div class="modal-acoes">
+          ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
+          <button type="button" id="btn-salvar-edicao">Salvar</button>
+        </div>
+      `);
+      const campoRecebido = document.getElementById('e-recebido');
+      campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      aplicarMascaraMoeda(campoRecebido);
 
-      if (etapaMudou) {
-        let motivoPerda;
-        if (tipoEtapa === 'perdida') {
-          motivoPerda = await pedirMotivoPerda();
-          if (!motivoPerda) return;
+      document.getElementById('btn-salvar-edicao').addEventListener('click', async () => {
+        const novaEtapaId = document.getElementById('e-etapa').value;
+        const novoRecursoId = document.getElementById('e-recurso').value || null;
+        const novaPrioridade = document.getElementById('e-prioridade').value || null;
+        const novoStatus = document.getElementById('e-status').value;
+        const novoRecebido = valorMoedaParaNumero(campoRecebido);
+
+        if (novaEtapaId !== p.etapa_id) {
+          const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
+          let motivoPerda;
+          if (etapaAlvo.tipo === 'perdida') {
+            motivoPerda = await pedirMotivoPerda();
+            if (!motivoPerda) return;
+          }
+          const res = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }) });
+          if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao mover etapa'; return; }
         }
-        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/etapa`, {
-          method: 'PATCH',
-          body: JSON.stringify({ etapa_id: etapaId, motivo_perda: motivoPerda }),
-        });
-        if (!res.ok) { avisar('Erro', 'Falha ao mover pedido de etapa'); return; }
-      }
-      if (recursoMudou) {
-        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/recurso`, {
-          method: 'PATCH',
-          body: JSON.stringify({ recurso_id: recursoId }),
-        });
-        if (!res.ok) { avisar('Erro', 'Falha ao atribuir recurso'); return; }
-      }
-      await carregar();
+        if (novoRecursoId !== (p.recurso_id || null)) {
+          const res = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, { method: 'PATCH', body: JSON.stringify({ recurso_id: novoRecursoId }) });
+          if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atribuir recurso'; return; }
+        }
+        if (novaPrioridade !== (p.prioridade || null)) {
+          const res = await apiFetch(`/crm/api/pedidos/${p.id}/prioridade`, { method: 'PATCH', body: JSON.stringify({ prioridade: novaPrioridade }) });
+          if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atualizar prioridade'; return; }
+        }
+        const res = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }) });
+        if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar pagamento'; return; }
+
+        fecharModal();
+        carregar();
+      });
     }
 
     // --- Importar NF-e (US21) -----------------------------------------------
@@ -503,12 +457,12 @@
       });
     });
 
-    // --- Gerenciar recursos (raias) ---------------------------------------
+    // --- Gerenciar recursos (raias do Quadro) -------------------------------
     document.getElementById('btn-gerenciar-recursos').addEventListener('click', () => abrirModalRecursos());
 
     function abrirModalRecursos() {
       abrirModal('<h3>Recursos de produção</h3>', `
-        <p class="modal-texto">São as raias do quadro — ex.: cada impressora 3D, forno, posto de trabalho. Pedido sem recurso fica em "Sem recurso".</p>
+        <p class="modal-texto">São as raias do Quadro — ex.: cada impressora 3D, forno, posto de trabalho. Pedido sem recurso fica em "Sem recurso".</p>
         <div id="lista-recursos"></div>
         <label for="input-novo-recurso">Novo recurso</label>
         <input type="text" id="input-novo-recurso" placeholder="ex.: Impressora 1 (Enter pra adicionar)">
@@ -615,180 +569,6 @@
           await carregar();
           renderizarListaProdutos();
         });
-      });
-    }
-
-    // --- Novo pedido ---------------------------------------------------------
-    document.getElementById('btn-novo-pedido').addEventListener('click', () => {
-      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
-      const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
-      const overlay = abrirModal('<h3>Novo pedido</h3>', `
-        <div class="grid2">
-          <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
-          <div><label for="p-nome-cliente">Nome (se cliente novo)</label><input id="p-nome-cliente"></div>
-        </div>
-        ${produtos.length ? `
-        <label for="p-produto">Produto do catálogo (opcional)</label>
-        <select id="p-produto"><option value="">— escolher da lista preenche descrição e valor —</option>${opcoesProduto}</select>
-        ` : ''}
-        <div class="grid2">
-          <div><label for="p-descricao">Item / descrição</label><input id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
-          <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-valor">Valor total</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
-          <div><label for="p-origem">Origem<span class="obrigatorio">*</span></label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-entrega">Tipo de entrega</label><input id="p-entrega" placeholder="retirada, correios, uber…"></div>
-          <div><label for="p-recurso">Recurso</label>
-            <select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
-          </div>
-        </div>
-        <div class="modal-erro" id="p-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="btn-cancelar-pedido">Cancelar</button>
-          <button type="button" id="btn-salvar-pedido">Criar pedido</button>
-        </div>
-      `);
-      const campoValorPedido = document.getElementById('p-valor');
-      aplicarMascaraMoeda(campoValorPedido);
-      const selectProduto = document.getElementById('p-produto');
-      if (selectProduto) {
-        selectProduto.addEventListener('change', () => {
-          const opcao = selectProduto.selectedOptions[0];
-          if (!opcao.value) return;
-          document.getElementById('p-descricao').value = opcao.textContent;
-          if (opcao.dataset.preco) {
-            campoValorPedido.value = Number(opcao.dataset.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          }
-        });
-      }
-      document.getElementById('btn-cancelar-pedido').addEventListener('click', fecharModal);
-      document.getElementById('btn-salvar-pedido').addEventListener('click', async () => {
-        const origem = document.getElementById('p-origem').value.trim();
-        if (!origem) { document.getElementById('p-erro').textContent = 'Origem é obrigatória'; return; }
-        const res = await apiFetch('/crm/api/pedidos', {
-          method: 'POST',
-          body: JSON.stringify({
-            telefone: document.getElementById('p-telefone').value.trim() || null,
-            nome_cliente: document.getElementById('p-nome-cliente').value.trim() || null,
-            produto_id: selectProduto ? (selectProduto.value || null) : null,
-            descricao: document.getElementById('p-descricao').value.trim() || null,
-            quantidade: Number(document.getElementById('p-quantidade').value) || 1,
-            valor_total: valorMoedaParaNumero(campoValorPedido),
-            origem,
-            tipo_entrega: document.getElementById('p-entrega').value.trim() || null,
-            recurso_id: document.getElementById('p-recurso').value || null,
-          }),
-        });
-        if (!res.ok) {
-          const dados = await res.json().catch(() => ({}));
-          document.getElementById('p-erro').textContent = dados.error || 'Falha ao criar pedido';
-          return;
-        }
-        fecharModal();
-        carregar();
-      });
-    });
-
-    // --- Detalhe do pedido -----------------------------------------------------
-    // US20: aviso de cartão de recompra — só pra canal próprio. Marketplace
-    // (Shopee/TikTok Shop/Mercado Livre) proíbe material de outro
-    // produto/serviço ou link externo dentro do pacote (seção 9 do doc);
-    // regras do TikTok Shop ainda não confirmadas (DECISOES-PENDENTES #6),
-    // tratado com a mesma cautela da Shopee por ora.
-    const ORIGENS_MARKETPLACE = ['shopee', 'tiktok', 'mercado livre', 'mercadolivre', ' ml'];
-    function ehOrigemPropria(origem) {
-      const o = ` ${(origem || '').toLowerCase()}`;
-      return !ORIGENS_MARKETPLACE.some((m) => o.includes(m));
-    }
-
-    function abrirDetalhe(pedidoId) {
-      const p = pedidos.find((x) => x.id === pedidoId);
-      if (!p) return;
-      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
-      const overlay = abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
-
-        ${ehOrigemPropria(p.origem) ? `
-        <div class="banner-assinatura" style="margin-top:12px">
-          <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
-        </div>` : ''}
-
-        <div class="grid2">
-          <div><label for="d-etapa">Etapa</label>
-            <select id="d-etapa">
-              ${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}
-            </select>
-          </div>
-          <div><label for="d-recurso">Recurso</label>
-            <select id="d-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
-          </div>
-        </div>
-
-        <div class="grid2">
-          <div><label for="d-status">Pagamento</label>
-            <select id="d-status">
-              <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
-              <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
-              <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
-            </select>
-          </div>
-          <div><label for="d-recebido">Valor recebido</label><input id="d-recebido" inputmode="decimal"></div>
-        </div>
-        <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
-
-        <div class="modal-erro" id="d-erro"></div>
-        <div class="modal-acoes">
-          ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
-          <button type="button" id="btn-salvar-detalhe">Salvar</button>
-        </div>
-      `);
-
-      const campoRecebido = document.getElementById('d-recebido');
-      campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      aplicarMascaraMoeda(campoRecebido);
-
-      document.getElementById('btn-salvar-detalhe').addEventListener('click', async () => {
-        const novaEtapaId = document.getElementById('d-etapa').value;
-        const novoRecursoId = document.getElementById('d-recurso').value || null;
-        const novoStatus = document.getElementById('d-status').value;
-        const novoRecebido = valorMoedaParaNumero(campoRecebido);
-
-        if (novaEtapaId !== p.etapa_id) {
-          const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
-          let motivoPerda;
-          if (etapaAlvo.tipo === 'perdida') {
-            // Abre por cima do modal de detalhe (abrirModal fecha o atual antes
-            // de abrir o novo) — os valores do formulário já foram lidos acima,
-            // então perder o modal de detalhe aqui não perde dado nenhum.
-            motivoPerda = await pedirMotivoPerda();
-            if (!motivoPerda) return;
-          }
-          const resEtapa = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, {
-            method: 'PATCH',
-            body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }),
-          });
-          if (!resEtapa.ok) { document.getElementById('d-erro').textContent = 'Falha ao mover etapa'; return; }
-        }
-
-        if (novoRecursoId !== (p.recurso_id || null)) {
-          const resRecurso = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, {
-            method: 'PATCH',
-            body: JSON.stringify({ recurso_id: novoRecursoId }),
-          });
-          if (!resRecurso.ok) { document.getElementById('d-erro').textContent = 'Falha ao atribuir recurso'; return; }
-        }
-
-        const resPagamento = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }),
-        });
-        if (!resPagamento.ok) { document.getElementById('d-erro').textContent = 'Falha ao salvar pagamento'; return; }
-
-        fecharModal();
-        carregar();
       });
     }
 
