@@ -76,6 +76,19 @@ document.querySelectorAll('.menu-item[href]').forEach((item) => {
   if (item.getAttribute('href') === window.location.pathname) item.classList.add('active');
 });
 
+// --- Grupo colapsável do menu (Configurações > Automações etc.) ---
+document.querySelectorAll('.ds-menu-sublink[href]').forEach((item) => {
+  if (item.getAttribute('href') === window.location.pathname) item.classList.add('ds-menu-sublink-ativo');
+});
+document.querySelectorAll('.ds-menu-grupo-botao').forEach((botao) => {
+  const grupo = botao.closest('.ds-menu-grupo');
+  const jaTemAtivo = !!(grupo && grupo.querySelector('.ds-menu-sublink-ativo'));
+  botao.setAttribute('aria-expanded', String(jaTemAtivo));
+  botao.addEventListener('click', () => {
+    botao.setAttribute('aria-expanded', String(botao.getAttribute('aria-expanded') !== 'true'));
+  });
+});
+
 // --- Tema claro/escuro ---
 function temaAtual() {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';

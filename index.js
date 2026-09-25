@@ -18,7 +18,8 @@ const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelator
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
-const { enviarTexto, enviarBotoes, enviarLista } = require('@kyvvohq/whatsapp');
+const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
+const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
 
 const PORT = process.env.PORT || 3005;
 
@@ -706,6 +707,8 @@ async function build() {
         [tenantId, cliente.id, pedido.id]
       );
       await client.query('COMMIT');
+      dispararPedidoCriado(pool, { tenantId, pedidoId: pedido.id, cliente, valorTotal: pedido.valor_total })
+        .catch((err) => fastify.log.error(`[automacoes] pedido_criado: ${err.message}`));
       return reply.code(201).send({ ...pedido, cliente });
     } catch (erro) {
       await client.query('ROLLBACK');
@@ -714,6 +717,20 @@ async function build() {
       client.release();
     }
   });
+
+  // Best-effort, não bloqueia a resposta da rota que moveu o pedido — busca
+  // nome/telefone do cliente (não vem no `returning *` de crm_pedidos) e
+  // dispara toda automação 'mudanca_etapa' configurada pra etapa de destino.
+  function disparaAutomacaoDeEtapa(pedido, etapa) {
+    pool.query('select nome, telefone from crm_clientes where id = $1', [pedido.cliente_id])
+      .then(({ rows }) => {
+        if (!rows[0]) return null;
+        return dispararMudancaEtapa(pool, {
+          tenantId: pedido.tenant_id, pedidoId: pedido.id, etapaId: etapa.id, etapaNome: etapa.nome, cliente: rows[0],
+        });
+      })
+      .catch((err) => fastify.log.error(`[automacoes] mudanca_etapa: ${err.message}`));
+  }
 
   // Mover de etapa (arrastar no kanban). Exige motivo quando a etapa de
   // destino é do tipo 'perdida' (seção 7.2).
@@ -741,6 +758,7 @@ async function build() {
        values ($1, $2, $3, 'mudanca_etapa', $4, $5)`,
       [tenantId, rows[0].cliente_id, rows[0].id, JSON.stringify({ etapa_id, motivo_perda: motivo_perda || null }), userId || null]
     );
+    disparaAutomacaoDeEtapa(rows[0], etapaRows[0]);
     return rows[0];
   });
 
@@ -809,7 +827,7 @@ async function build() {
     if (!motivo) return reply.code(400).send({ error: 'Motivo é obrigatório pra cancelar um pedido' });
 
     const { rows: etapaRows } = await pool.query(
-      `select id from crm_etapas where tenant_id = $1 and tipo = 'perdida' order by ordem asc limit 1`,
+      `select id, nome from crm_etapas where tenant_id = $1 and tipo = 'perdida' order by ordem asc limit 1`,
       [tenantId]
     );
     if (!etapaRows[0]) return reply.code(409).send({ error: 'Conta sem etapa do tipo "perdida" configurada' });
@@ -826,6 +844,7 @@ async function build() {
        values ($1, $2, $3, 'mudanca_etapa', $4, $5)`,
       [tenantId, rows[0].cliente_id, rows[0].id, JSON.stringify({ etapa_id: etapaRows[0].id, motivo_perda: motivo, origem: 'cancelamento_lista' }), userId || null]
     );
+    disparaAutomacaoDeEtapa(rows[0], etapaRows[0]);
     return rows[0];
   });
 
@@ -1081,6 +1100,69 @@ async function build() {
     return rows;
   });
 
+  // --- Automações (issue #40) -----------------------------------------------
+  // V1: só WhatsApp, só funciona pra tenant com número vinculado (ver
+  // lib/automacoes.js). Motor de disparo em si fica todo em lib/automacoes.js
+  // — aqui é só CRUD de configuração + a lista de templates da Meta pra UI.
+  fastify.get('/crm/api/automacoes', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      `select a.*, e.nome as etapa_nome from crm_automacoes a
+       left join crm_etapas e on e.id = a.etapa_id
+       where a.tenant_id = $1 order by a.criado_em desc`,
+      [request.user.tenantId]
+    );
+    return rows;
+  });
+
+  fastify.get('/crm/api/automacoes/templates-whatsapp', { preHandler: fastify.authenticate }, async () => {
+    return listarTemplates();
+  });
+
+  fastify.post('/crm/api/automacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { nome, gatilho, etapa_id, whatsapp_template } = request.body || {};
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    if (!GATILHOS_VALIDOS.includes(gatilho)) return reply.code(400).send({ error: `Gatilho inválido. Válidos: ${GATILHOS_VALIDOS.join(', ')}` });
+    if ((gatilho === 'mudanca_etapa' || gatilho === 'pedido_parado') && !etapa_id) {
+      return reply.code(400).send({ error: 'Esse gatilho exige uma etapa' });
+    }
+    if (etapa_id) {
+      const { rows: etapaRows } = await pool.query('select 1 from crm_etapas where id = $1 and tenant_id = $2', [etapa_id, tenantId]);
+      if (!etapaRows[0]) return reply.code(400).send({ error: 'Etapa inválida' });
+    }
+    const { rows } = await pool.query(
+      `insert into crm_automacoes (tenant_id, nome, gatilho, etapa_id, whatsapp_template)
+       values ($1, $2, $3, $4, $5) returning *`,
+      [tenantId, nome, gatilho, etapa_id || null, whatsapp_template || null]
+    );
+    return reply.code(201).send(rows[0]);
+  });
+
+  fastify.patch('/crm/api/automacoes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const campos = ['nome', 'whatsapp_template', 'ativo', 'etapa_id'];
+    const body = request.body || {};
+    const sets = [];
+    const params = [request.params.id, tenantId];
+    for (const campo of campos) {
+      if (body[campo] === undefined) continue;
+      params.push(body[campo]);
+      sets.push(`${campo} = $${params.length}`);
+    }
+    if (sets.length === 0) return reply.code(400).send({ error: 'Nenhum campo pra atualizar' });
+    const { rows } = await pool.query(
+      `update crm_automacoes set ${sets.join(', ')}, atualizado_em = now() where id = $1 and tenant_id = $2 returning *`,
+      params
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Automação não encontrada' });
+    return rows[0];
+  });
+
+  fastify.delete('/crm/api/automacoes/:id', { preHandler: fastify.authenticate }, async (request) => {
+    await pool.query('delete from crm_automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    return { ok: true };
+  });
+
   // --- Painel Hoje (seção 7.6) -------------------------------------------------
   fastify.get('/crm/api/painel-hoje', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
@@ -1142,6 +1224,13 @@ async function start() {
   const fastify = await build();
   try {
     await migrar();
+    // Checador dos gatilhos de automação sem evento síncrono (pedido parado
+    // numa etapa, aniversário do cliente) — granularidade de dia, de hora em
+    // hora é sobra. Só em start() (não em build(), usado pelos testes) pra
+    // não deixar um interval pendurado no processo de teste.
+    setInterval(() => {
+      checarGatilhosPeriodicos(pool).catch((err) => fastify.log.error(`[automacoes] checador periódico: ${err.message}`));
+    }, 60 * 60 * 1000);
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
   } catch (err) {
     fastify.log.error(err);
