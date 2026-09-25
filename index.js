@@ -18,7 +18,7 @@ const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelator
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
-const { enviarTexto, enviarBotoes } = require('@kyvvohq/whatsapp');
+const { enviarTexto, enviarBotoes, enviarLista } = require('@kyvvohq/whatsapp');
 
 const PORT = process.env.PORT || 3005;
 
@@ -77,6 +77,12 @@ async function build() {
     if (msg.type === 'interactive' && msg.interactive && msg.interactive.type === 'button_reply') {
       return { tipo: 'botao', id: msg.interactive.button_reply.id };
     }
+    // Clique numa mensagem de lista (interactive/list) — mesma forma que um
+    // clique de botão pro bot (só id importa), mas a Meta manda num campo
+    // diferente (list_reply em vez de button_reply).
+    if (msg.type === 'interactive' && msg.interactive && msg.interactive.type === 'list_reply') {
+      return { tipo: 'botao', id: msg.interactive.list_reply.id };
+    }
     if (msg.type === 'document' && msg.document) {
       return { tipo: 'arquivo', mediaId: msg.document.id, nomeArquivo: msg.document.filename || null };
     }
@@ -114,6 +120,8 @@ async function build() {
           for (const envio of envios) {
             if (envio.tipo === 'botoes') {
               await enviarBotoes({ to: telefoneE164, texto: envio.texto, botoes: envio.botoes, phoneNumberId });
+            } else if (envio.tipo === 'lista') {
+              await enviarLista({ to: telefoneE164, texto: envio.texto, tituloBotao: envio.tituloBotao, opcoes: envio.opcoes, phoneNumberId });
             } else {
               await enviarTexto({ to: telefoneE164, texto: envio.texto, phoneNumberId });
             }
@@ -306,7 +314,7 @@ async function build() {
 
   fastify.patch('/crm/api/clientes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'numero', 'complemento', 'data_nascimento', 'origem', 'segmento', 'observacoes'];
+    const campos = ['nome', 'telefone', 'email', 'cpf', 'cidade', 'uf', 'cep', 'numero', 'complemento', 'endereco_completo', 'data_nascimento', 'origem', 'segmento', 'observacoes'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];

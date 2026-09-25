@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { processarMensagem, SAUDACAO_TEXTO, SAUDACAO_BOTOES } = require('../lib/bot-whatsapp');
+const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES } = require('../lib/bot-whatsapp');
 
 function poolFalso({ semEtapa, clienteExistente } = {}) {
   const conversas = new Map();
@@ -33,10 +33,10 @@ function poolFalso({ semEtapa, clienteExistente } = {}) {
       if (/^select id from crm_etapas/.test(sql)) {
         return { rows: semEtapa ? [] : [{ id: 'etapa-1' }] };
       }
-      if (/^select cep, numero from crm_clientes/.test(sql)) {
+      if (/^select endereco_completo from crm_clientes/.test(sql)) {
         const [, telefone] = params;
         const c = clientes.get(telefone);
-        return { rows: c ? [{ cep: c.cep || null, numero: c.numero || null }] : [] };
+        return { rows: c ? [{ endereco_completo: c.endereco_completo || null }] : [] };
       }
       if (/^select \* from crm_clientes where tenant_id = \$1 and telefone = \$2/.test(sql)) {
         const [, telefone] = params;
@@ -49,9 +49,9 @@ function poolFalso({ semEtapa, clienteExistente } = {}) {
         clientes.set(telefone, cliente);
         return { rows: [cliente] };
       }
-      if (/^update crm_clientes set cep = \$1, numero = \$2, complemento = \$3/.test(sql)) {
-        const [cep, numero, complemento, clienteId] = params;
-        for (const c of clientes.values()) if (c.id === clienteId) Object.assign(c, { cep, numero, complemento });
+      if (/^update crm_clientes set endereco_completo = \$1/.test(sql)) {
+        const [enderecoCompleto, clienteId] = params;
+        for (const c of clientes.values()) if (c.id === clienteId) c.endereco_completo = enderecoCompleto;
         return { rows: [] };
       }
       throw new Error('query inesperada: ' + sql);
@@ -96,32 +96,40 @@ const baixarMidiaFalso = async (mediaId, { nomeArquivoSugerido }) => ({
 });
 const enviar = (pool, tenantId, telefoneE164, entrada, extra = {}) => processarMensagem(pool, { tenantId, telefoneE164, entrada, baixarMidia: baixarMidiaFalso, ...extra });
 
-test('primeira mensagem: manda a saudação com botões e cria conversa em aguardando_opcao', async () => {
+test('saudacaoTexto: usa o primeiro nome do WhatsApp quando disponível', () => {
+  assert.ok(saudacaoTexto('Maria da Silva').startsWith('Olá, Maria! 👋'));
+  assert.ok(saudacaoTexto(null).startsWith('Olá! 👋'));
+});
+
+test('primeira mensagem: manda a saudação com nome e botões', async () => {
   const { pool, conversas } = poolFalso();
-  const envios = await enviar(pool, TENANT, TELEFONE, texto('oi'));
-  assert.deepEqual(envios, [{ tipo: 'botoes', texto: SAUDACAO_TEXTO, botoes: SAUDACAO_BOTOES }]);
+  const envios = await enviar(pool, TENANT, TELEFONE, texto('oi'), { nomeWhatsapp: 'Ana Ribeiro' });
+  assert.deepEqual(envios, [{ tipo: 'botoes', texto: saudacaoTexto('Ana Ribeiro'), botoes: SAUDACAO_BOTOES }]);
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
 });
 
-test('botão "ver_lojas": manda o texto das lojas e encerra a conversa', async () => {
+test('ver_lojas -> encerrar_atendimento: agradece e encerra', async () => {
   const { pool, conversas, pedidos } = poolFalso();
   await enviar(pool, TENANT, TELEFONE, texto('oi'));
-  const envios = await enviar(pool, TENANT, TELEFONE, botao('ver_lojas'));
-  assert.equal(envios.length, 1);
-  assert.ok(envios[0].texto.includes('Shopee'));
+  const [lojas] = await enviar(pool, TENANT, TELEFONE, botao('ver_lojas'));
+  assert.equal(lojas.tipo, 'botoes');
+  assert.ok(lojas.texto.includes('Shopee'));
+  const [despedida] = await enviar(pool, TENANT, TELEFONE, botao('encerrar_atendimento'));
+  assert.ok(despedida.texto.includes('Até mais'));
   assert.equal(conversas.has(`${TENANT}|${TELEFONE}`), false);
   assert.equal(pedidos.length, 0);
 });
 
-test('entrada inesperada em aguardando_opcao: reenvia os mesmos botões', async () => {
+test('ver_lojas -> voltar_menu: volta pra saudação, não encerra', async () => {
   const { pool, conversas } = poolFalso();
   await enviar(pool, TENANT, TELEFONE, texto('oi'));
-  const envios = await enviar(pool, TENANT, TELEFONE, texto('blabla'));
-  assert.deepEqual(envios, [{ tipo: 'botoes', texto: SAUDACAO_TEXTO, botoes: SAUDACAO_BOTOES }]);
+  await enviar(pool, TENANT, TELEFONE, botao('ver_lojas'));
+  const [voltou] = await enviar(pool, TENANT, TELEFONE, botao('voltar_menu'));
+  assert.equal(voltou.tipo, 'botoes');
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
 });
 
-test('fluxo com arquivo: vários arquivos, cor, quantidade validada, endereço e criação do pedido', async () => {
+test('fluxo com arquivo: vários arquivos, cor, quantidade, endereço numa mensagem só', async () => {
   const { pool, conversas, clientes, pedidos, itens, arquivosPedido } = poolFalso();
   await enviar(pool, TENANT, TELEFONE, texto('oi'), { nomeWhatsapp: 'Maria da Silva' });
   await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
@@ -138,76 +146,97 @@ test('fluxo com arquivo: vários arquivos, cor, quantidade validada, endereço e
   const [invalida] = await enviar(pool, TENANT, TELEFONE, texto('umas três'));
   assert.ok(invalida.texto.includes('inteiro de pelo menos 1'));
 
-  const [pedeCep] = await enviar(pool, TENANT, TELEFONE, texto('3'));
-  assert.ok(pedeCep.texto.includes('CEP'));
-  const [pedeNumero] = await enviar(pool, TENANT, TELEFONE, texto('01310-000'));
-  assert.ok(pedeNumero.texto.includes('número'));
-  const [pedeComplemento] = await enviar(pool, TENANT, TELEFONE, texto('123'));
-  assert.ok(pedeComplemento.texto.includes('complemento'));
-  // Meta manda o nome do perfil em toda mensagem, não só na primeira — o
-  // webhook real (index.js) sempre repassa o valor mais recente.
-  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('não'), { nomeWhatsapp: 'Maria da Silva' });
+  const [pedeEndereco] = await enviar(pool, TENANT, TELEFONE, texto('3'));
+  assert.ok(pedeEndereco.texto.includes('endereço completo'));
+
+  const enderecoExemplo = 'Rua das Flores, 123, Apto 202, Centro, Uberlândia - MG, 38400-000';
+  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto(enderecoExemplo), { nomeWhatsapp: 'Maria da Silva' });
 
   assert.ok(confirmacao.texto.includes('peca.stl'));
   assert.ok(confirmacao.texto.includes('foto-referencia.png'));
   assert.ok(confirmacao.texto.includes('vermelho'));
   assert.ok(confirmacao.texto.includes('3'));
-  assert.ok(confirmacao.texto.includes('01310-000'));
+  assert.ok(confirmacao.texto.includes(enderecoExemplo));
 
   assert.equal(conversas.has(`${TENANT}|${TELEFONE}`), false);
   assert.equal(clientes.get(TELEFONE).nome, 'Maria da Silva');
-  assert.equal(clientes.get(TELEFONE).cep, '01310-000');
-  assert.equal(clientes.get(TELEFONE).numero, '123');
-  assert.equal(clientes.get(TELEFONE).complemento, null);
+  assert.equal(clientes.get(TELEFONE).endereco_completo, enderecoExemplo);
   assert.equal(pedidos.length, 1);
   assert.equal(itens[0].quantidade, 3);
   assert.equal(arquivosPedido.length, 2);
 });
 
-test('fluxo sem arquivo: referência em texto, quantidade e endereço', async () => {
-  const { pool, pedidos, itens, arquivosPedido } = poolFalso();
-  await enviar(pool, TENANT, TELEFONE, texto('oi'));
-  await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
-  const [pedeReferencia] = await enviar(pool, TENANT, TELEFONE, botao('sem_arquivo'));
-  assert.ok(pedeReferencia.texto.includes('referência'));
+for (const [id, tituloEsperado] of [
+  ['biscoito', 'Cortador de biscoito'],
+  ['projeto_3d', 'Projeto 3D'],
+  ['brinde', 'Brinde'],
+  ['decoracao', 'Decoração'],
+]) {
+  test(`fluxo sem arquivo: lista de tipo de peça "${id}" segue pro mesmo caminho`, async () => {
+    const { pool, pedidos, itens } = poolFalso();
+    await enviar(pool, TENANT, TELEFONE, texto('oi'));
+    await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
+    const [lista] = await enviar(pool, TENANT, TELEFONE, botao('sem_arquivo'));
+    assert.equal(lista.tipo, 'lista');
 
-  await enviar(pool, TENANT, TELEFONE, texto('Um vaso parecido com o modelo X do Pinterest'));
-  await enviar(pool, TENANT, TELEFONE, texto('2'));
-  await enviar(pool, TENANT, TELEFONE, texto('01310-000'));
-  await enviar(pool, TENANT, TELEFONE, texto('50'));
-  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('casa 2'));
+    const envios = await enviar(pool, TENANT, TELEFONE, botao(id));
+    assert.equal(envios.length, 2);
+    assert.ok(envios[0].texto.includes('textinho maior'));
+    assert.ok(envios[1].texto.includes('Sobre a sua peça'));
 
-  assert.ok(confirmacao.texto.includes('Pinterest'));
-  assert.ok(confirmacao.texto.includes('casa 2'));
-  assert.equal(pedidos.length, 1);
-  assert.equal(itens[0].quantidade, 2);
-  assert.equal(arquivosPedido.length, 0);
-});
+    const [pedeReferencia] = await enviar(pool, TENANT, TELEFONE, texto('Detalhes: logo da minha marca, uns 10cm, sem borda'));
+    assert.ok(pedeReferencia.texto.includes('foto, desenho ou referência'));
 
-test('fluxo sem arquivo: referência enviada como foto (arquivo) também é aceita', async () => {
-  const { pool, arquivosPedido } = poolFalso();
+    await enviar(pool, TENANT, TELEFONE, texto('Uma foto que mandei no Pinterest'));
+    await enviar(pool, TENANT, TELEFONE, texto('2'));
+    const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('Rua X, 10, Bairro Y, Cidade - UF, 00000-000'));
+
+    assert.ok(confirmacao.texto.includes(tituloEsperado));
+    assert.ok(confirmacao.texto.includes('Pinterest'));
+    assert.equal(pedidos.length, 1);
+    assert.equal(itens[0].quantidade, 2);
+  });
+}
+
+test('fluxo sem arquivo: opção "outro" pede descrição breve antes de seguir', async () => {
+  const { pool } = poolFalso();
   await enviar(pool, TENANT, TELEFONE, texto('oi'));
   await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
   await enviar(pool, TENANT, TELEFONE, botao('sem_arquivo'));
-  await enviar(pool, TENANT, TELEFONE, arquivo('foto.jpg'));
+  const [pedeDescricao] = await enviar(pool, TENANT, TELEFONE, botao('outro'));
+  assert.ok(pedeDescricao.texto.includes('descreva brevemente'));
+
+  const envios = await enviar(pool, TENANT, TELEFONE, texto('Um porta-chaves personalizado'));
+  assert.equal(envios.length, 2);
+
+  await enviar(pool, TENANT, TELEFONE, texto('sem detalhes extras'));
+  await enviar(pool, TENANT, TELEFONE, texto('foto em anexo depois'));
   await enviar(pool, TENANT, TELEFONE, texto('1'));
-  await enviar(pool, TENANT, TELEFONE, texto('01310-000'));
-  await enviar(pool, TENANT, TELEFONE, texto('50'));
-  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('não'));
-  assert.ok(confirmacao.texto.includes('foto.jpg'));
-  assert.equal(arquivosPedido.length, 1);
+  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('Rua X, 10, Bairro Y, Cidade - UF, 00000-000'));
+  assert.ok(confirmacao.texto.includes('Um porta-chaves personalizado'));
 });
 
-test('cliente já tem endereço cadastrado: pula direto pra confirmação, sem perguntar CEP', async () => {
-  const clienteExistente = { id: 'cliente-existente', tenant_id: TENANT, telefone: TELEFONE, nome: 'Ana', cep: '20000-000', numero: '10' };
+test('entrada inesperada na lista de tipo de peça: reenvia a lista', async () => {
+  const { pool, conversas } = poolFalso();
+  await enviar(pool, TENANT, TELEFONE, texto('oi'));
+  await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
+  await enviar(pool, TENANT, TELEFONE, botao('sem_arquivo'));
+  const [envio] = await enviar(pool, TENANT, TELEFONE, texto('não sei'));
+  assert.equal(envio.tipo, 'lista');
+  assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'pergunta_tipo_peca');
+});
+
+test('cliente já tem endereço cadastrado: pula a pergunta de endereço', async () => {
+  const clienteExistente = { id: 'cliente-existente', tenant_id: TENANT, telefone: TELEFONE, nome: 'Ana', endereco_completo: 'Rua Já Cadastrada, 1' };
   const { pool, pedidos } = poolFalso({ clienteExistente });
   await enviar(pool, TENANT, TELEFONE, texto('oi'));
   await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
   await enviar(pool, TENANT, TELEFONE, botao('sem_arquivo'));
-  await enviar(pool, TENANT, TELEFONE, texto('vaso simples'));
+  await enviar(pool, TENANT, TELEFONE, botao('brinde'));
+  await enviar(pool, TENANT, TELEFONE, texto('detalhes'));
+  await enviar(pool, TENANT, TELEFONE, texto('sem referência'));
   const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('1'));
-  assert.ok(confirmacao.texto.includes('vaso simples'));
-  assert.ok(!confirmacao.texto.includes('CEP'));
+  assert.ok(!confirmacao.texto.includes('endereço completo'));
   assert.equal(pedidos.length, 1);
 });
 
@@ -237,11 +266,11 @@ test('sem etapa configurada: ainda responde ao cliente, mas não cria pedido', a
   await enviar(pool, TENANT, TELEFONE, texto('oi'));
   await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido'));
   await enviar(pool, TENANT, TELEFONE, botao('sem_arquivo'));
-  await enviar(pool, TENANT, TELEFONE, texto('vaso simples'));
+  await enviar(pool, TENANT, TELEFONE, botao('projeto_3d'));
+  await enviar(pool, TENANT, TELEFONE, texto('detalhes'));
+  await enviar(pool, TENANT, TELEFONE, texto('sem referência'));
   await enviar(pool, TENANT, TELEFONE, texto('1'));
-  await enviar(pool, TENANT, TELEFONE, texto('01310-000'));
-  await enviar(pool, TENANT, TELEFONE, texto('50'));
-  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('não'));
+  const [confirmacao] = await enviar(pool, TENANT, TELEFONE, texto('Rua X, 10, Bairro Y, Cidade - UF, 00000-000'));
   assert.ok(confirmacao.texto.includes('Já registrei seu pedido'));
   assert.equal(pedidos.length, 0);
 });
