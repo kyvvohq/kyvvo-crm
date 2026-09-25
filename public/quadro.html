@@ -223,6 +223,7 @@
             <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
             <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
             <button type="button" class="btn-pronto${et.eh_pronto ? ' ativo' : ''}" data-marcar-pronto="${et.id}" data-valor-pronto="${!et.eh_pronto}" title="${et.eh_pronto ? 'Esta é a etapa de pronto pra envio/retirada (clique pra desmarcar)' : 'Marcar como etapa de pronto pra envio/retirada'}">${icon('package-check', 14)}</button>
+            <button type="button" class="btn-pronto" data-criar-automacao-etapa="${et.id}" title="Criar automação de WhatsApp pra quando um pedido entrar nessa etapa">⚡</button>
             <button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>
           </div>
         `;
@@ -339,6 +340,13 @@
             body: JSON.stringify({ eh_pronto: btn.dataset.valorPronto === 'true' }),
           });
           carregar();
+        });
+      });
+
+      document.querySelectorAll('[data-criar-automacao-etapa]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `/crm/automacoes.html?gatilho=mudanca_etapa&etapa_id=${btn.dataset.criarAutomacaoEtapa}`;
         });
       });
 

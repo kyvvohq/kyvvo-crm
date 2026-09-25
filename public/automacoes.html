@@ -111,6 +111,7 @@
       aniversario_cliente: 'Aniversário do cliente',
     };
     const GATILHOS_COM_ETAPA = ['mudanca_etapa', 'pedido_parado'];
+    const GATILHOS_VALIDOS_UI = ['mudanca_etapa', 'pedido_criado', 'pedido_parado', 'aniversario_cliente'];
 
     async function carregar() {
       const [resAutomacoes, resEtapas] = await Promise.all([
@@ -180,19 +181,23 @@
       return templates;
     }
 
-    document.getElementById('btn-nova-automacao').addEventListener('click', async () => {
+    // `gatilhoInicial`/`etapaIdInicial` vêm do ⚡ por etapa no Quadro
+    // (?gatilho=mudanca_etapa&etapa_id=...) — préseleciona o gatilho e a
+    // etapa em vez de abrir o formulário em branco.
+    async function abrirModalNovaAutomacao({ gatilhoInicial, etapaIdInicial } = {}) {
       await carregarTemplates();
-      const opcoesEtapa = etapas.map((e) => `<option value="${e.id}">${escapeHtml(e.nome)}</option>`).join('');
+      const opcoesEtapa = etapas.map((e) => `<option value="${e.id}" ${e.id === etapaIdInicial ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
       const opcoesTemplate = ['<option value="">Nenhum ainda</option>', ...templates.map((t) => `<option value="${escapeHtml(t.nome)}">${escapeHtml(t.nome)} (${t.status})</option>`)].join('');
+      const gatilhoInicialValido = GATILHOS_VALIDOS_UI.includes(gatilhoInicial) ? gatilhoInicial : 'mudanca_etapa';
       abrirModal('<h3>Nova automação</h3>', `
         <label for="au-nome">Nome</label>
         <input id="au-nome" placeholder="ex.: Aviso de pedido pronto">
         <label for="au-gatilho">Gatilho</label>
         <select id="au-gatilho">
-          <option value="mudanca_etapa">Pedido muda de etapa</option>
-          <option value="pedido_criado">Pedido criado</option>
-          <option value="pedido_parado">Pedido parado numa etapa</option>
-          <option value="aniversario_cliente">Aniversário do cliente</option>
+          <option value="mudanca_etapa" ${gatilhoInicialValido === 'mudanca_etapa' ? 'selected' : ''}>Pedido muda de etapa</option>
+          <option value="pedido_criado" ${gatilhoInicialValido === 'pedido_criado' ? 'selected' : ''}>Pedido criado</option>
+          <option value="pedido_parado" ${gatilhoInicialValido === 'pedido_parado' ? 'selected' : ''}>Pedido parado numa etapa</option>
+          <option value="aniversario_cliente" ${gatilhoInicialValido === 'aniversario_cliente' ? 'selected' : ''}>Aniversário do cliente</option>
         </select>
         <div id="au-etapa-wrap">
           <label for="au-etapa">Etapa</label>
@@ -244,9 +249,17 @@
         fecharModal();
         carregar();
       });
-    });
+    }
 
-    carregar();
+    document.getElementById('btn-nova-automacao').addEventListener('click', () => abrirModalNovaAutomacao());
+
+    carregar().then(() => {
+      // ⚡ por etapa no Quadro chega aqui como ?gatilho=mudanca_etapa&etapa_id=...
+      const params = new URLSearchParams(window.location.search);
+      const etapaIdInicial = params.get('etapa_id');
+      const gatilhoInicial = params.get('gatilho');
+      if (etapaIdInicial || gatilhoInicial) abrirModalNovaAutomacao({ gatilhoInicial, etapaIdInicial });
+    });
   </script>
 </body>
 </html>
