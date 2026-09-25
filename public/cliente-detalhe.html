@@ -202,7 +202,7 @@
 
           <div class="modal-erro" id="ed-erro" style="margin-top:12px"></div>
           <div class="modal-acoes">
-            <button type="button" id="btn-salvar-cliente" hidden>Salvar alterações</button>
+            <button type="button" id="btn-salvar-cliente" style="display:none">Salvar alterações</button>
           </div>
         </div>
 
@@ -309,8 +309,8 @@
       const btnSalvar = document.getElementById('btn-salvar-cliente');
       const camposEditaveis = ['ed-nome', 'ed-telefone', 'ed-email', 'ed-documento', 'ed-endereco', 'ed-cidade', 'ed-uf', 'ed-segmento', 'ed-origem', 'ed-observacoes'];
       camposEditaveis.forEach((id) => {
-        document.getElementById(id).addEventListener('input', () => { btnSalvar.hidden = false; });
-        document.getElementById(id).addEventListener('change', () => { btnSalvar.hidden = false; });
+        document.getElementById(id).addEventListener('input', () => { btnSalvar.style.display = ''; });
+        document.getElementById(id).addEventListener('change', () => { btnSalvar.style.display = ''; });
       });
 
       btnSalvar.addEventListener('click', async () => {
