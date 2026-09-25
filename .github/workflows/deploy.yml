@@ -1,10 +1,12 @@
 name: Deploy to EC2
 
-# TEMPLATE — ainda não wireado. Faltam: secrets do repo (NPM_PACKAGES_TOKEN,
-# EC2_HOST, EC2_USER, EC2_SSH_KEY_B64), a entrada do serviço `crm` no
-# docker-compose da EC2 (repo kyvvo-infra) e o diretório /opt/kyvvo/crm lá.
-# Ver docs/DECISOES-PENDENTES.md #3. Mesmo padrão do kyvvo-people/deploy.yml:
-# push na branch `release` -> scp -> recria o serviço `crm`.
+# Mesmo padrão do kyvvo-people/deploy.yml: push na branch `release` -> scp
+# -> recria o serviço `crm`. Verificação de saúde ao final (2026-09-25):
+# sem isso, "o deploy rodou" só significava que o container foi recriado,
+# nunca que o `npm install`/app dentro dele realmente subiu — cada checagem
+# precisava de um round-trip manual no CloudShell (docker logs + curl).
+# Agora falha o job (com os logs já impressos aqui) se /crm/api/saude não
+# responder em ~30s.
 
 on:
   push:
@@ -50,12 +52,23 @@ jobs:
           source: ".npmrc,index.js,package.json,package-lock.json,version.json,lib/**,db/**,public/**"
           target: "/opt/kyvvo/crm"
 
-      - name: Regenerar env do SSM + recriar container
+      - name: Regenerar env do SSM + recriar container + checar saúde
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ steps.sshkey.outputs.value }}
           script: |
+            set -e
             sudo /opt/kyvvo/scripts/gen-env-from-ssm.sh
             cd /opt/kyvvo && sudo docker compose up -d --force-recreate crm
+            for i in $(seq 1 15); do
+              if curl -sf http://127.0.0.1:3005/crm/api/saude > /dev/null; then
+                echo "OK: /crm/api/saude respondeu na tentativa ${i} (~$((i * 2))s)."
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "::error::/crm/api/saude não respondeu depois de ~30s — logs do container:"
+            sudo docker logs kyvvo-crm-1 --tail 80
+            exit 1
