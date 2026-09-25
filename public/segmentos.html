@@ -103,10 +103,6 @@
             </select>
           </div>
         </div>
-        <div class="grid3">
-          <div><label for="f-campo">Campo customizado</label><select id="f-campo"><option value="">Nenhum</option></select></div>
-          <div id="f-campo-valor-wrap" hidden><label for="f-campo-valor">Valor do campo</label><input type="text" id="f-campo-valor"></div>
-        </div>
         <div class="campo-check"><input type="checkbox" id="f-aniversario"><label for="f-aniversario" style="margin:0">Aniversário no mês atual</label></div>
         <div class="campo-check"><input type="checkbox" id="f-consentimento"><label for="f-consentimento" style="margin:0">Só clientes com consentimento de comunicação registrado</label></div>
 
@@ -141,35 +137,27 @@
   <script>
     let tags = [];
     let produtos = [];
-    let camposCustomizados = [];
     let segmentosSalvos = [];
     let ultimoPreview = [];
 
     async function carregar() {
-      const [resTags, resProdutos, resCampos, resSegmentos, resSorteios] = await Promise.all([
+      const [resTags, resProdutos, resSegmentos, resSorteios] = await Promise.all([
         apiFetch('/crm/api/tags'),
         apiFetch('/crm/api/produtos'),
-        apiFetch('/crm/api/campos-customizados'),
         apiFetch('/crm/api/segmentos'),
         apiFetch('/crm/api/sorteios'),
       ]);
       tags = await resTags.json();
       produtos = await resProdutos.json();
-      camposCustomizados = await resCampos.json();
       segmentosSalvos = await resSegmentos.json();
       const sorteios = await resSorteios.json();
 
       document.getElementById('f-tag').innerHTML = '<option value="">Qualquer</option>' + tags.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
       document.getElementById('f-produto').innerHTML = '<option value="">Qualquer</option>' + produtos.map((p) => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
-      document.getElementById('f-campo').innerHTML = '<option value="">Nenhum</option>' + camposCustomizados.map((c) => `<option value="${c.id}">${escapeHtml(c.label)}</option>`).join('');
 
       renderizarSegmentosSalvos();
       renderizarSorteios(sorteios);
     }
-
-    document.getElementById('f-campo').addEventListener('change', (e) => {
-      document.getElementById('f-campo-valor-wrap').hidden = !e.target.value;
-    });
 
     function lerFiltros() {
       const filtros = {};
@@ -179,10 +167,6 @@
       if (document.getElementById('f-produto').value) filtros.produto_id = document.getElementById('f-produto').value;
       if (document.getElementById('f-dias-sem-comprar').value) filtros.dias_sem_comprar_min = Number(document.getElementById('f-dias-sem-comprar').value);
       if (document.getElementById('f-pagamento').value) filtros.status_pagamento = document.getElementById('f-pagamento').value;
-      if (document.getElementById('f-campo').value && document.getElementById('f-campo-valor').value.trim()) {
-        filtros.campo_customizado_id = document.getElementById('f-campo').value;
-        filtros.campo_customizado_valor = document.getElementById('f-campo-valor').value.trim();
-      }
       if (document.getElementById('f-aniversario').checked) filtros.aniversario_mes = true;
       if (document.getElementById('f-consentimento').checked) filtros.consentimento = true;
       return filtros;
