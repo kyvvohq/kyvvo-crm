@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kyvvo CRM — Segmentos</title>
+<title>Kyvvo CRM — Campanhas</title>
 <link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,7 +70,7 @@
         <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
         <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
         <a class="menu-item" href="/crm/pedidos.html"><span data-icon="kanban"></span><span class="rotulo">Pedidos</span></a>
-        <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Segmentos</span></a>
+        <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Campanhas</span></a>
       </nav>
       </aside>
       <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
@@ -79,13 +79,13 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Segmentos</h1></div>
+          <div class="linha-titulo"><h1>Campanhas</h1></div>
           <p class="descricao">Combine filtros pra achar um grupo de clientes — pra campanha, ou pra sortear.</p>
         </div>
       </div>
 
       <div class="card">
-        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Novo segmento</h2>
+        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Nova campanha</h2>
         <div class="grid3">
           <div><label for="f-tag">Tag</label><select id="f-tag"><option value="">Qualquer</option></select></div>
           <div><label for="f-cidade">Cidade</label><input type="text" id="f-cidade" placeholder="ex.: Uberlândia"></div>
@@ -113,7 +113,7 @@
         <div class="modal-acoes" style="margin-top:20px">
           <button type="button" class="btn-secundario" id="btn-pre-visualizar">Pré-visualizar</button>
           <button type="button" class="btn-secundario" id="btn-exportar-csv" disabled>Exportar CSV</button>
-          <button type="button" id="btn-salvar-segmento" disabled>Salvar segmento</button>
+          <button type="button" id="btn-salvar-segmento" disabled>Salvar campanha</button>
         </div>
 
         <div class="resultado-preview" id="resultado-preview" hidden>
@@ -123,7 +123,7 @@
       </div>
 
       <div class="card">
-        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Segmentos salvos</h2>
+        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Campanhas salvas</h2>
         <div id="lista-segmentos-salvos"><p class="vazio">Carregando…</p></div>
       </div>
 
@@ -206,7 +206,7 @@
     });
 
     document.getElementById('btn-exportar-csv').addEventListener('click', () => {
-      exportarCsv(ultimoPreview, 'segmento');
+      exportarCsv(ultimoPreview, 'campanha');
     });
 
     function exportarCsv(clientes, nomeArquivo) {
@@ -224,8 +224,8 @@
     }
 
     document.getElementById('btn-salvar-segmento').addEventListener('click', () => {
-      const overlay = abrirModal('<h3>Salvar segmento</h3>', `
-        <label for="seg-nome">Nome do segmento</label>
+      const overlay = abrirModal('<h3>Salvar campanha</h3>', `
+        <label for="seg-nome">Nome da campanha</label>
         <input type="text" id="seg-nome" placeholder="ex.: Clientes de Uberlândia sem comprar há 30 dias">
         <div class="modal-erro" id="seg-erro"></div>
         <div class="modal-acoes">
@@ -257,7 +257,7 @@
             </div>
           </div>
         </div>
-      `).join('') : '<p class="vazio">Nenhum segmento salvo ainda.</p>';
+      `).join('') : '<p class="vazio">Nenhuma campanha salva ainda.</p>';
 
       el.querySelectorAll('[data-ver-segmento]').forEach((btn) => {
         btn.addEventListener('click', async () => {
@@ -280,7 +280,7 @@
 
     function abrirModalSortear(segmentoId, nomeSegmento) {
       const overlay = abrirModal(`<h3>Sortear — ${escapeHtml(nomeSegmento)}</h3>`, `
-        <p class="modal-texto">A lista de participantes é congelada no momento do sorteio — fica registrada pra sempre, mesmo se o segmento mudar depois.</p>
+        <p class="modal-texto">A lista de participantes é congelada no momento do sorteio — fica registrada pra sempre, mesmo se a campanha mudar depois.</p>
         <label for="sorteio-qtd">Quantos vencedores?</label>
         <input type="number" id="sorteio-qtd" min="1" value="1">
         <div class="modal-erro" id="sorteio-erro"></div>
@@ -308,7 +308,7 @@
       el.innerHTML = sorteios.length ? sorteios.map((s) => `
         <div class="lista-sorteios-item">
           <div class="topo">
-            <span class="nome">${escapeHtml(s.segmento_nome || 'Segmento removido')}</span>
+            <span class="nome">${escapeHtml(s.segmento_nome || 'Campanha removida')}</span>
             <span style="color:var(--muted);font-size:12px">${formatarDataHora(s.criado_em)}</span>
           </div>
           <p class="campo-ajuda" style="margin-top:6px">Vencedor(es): ${(s.vencedores || []).map((v) => escapeHtml(v.nome)).join(', ') || '—'}</p>
