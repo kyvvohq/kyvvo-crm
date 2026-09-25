@@ -82,6 +82,7 @@
         <div class="textos">
           <div class="linha-titulo"><h1>Pedidos</h1><span class="contagem" id="contagem-pedidos">—</span></div>
           <p class="descricao">Lista com filtros — pra mexer no fluxo visual (arrastar entre etapas), use o Quadro.</p>
+          <p class="descricao" id="aviso-filtro-cliente" hidden>Mostrando só os pedidos deste cliente — <a href="/crm/pedidos.html">ver todos</a>.</p>
         </div>
         <div class="acoes">
           <button type="button" class="btn-secundario" id="btn-importar-upseller">Importar UpSeller</button>
@@ -130,8 +131,15 @@
     let recursos = [];
     let produtos = [];
 
+    // Atalho "Pedidos" no menu de ações de um cliente (tela de Clientes)
+    // chega aqui como ?cliente_id=... — filtro fixo, não aparece nos
+    // selects (não tem um pra "voltar" no meio dos outros filtros).
+    const clienteIdFiltroFixo = new URLSearchParams(window.location.search).get('cliente_id');
+    document.getElementById('aviso-filtro-cliente').hidden = !clienteIdFiltroFixo;
+
     async function carregar() {
       const params = new URLSearchParams();
+      if (clienteIdFiltroFixo) params.set('cliente_id', clienteIdFiltroFixo);
       if (document.getElementById('f-etapa').value) params.set('etapa_id', document.getElementById('f-etapa').value);
       if (document.getElementById('f-recurso').value) params.set('recurso_id', document.getElementById('f-recurso').value);
       if (document.getElementById('f-pagamento').value) params.set('status_pagamento', document.getElementById('f-pagamento').value);

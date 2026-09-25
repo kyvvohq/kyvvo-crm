@@ -17,18 +17,16 @@
   .busca input { height:40px; }
   tr.linha-cliente { cursor:pointer; }
   tr.linha-cliente:hover td { background:var(--surface-hover); }
-
-  .ficha-metricas { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:16px 0 20px; }
-  @media(max-width:560px) { .ficha-metricas { grid-template-columns:1fr 1fr; } }
-  .ficha-metrica { background:var(--surface-muted); border-radius:var(--radius-md); padding:10px 12px; }
-  .ficha-metrica .lbl { font-size:11px; color:var(--muted); }
-  .ficha-metrica .num { font-size:16px; font-weight:700; color:var(--text); font-family:var(--font-display); }
-  .ficha-secao { margin-top:20px; }
-  .ficha-secao h4 { font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0 0 8px; }
-  .ficha-tags { display:flex; gap:6px; flex-wrap:wrap; }
-  .ficha-pedido-linha, .ficha-evento-linha { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13px; }
-  .ficha-pedido-linha:first-child, .ficha-evento-linha:first-child { border-top:none; }
-  .ficha-evento-linha .quando { color:var(--muted); font-size:11.5px; white-space:nowrap; }
+  tr.linha-cliente td { position:relative; }
+  .menu-acoes-wrap { position:relative; display:inline-block; }
+  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
+  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
+    box-shadow:var(--shadow-md); min-width:190px; z-index:20; padding:6px; }
+  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
+  .menu-acoes button:hover { background:var(--surface-muted); }
+  .menu-acoes button.perigo { color:var(--danger); }
+  .badge-bloqueado { background:color-mix(in srgb, var(--danger) 20%, transparent); color:var(--danger); }
 </style>
 </head>
 <body>
@@ -98,7 +96,7 @@
       <div class="card" style="padding:0">
         <table>
           <thead>
-            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Segmento</th><th>Origem</th><th>Desde</th></tr>
+            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Segmento</th><th>Origem</th><th>Desde</th><th></th></tr>
           </thead>
           <tbody id="tbody-clientes"></tbody>
         </table>
@@ -132,21 +130,86 @@
       document.getElementById('contagem-clientes').textContent = clientes.length;
       const tbody = document.getElementById('tbody-clientes');
       if (!clientes.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
         return;
       }
       tbody.innerHTML = clientes.map((c) => `
         <tr class="linha-cliente" data-id="${c.id}">
-          <td>${escapeHtml(c.nome)}</td>
+          <td>${escapeHtml(c.nome)} ${c.bloqueado ? '<span class="badge badge-bloqueado">Bloqueado</span>' : ''}</td>
           <td>${escapeHtml(c.telefone || '—')}</td>
           <td>${escapeHtml([c.cidade, c.uf].filter(Boolean).join('/') || '—')}</td>
           <td>${escapeHtml(c.segmento || '—')}</td>
           <td>${escapeHtml(c.origem || '—')}</td>
           <td>${formatarData(c.criado_em)}</td>
+          <td>
+            <div class="menu-acoes-wrap">
+              <button type="button" class="btn-acoes" data-abrir-menu="${c.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
+              <div class="menu-acoes" data-menu="${c.id}" hidden>
+                <button type="button" data-editar-cliente="${c.id}">Editar</button>
+                <button type="button" data-alternar-bloqueio="${c.id}" data-bloqueado="${!c.bloqueado}">${c.bloqueado ? 'Desbloquear' : 'Bloquear'}</button>
+                <button type="button" data-ver-pedidos="${c.id}">Pedidos</button>
+                <button type="button" data-atendimento="${c.id}">Atendimento</button>
+              </div>
+            </div>
+          </td>
         </tr>
       `).join('');
       tbody.querySelectorAll('.linha-cliente').forEach((tr) => {
-        tr.addEventListener('click', () => abrirFicha(tr.dataset.id));
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('.menu-acoes-wrap')) return;
+          window.location.href = `/crm/cliente-detalhe.html?id=${tr.dataset.id}`;
+        });
+      });
+      ligarEventosLinhasClientes();
+    }
+
+    function fecharMenusAbertosClientes() {
+      document.querySelectorAll('.menu-acoes').forEach((m) => { m.hidden = true; });
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.menu-acoes-wrap')) fecharMenusAbertosClientes();
+    });
+
+    function ligarEventosLinhasClientes() {
+      document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = document.querySelector(`[data-menu="${btn.dataset.abrirMenu}"]`);
+          const jaAberto = !menu.hidden;
+          fecharMenusAbertosClientes();
+          menu.hidden = jaAberto;
+        });
+      });
+      document.querySelectorAll('[data-editar-cliente]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `/crm/cliente-detalhe.html?id=${btn.dataset.editarCliente}`;
+        });
+      });
+      document.querySelectorAll('[data-alternar-bloqueio]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          fecharMenusAbertosClientes();
+          await apiFetch(`/crm/api/clientes/${btn.dataset.alternarBloqueio}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ bloqueado: btn.dataset.bloqueado === 'true' }),
+          });
+          carregar();
+        });
+      });
+      document.querySelectorAll('[data-ver-pedidos]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.location.href = `/crm/pedidos.html?cliente_id=${btn.dataset.verPedidos}`;
+        });
+      });
+      document.querySelectorAll('[data-atendimento]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          fecharMenusAbertosClientes();
+          const c = clientes.find((x) => x.id === btn.dataset.atendimento);
+          if (c && c.telefone) window.open(linkWhatsapp(c.telefone), '_blank', 'noopener');
+        });
       });
     }
 
@@ -449,88 +512,6 @@
         carregar();
       });
     });
-
-    const ROTULO_TIPO_EVENTO = {
-      criacao: 'Criado',
-      mudanca_etapa: 'Mudou de etapa',
-      pagamento: 'Pagamento atualizado',
-      importacao: 'Importado',
-      formulario: 'Respondeu formulário',
-      sorteio: 'Participou de sorteio',
-      mensagem_enviada: 'Mensagem enviada',
-      mesclagem: 'Mesclado com outro cadastro',
-    };
-
-    async function abrirFicha(id) {
-      const overlay = abrirModal('<h3>Carregando…</h3>', '', 'modal-card-larga');
-      const res = await apiFetch(`/crm/api/clientes/${id}`);
-      const c = await res.json();
-
-      overlay.querySelector('h3').textContent = c.nome;
-      overlay.querySelector('.modal-card').insertAdjacentHTML('beforeend', `
-        <div class="modal-texto" style="margin-top:4px">
-          ${escapeHtml(c.telefone || 'sem telefone')} ${c.email ? `· ${escapeHtml(c.email)}` : ''}
-          ${c.cidade ? `· ${escapeHtml(c.cidade)}${c.uf ? '/' + escapeHtml(c.uf) : ''}` : ''}
-          ${c.segmento ? `· ${escapeHtml(c.segmento)}` : ''}
-        </div>
-
-        <div class="ficha-metricas">
-          <div class="ficha-metrica"><div class="lbl">Total gasto</div><div class="num">${formatarMoeda(c.metricas.total_gasto)}</div></div>
-          <div class="ficha-metrica"><div class="lbl">Pedidos</div><div class="num">${c.metricas.quantidade_pedidos}</div></div>
-          <div class="ficha-metrica"><div class="lbl">Ticket médio</div><div class="num">${formatarMoeda(c.metricas.ticket_medio)}</div></div>
-          <div class="ficha-metrica"><div class="lbl">Dias sem comprar</div><div class="num">${c.metricas.dias_sem_comprar ?? '—'}</div></div>
-        </div>
-
-        <div class="ficha-secao">
-          <h4>Tags</h4>
-          <div class="ficha-tags">${(c.tags || []).map((t) => `<span class="badge destaque">${escapeHtml(t.nome)}<button type="button" class="remover-tag-chip" data-remover-tag="${t.id}" aria-label="Remover tag">×</button></span>`).join('') || '<span class="vazio" style="padding:0">Nenhuma ainda.</span>'}</div>
-          <input type="text" id="ficha-nova-tag" placeholder="+ Nova tag (Enter)" style="margin-top:8px;max-width:220px">
-        </div>
-
-        <div class="ficha-secao">
-          <h4>Pedidos (${c.pedidos.length})</h4>
-          ${c.pedidos.length ? c.pedidos.map((p) => `
-            <div class="ficha-pedido-linha">
-              <span>${escapeHtml(p.etapa_nome)} · ${formatarMoeda(p.valor_total)}</span>
-              <span class="quando">${formatarData(p.criado_em)}</span>
-            </div>
-          `).join('') : '<p class="vazio">Nenhum pedido ainda.</p>'}
-        </div>
-
-        <div class="ficha-secao">
-          <h4>Linha do tempo</h4>
-          ${c.eventos.length ? c.eventos.map((e) => `
-            <div class="ficha-evento-linha">
-              <span>${ROTULO_TIPO_EVENTO[e.tipo] || e.tipo}</span>
-              <span class="quando">${formatarDataHora(e.criado_em)}</span>
-            </div>
-          `).join('') : '<p class="vazio">Sem eventos.</p>'}
-        </div>
-
-        ${c.telefone ? `
-        <div class="modal-acoes">
-          <a class="btn" style="background:#25D366" href="${linkWhatsapp(c.telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} Abrir WhatsApp</a>
-        </div>` : ''}
-      `);
-
-      overlay.querySelectorAll('[data-remover-tag]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/clientes/${id}/tags/${btn.dataset.removerTag}`, { method: 'DELETE' });
-          carregar();
-          abrirFicha(id);
-        });
-      });
-      document.getElementById('ficha-nova-tag').addEventListener('keydown', async (e) => {
-        if (e.key !== 'Enter') return;
-        const nome = e.target.value.trim();
-        if (!nome) return;
-        e.target.disabled = true;
-        const res = await apiFetch(`/crm/api/clientes/${id}/tags`, { method: 'POST', body: JSON.stringify({ nome }) });
-        if (!res.ok) { e.target.disabled = false; return; }
-        carregar();
-        abrirFicha(id);
-      });
-    }
 
     carregar();
   </script>

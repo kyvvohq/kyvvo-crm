@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Cliente</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .bloco-cliente { margin-bottom:20px; }
+  .ficha-metricas { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:0 0 20px; }
+  @media(max-width:560px) { .ficha-metricas { grid-template-columns:1fr 1fr; } }
+  .ficha-metrica { background:var(--surface-muted); border-radius:var(--radius-md); padding:12px 14px; }
+  .ficha-metrica .lbl { font-size:11px; color:var(--muted); }
+  .ficha-metrica .num { font-size:18px; font-weight:700; color:var(--text); font-family:var(--font-display); }
+  .ficha-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .ficha-pedido-linha { padding:12px 0; border-top:1px solid var(--border); }
+  .ficha-pedido-linha:first-child { border-top:none; }
+  .ficha-pedido-linha .topo { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .ficha-pedido-linha .arquivos { margin-top:6px; display:flex; gap:8px; flex-wrap:wrap; }
+  .ficha-pedido-linha .arquivos a { font-size:12px; }
+  .cabecalho-cliente { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+  .cabecalho-cliente .acoes { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .cabecalho-cliente .acoes a.btn-secundario, .cabecalho-cliente .acoes a.btn { display:inline-flex; align-items:center; gap:6px; text-decoration:none; line-height:1; padding:0 14px; height:38px; }
+  .badge-bloqueado { background:color-mix(in srgb, var(--danger) 20%, transparent); color:var(--danger); }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Kyvvo CRM</div>
+        <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
+        <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
+        <a class="menu-item" href="/crm/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="list"></span><span class="rotulo">Pedidos</span></a>
+        <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Campanhas</span></a>
+      </nav>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
+
+    <div class="painel-main" id="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><a href="/crm/clientes.html" style="color:var(--muted);font-size:13px;text-decoration:none">← Clientes</a></div>
+        </div>
+      </div>
+      <div id="conteudo-cliente"><div class="vazio">Carregando…</div></div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    const clienteId = new URLSearchParams(window.location.search).get('id');
+    let cliente = null;
+
+    const ROTULO_TIPO_EVENTO = {
+      criacao: 'Criado',
+      mudanca_etapa: 'Mudou de etapa',
+      pagamento: 'Pagamento atualizado',
+      importacao: 'Importado',
+      formulario: 'Respondeu formulário',
+      sorteio: 'Participou de sorteio',
+      mensagem_enviada: 'Mensagem enviada',
+      mesclagem: 'Mesclado com outro cadastro',
+    };
+    const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
+
+    async function carregar() {
+      if (!clienteId) {
+        document.getElementById('conteudo-cliente').innerHTML = '<div class="vazio">Cliente não informado.</div>';
+        return;
+      }
+      const res = await apiFetch(`/crm/api/clientes/${clienteId}`);
+      if (!res.ok) {
+        document.getElementById('conteudo-cliente').innerHTML = '<div class="vazio">Cliente não encontrado.</div>';
+        return;
+      }
+      cliente = await res.json();
+      renderizar();
+    }
+
+    function renderizar() {
+      const c = cliente;
+      document.getElementById('conteudo-cliente').innerHTML = `
+        <div class="cabecalho-cliente bloco-cliente">
+          <div>
+            <h1 style="margin:0 0 4px">${escapeHtml(c.nome)} ${c.bloqueado ? '<span class="badge badge-bloqueado">Bloqueado</span>' : ''}</h1>
+            <p class="descricao" style="margin:0">Cliente desde ${formatarData(c.criado_em)}</p>
+          </div>
+          <div class="acoes">
+            ${c.telefone ? `<a class="btn" style="background:#25D366" href="${linkWhatsapp(c.telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} Atendimento</a>` : ''}
+            <a class="btn-secundario" href="/crm/pedidos.html?cliente_id=${c.id}">Ver pedidos</a>
+            <button type="button" class="btn-secundario" id="btn-bloquear">${c.bloqueado ? 'Desbloquear' : 'Bloquear'}</button>
+          </div>
+        </div>
+
+        <div class="card bloco-cliente">
+          <h3 style="margin:0 0 14px">Dados de cadastro</h3>
+          <div class="grid2">
+            <div><label for="ed-nome">Nome</label><input id="ed-nome" value="${escapeHtml(c.nome)}"></div>
+            <div><label for="ed-telefone">Telefone</label><input id="ed-telefone" value="${escapeHtml(c.telefone || '')}"></div>
+          </div>
+          <div class="grid2">
+            <div><label for="ed-email">E-mail</label><input id="ed-email" type="email" value="${escapeHtml(c.email || '')}"></div>
+            <div><label for="ed-documento">CPF ou CNPJ</label><input id="ed-documento" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
+          </div>
+          <div class="grid2">
+            <div><label for="ed-cidade">Cidade</label><input id="ed-cidade" value="${escapeHtml(c.cidade || '')}"></div>
+            <div><label for="ed-uf">UF</label><input id="ed-uf" maxlength="2" style="text-transform:uppercase" value="${escapeHtml(c.uf || '')}"></div>
+          </div>
+          <label for="ed-endereco">Endereço completo</label>
+          <textarea id="ed-endereco" placeholder="Rua, número, complemento, bairro, cidade - UF, CEP">${escapeHtml(c.endereco_completo || '')}</textarea>
+          <div class="grid2">
+            <div><label for="ed-segmento">Segmento</label><input id="ed-segmento" value="${escapeHtml(c.segmento || '')}"></div>
+            <div><label for="ed-origem">Origem</label><input id="ed-origem" value="${escapeHtml(c.origem || '')}"></div>
+          </div>
+          <label for="ed-observacoes">Observações</label>
+          <textarea id="ed-observacoes">${escapeHtml(c.observacoes || '')}</textarea>
+
+          <div class="ficha-secao">
+            <h4>Tags</h4>
+            <div class="ficha-tags">${(c.tags || []).map((t) => `<span class="badge destaque">${escapeHtml(t.nome)}<button type="button" class="remover-tag-chip" data-remover-tag="${t.id}" aria-label="Remover tag">×</button></span>`).join('') || '<span class="vazio" style="padding:0">Nenhuma ainda.</span>'}</div>
+            <input type="text" id="ficha-nova-tag" placeholder="+ Nova tag (Enter)" style="margin-top:8px;max-width:220px">
+          </div>
+
+          <div class="modal-erro" id="ed-erro" style="margin-top:12px"></div>
+          <div class="modal-acoes">
+            <button type="button" id="btn-salvar-cliente">Salvar alterações</button>
+          </div>
+        </div>
+
+        <div class="ficha-metricas">
+          <div class="ficha-metrica"><div class="lbl">Total gasto</div><div class="num">${formatarMoeda(c.metricas.total_gasto)}</div></div>
+          <div class="ficha-metrica"><div class="lbl">Pedidos</div><div class="num">${c.metricas.quantidade_pedidos}</div></div>
+          <div class="ficha-metrica"><div class="lbl">Ticket médio</div><div class="num">${formatarMoeda(c.metricas.ticket_medio)}</div></div>
+          <div class="ficha-metrica"><div class="lbl">Dias sem comprar</div><div class="num">${c.metricas.dias_sem_comprar ?? '—'}</div></div>
+        </div>
+
+        <div class="card bloco-cliente">
+          <h3 style="margin:0 0 4px">Histórico de pedidos (${c.pedidos.length})</h3>
+          ${c.pedidos.length ? c.pedidos.map((p) => `
+            <div class="ficha-pedido-linha">
+              <div class="topo">
+                <span>${escapeHtml(p.etapa_nome)} · <span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span></span>
+                <span>${formatarMoeda(p.valor_total)} <span style="color:var(--muted);font-size:12px">${formatarData(p.criado_em)}</span></span>
+              </div>
+              ${p.arquivos && p.arquivos.length ? `
+              <div class="arquivos">${p.arquivos.map((a) => `<a href="/crm/api/pedidos/${p.id}/arquivos/${a.id}" target="_blank" rel="noopener">${icon('paperclip', 12)} ${escapeHtml(a.nome_arquivo)}</a>`).join('')}</div>
+              ` : ''}
+            </div>
+          `).join('') : '<p class="vazio">Nenhum pedido ainda.</p>'}
+        </div>
+
+        <div class="card">
+          <h3 style="margin:0 0 4px">Linha do tempo</h3>
+          ${c.eventos.length ? c.eventos.map((e) => `
+            <div class="ficha-evento-linha" style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);font-size:13px">
+              <span>${ROTULO_TIPO_EVENTO[e.tipo] || e.tipo}</span>
+              <span style="color:var(--muted);font-size:11.5px">${formatarDataHora(e.criado_em)}</span>
+            </div>
+          `).join('') : '<p class="vazio">Sem eventos.</p>'}
+        </div>
+      `;
+
+      document.getElementById('btn-bloquear').addEventListener('click', async () => {
+        const res = await apiFetch(`/crm/api/clientes/${c.id}`, { method: 'PATCH', body: JSON.stringify({ bloqueado: !c.bloqueado }) });
+        if (res.ok) await carregar();
+      });
+
+      document.getElementById('btn-salvar-cliente').addEventListener('click', async () => {
+        const nome = document.getElementById('ed-nome').value.trim();
+        if (!nome) { document.getElementById('ed-erro').textContent = 'Nome é obrigatório'; return; }
+        const documento = document.getElementById('ed-documento').value.trim();
+        // CPF tem 11 dígitos, CNPJ tem 14 — decide em qual coluna salvar pelo
+        // tamanho depois de limpar a formatação, sem pedir pro usuário
+        // escolher o tipo à parte.
+        const somenteDigitos = documento.replace(/\D/g, '');
+        const ehCnpj = somenteDigitos.length > 11;
+        const res = await apiFetch(`/crm/api/clientes/${c.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            nome,
+            telefone: document.getElementById('ed-telefone').value.trim() || null,
+            email: document.getElementById('ed-email').value.trim() || null,
+            cpf: documento && !ehCnpj ? documento : null,
+            cnpj: documento && ehCnpj ? documento : null,
+            cidade: document.getElementById('ed-cidade').value.trim() || null,
+            uf: document.getElementById('ed-uf').value.trim() || null,
+            endereco_completo: document.getElementById('ed-endereco').value.trim() || null,
+            segmento: document.getElementById('ed-segmento').value.trim() || null,
+            origem: document.getElementById('ed-origem').value.trim() || null,
+            observacoes: document.getElementById('ed-observacoes').value.trim() || null,
+          }),
+        });
+        if (!res.ok) { document.getElementById('ed-erro').textContent = 'Falha ao salvar'; return; }
+        document.getElementById('ed-erro').textContent = '';
+        await carregar();
+      });
+
+      document.querySelectorAll('[data-remover-tag]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/clientes/${c.id}/tags/${btn.dataset.removerTag}`, { method: 'DELETE' });
+          carregar();
+        });
+      });
+      document.getElementById('ficha-nova-tag').addEventListener('keydown', async (e) => {
+        if (e.key !== 'Enter') return;
+        const nome = e.target.value.trim();
+        if (!nome) return;
+        e.target.disabled = true;
+        const res = await apiFetch(`/crm/api/clientes/${c.id}/tags`, { method: 'POST', body: JSON.stringify({ nome }) });
+        if (!res.ok) { e.target.disabled = false; return; }
+        carregar();
+      });
+    }
+
+    carregar();
+  </script>
+</body>
+</html>
