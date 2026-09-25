@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Automações</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .lista-automacoes-item { padding:14px 20px; border-top:1px solid var(--border); }
+  .lista-automacoes-item:first-child { border-top:none; }
+  .lista-automacoes-item .topo { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .lista-automacoes-item .nome { font-weight:600; color:var(--text); }
+  .lista-automacoes-item .acoes-linha { display:flex; gap:8px; }
+  .lista-automacoes-item .acoes-linha button { height:30px; padding:0 12px; font-size:12px; }
+  .lista-automacoes-item .detalhe { margin-top:4px; font-size:13px; color:var(--muted-strong); }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <div class="sidebar-wrap">
+      <aside class="painel-sidebar" id="painel-sidebar">
+      <nav class="grupo-menu">
+        <div class="grupo-titulo">Kyvvo CRM</div>
+        <a class="menu-item" href="/crm/painel.html"><span data-icon="layout-dashboard"></span><span class="rotulo">Painel Hoje</span></a>
+        <a class="menu-item" href="/crm/clientes.html"><span data-icon="users"></span><span class="rotulo">Clientes</span></a>
+        <a class="menu-item" href="/crm/quadro.html"><span data-icon="kanban"></span><span class="rotulo">Quadro</span></a>
+        <a class="menu-item" href="/crm/pedidos.html"><span data-icon="list"></span><span class="rotulo">Pedidos</span></a>
+        <a class="menu-item" href="/crm/segmentos.html"><span data-icon="funnel"></span><span class="rotulo">Campanhas</span></a>
+        <div class="ds-menu-grupo">
+          <button type="button" class="menu-item ds-menu-grupo-botao" aria-expanded="false" style="width:100%;border:none;background:transparent;font:inherit;cursor:pointer;text-align:left">
+            <span data-icon="settings"></span><span class="rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <div class="ds-menu-sub">
+            <a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a>
+          </div>
+        </div>
+      </nav>
+      </aside>
+      <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" type="button" aria-label="Ocultar menu" title="Ocultar menu">&lt;</button>
+    </div>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Automações</h1><span class="contagem" id="contagem-automacoes">—</span></div>
+          <p class="descricao">Dispara uma mensagem de WhatsApp sozinho quando um pedido muda de etapa, é criado, fica parado ou no aniversário do cliente. V1: só funciona pra quem já tem um número de WhatsApp vinculado (Configurações no admin).</p>
+        </div>
+        <div class="acoes">
+          <button type="button" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div id="lista-automacoes"><div class="vazio">Carregando…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    let automacoes = [];
+    let etapas = [];
+    let templates = [];
+
+    const ROTULO_GATILHO = {
+      mudanca_etapa: 'Pedido muda de etapa',
+      pedido_criado: 'Pedido criado',
+      pedido_parado: 'Pedido parado numa etapa',
+      aniversario_cliente: 'Aniversário do cliente',
+    };
+    const GATILHOS_COM_ETAPA = ['mudanca_etapa', 'pedido_parado'];
+
+    async function carregar() {
+      const [resAutomacoes, resEtapas] = await Promise.all([
+        apiFetch('/crm/api/automacoes'),
+        apiFetch('/crm/api/etapas'),
+      ]);
+      automacoes = await resAutomacoes.json();
+      etapas = await resEtapas.json();
+      renderizar();
+    }
+
+    function renderizar() {
+      document.getElementById('contagem-automacoes').textContent = automacoes.length;
+      const el = document.getElementById('lista-automacoes');
+      if (!automacoes.length) {
+        el.innerHTML = '<div class="vazio">Nenhuma automação configurada ainda.</div>';
+        return;
+      }
+      el.innerHTML = automacoes.map((a) => `
+        <div class="lista-automacoes-item">
+          <div class="topo">
+            <span class="nome">${escapeHtml(a.nome)} <span class="badge ${a.ativo ? 'sucesso' : 'neutro'}">${a.ativo ? 'ativa' : 'pausada'}</span></span>
+            <div class="acoes-linha">
+              <button type="button" class="btn-secundario" data-alternar-automacao="${a.id}" data-ativo="${!a.ativo}">${a.ativo ? 'Pausar' : 'Ativar'}</button>
+              <button type="button" class="btn-secundario" data-apagar-automacao="${a.id}">Remover</button>
+            </div>
+          </div>
+          <div class="detalhe">${ROTULO_GATILHO[a.gatilho] || a.gatilho}${a.etapa_nome ? ` — etapa "${escapeHtml(a.etapa_nome)}"` : ''} · Template: ${a.whatsapp_template ? escapeHtml(a.whatsapp_template) : '<span class="vazio" style="padding:0;display:inline">nenhum escolhido</span>'}</div>
+        </div>
+      `).join('');
+
+      el.querySelectorAll('[data-alternar-automacao]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/automacoes/${btn.dataset.alternarAutomacao}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ ativo: btn.dataset.ativo === 'true' }),
+          });
+          carregar();
+        });
+      });
+      el.querySelectorAll('[data-apagar-automacao]').forEach((btn) => {
+        btn.addEventListener('click', () => confirmarRemover(btn.dataset.apagarAutomacao));
+      });
+    }
+
+    function confirmarRemover(id) {
+      const automacao = automacoes.find((a) => a.id === id);
+      abrirModal('<h3>Remover automação?</h3>', `
+        <p class="modal-texto">"${escapeHtml(automacao ? automacao.nome : '')}" para de disparar imediatamente. Essa ação não pode ser desfeita.</p>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="remover-automacao-voltar">Voltar</button>
+          <button type="button" class="btn-perigo" id="remover-automacao-confirmar">Remover</button>
+        </div>
+      `);
+      document.getElementById('remover-automacao-voltar').addEventListener('click', fecharModal);
+      document.getElementById('remover-automacao-confirmar').addEventListener('click', async () => {
+        await apiFetch(`/crm/api/automacoes/${id}`, { method: 'DELETE' });
+        fecharModal();
+        carregar();
+      });
+    }
+
+    async function carregarTemplates() {
+      if (templates.length) return templates;
+      const res = await apiFetch('/crm/api/automacoes/templates-whatsapp');
+      templates = await res.json();
+      return templates;
+    }
+
+    document.getElementById('btn-nova-automacao').addEventListener('click', async () => {
+      await carregarTemplates();
+      const opcoesEtapa = etapas.map((e) => `<option value="${e.id}">${escapeHtml(e.nome)}</option>`).join('');
+      const opcoesTemplate = ['<option value="">Nenhum ainda</option>', ...templates.map((t) => `<option value="${escapeHtml(t.nome)}">${escapeHtml(t.nome)} (${t.status})</option>`)].join('');
+      abrirModal('<h3>Nova automação</h3>', `
+        <label for="au-nome">Nome</label>
+        <input id="au-nome" placeholder="ex.: Aviso de pedido pronto">
+        <label for="au-gatilho">Gatilho</label>
+        <select id="au-gatilho">
+          <option value="mudanca_etapa">Pedido muda de etapa</option>
+          <option value="pedido_criado">Pedido criado</option>
+          <option value="pedido_parado">Pedido parado numa etapa</option>
+          <option value="aniversario_cliente">Aniversário do cliente</option>
+        </select>
+        <div id="au-etapa-wrap">
+          <label for="au-etapa">Etapa</label>
+          <select id="au-etapa">${opcoesEtapa}</select>
+          <p class="modal-texto" style="margin-top:6px;font-size:12.5px" id="au-etapa-ajuda"></p>
+        </div>
+        <label for="au-template">Template aprovado no WhatsApp</label>
+        <select id="au-template">${opcoesTemplate}</select>
+        ${!templates.length ? '<p class="modal-texto" style="font-size:12.5px">Nenhum template encontrado — confira se o número de WhatsApp já está vinculado (Configurações no admin) e se há templates aprovados na Meta.</p>' : ''}
+        <div class="modal-erro" id="au-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="au-cancelar">Cancelar</button>
+          <button type="button" id="au-salvar">Salvar</button>
+        </div>
+      `, 'modal-card-larga');
+
+      function sincronizarVisibilidadeEtapa() {
+        const gatilho = document.getElementById('au-gatilho').value;
+        const precisaEtapa = GATILHOS_COM_ETAPA.includes(gatilho);
+        document.getElementById('au-etapa-wrap').hidden = !precisaEtapa;
+        document.getElementById('au-etapa-ajuda').textContent = gatilho === 'pedido_parado'
+          ? 'Usa o "prazo de alerta" já configurado nessa etapa (mesmo do card de orçamentos parados no Painel Hoje).'
+          : '';
+      }
+      sincronizarVisibilidadeEtapa();
+      document.getElementById('au-gatilho').addEventListener('change', sincronizarVisibilidadeEtapa);
+
+      document.getElementById('au-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('au-salvar').addEventListener('click', async () => {
+        const nome = document.getElementById('au-nome').value.trim();
+        const gatilho = document.getElementById('au-gatilho').value;
+        const precisaEtapa = GATILHOS_COM_ETAPA.includes(gatilho);
+        if (!nome) { document.getElementById('au-erro').textContent = 'Nome é obrigatório'; return; }
+        if (precisaEtapa && !document.getElementById('au-etapa').value) { document.getElementById('au-erro').textContent = 'Escolha a etapa'; return; }
+
+        const res = await apiFetch('/crm/api/automacoes', {
+          method: 'POST',
+          body: JSON.stringify({
+            nome, gatilho,
+            etapa_id: precisaEtapa ? document.getElementById('au-etapa').value : null,
+            whatsapp_template: document.getElementById('au-template').value || null,
+          }),
+        });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('au-erro').textContent = dados.error || 'Falha ao salvar';
+          return;
+        }
+        fecharModal();
+        carregar();
+      });
+    });
+
+    carregar();
+  </script>
+</body>
+</html>
