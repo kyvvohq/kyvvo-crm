@@ -17,21 +17,21 @@
   .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 16px; }
   @media(max-width:700px) { .grid3 { grid-template-columns:1fr 1fr; } }
   @media(max-width:480px) { .grid3 { grid-template-columns:1fr; } }
-  .dados-cadastro textarea { min-height:52px; }
-  .ficha-metricas { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:0 0 20px; }
+  .ficha-metricas { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
   @media(max-width:560px) { .ficha-metricas { grid-template-columns:1fr 1fr; } }
   .ficha-metrica { background:var(--surface-muted); border-radius:var(--radius-md); padding:12px 14px; }
   .ficha-metrica .lbl { font-size:11px; color:var(--muted); }
   .ficha-metrica .num { font-size:18px; font-weight:700; color:var(--text); font-family:var(--font-display); }
   .ficha-tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
-  .ficha-pedido-linha { padding:12px 0; border-top:1px solid var(--border); }
-  .ficha-pedido-linha:first-child { border-top:none; }
-  .ficha-pedido-linha .topo { display:flex; justify-content:space-between; gap:10px; align-items:center; }
-  .ficha-pedido-linha .arquivos { margin-top:6px; display:flex; gap:8px; flex-wrap:wrap; }
-  .ficha-pedido-linha .arquivos a { font-size:12px; }
   .cabecalho-cliente { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
   .cabecalho-cliente .acoes { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .badge-bloqueado { background:color-mix(in srgb, var(--danger) 20%, transparent); color:var(--danger); }
+  .tabela-pedidos td, .tabela-pedidos th { white-space:nowrap; }
+  .tabela-pedidos td:nth-child(2) { white-space:normal; }
+  .paginacao-pedidos { display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:10px; font-size:13px; color:var(--muted-strong); }
+  .paginacao-pedidos button { height:30px; padding:0 12px; font-size:12px; }
+  .linha-tempo-item { display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid var(--border); font-size:13px; }
+  .linha-tempo-item:first-child { border-top:none; }
 </style>
 </head>
 <body>
@@ -86,6 +86,7 @@
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
           <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
           </ul>
         </li>
@@ -109,6 +110,11 @@
   <script>
     const clienteId = new URLSearchParams(window.location.search).get('id');
     let cliente = null;
+    let segmentosOpcoes = [];
+    let origensOpcoes = [];
+    let paginaPedidos = 0;
+    let eventosVisiveis = 2;
+    const PEDIDOS_POR_PAGINA = 5;
 
     const ROTULO_TIPO_EVENTO = {
       criacao: 'Criado',
@@ -120,20 +126,36 @@
       mensagem_enviada: 'Mensagem enviada',
       mesclagem: 'Mesclado com outro cadastro',
     };
-    const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
 
     async function carregar() {
       if (!clienteId) {
         document.getElementById('conteudo-cliente').innerHTML = '<div class="vazio">Cliente não informado.</div>';
         return;
       }
-      const res = await apiFetch(`/crm/api/clientes/${clienteId}`);
-      if (!res.ok) {
+      const [resCliente, resSegmentos, resOrigens] = await Promise.all([
+        apiFetch(`/crm/api/clientes/${clienteId}`),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=segmento'),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=origem'),
+      ]);
+      if (!resCliente.ok) {
         document.getElementById('conteudo-cliente').innerHTML = '<div class="vazio">Cliente não encontrado.</div>';
         return;
       }
-      cliente = await res.json();
+      cliente = await resCliente.json();
+      segmentosOpcoes = (await resSegmentos.json()).filter((o) => o.ativo);
+      origensOpcoes = (await resOrigens.json()).filter((o) => o.ativo);
+      paginaPedidos = 0;
+      eventosVisiveis = 2;
       renderizar();
+    }
+
+    // <select> sempre inclui o valor atual do cliente, mesmo que tenha sido
+    // desativado/removido do cadastro depois — nunca troca o dado dele à
+    // força só por renderizar a tela.
+    function opcoesComboHtml(opcoes, valorAtual) {
+      const valores = new Set(opcoes.map((o) => o.valor));
+      const extra = valorAtual && !valores.has(valorAtual) ? `<option value="${escapeHtml(valorAtual)}" selected>${escapeHtml(valorAtual)}</option>` : '';
+      return `<option value="">—</option>${extra}${opcoes.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === valorAtual ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}`;
     }
 
     function renderizar() {
@@ -142,7 +164,6 @@
         <div class="cabecalho-cliente bloco-cliente">
           <div>
             <h1 style="margin:0 0 4px">${escapeHtml(c.nome)} ${c.bloqueado ? '<span class="badge badge-bloqueado">Bloqueado</span>' : ''}</h1>
-            <p class="descricao" style="margin:0">Cliente desde ${formatarData(c.criado_em)}</p>
           </div>
           <div class="acoes">
             ${c.telefone ? `<a class="btn" style="background:#25D366" href="${linkWhatsapp(c.telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} Atendimento</a>` : ''}
@@ -151,26 +172,24 @@
           </div>
         </div>
 
-        <div class="card bloco-cliente dados-cadastro">
+        <div class="card bloco-cliente">
           <h3 style="margin:0 0 14px">Dados de cadastro</h3>
           <div class="grid3">
             <div><label for="ed-nome">Nome</label><input id="ed-nome" value="${escapeHtml(c.nome)}"></div>
             <div><label for="ed-telefone">Telefone</label><input id="ed-telefone" value="${escapeHtml(c.telefone || '')}"></div>
             <div><label for="ed-email">E-mail</label><input id="ed-email" type="email" value="${escapeHtml(c.email || '')}"></div>
           </div>
+          <label for="ed-documento">CPF ou CNPJ</label>
+          <input id="ed-documento" value="${escapeHtml(c.cpf || c.cnpj || '')}">
           <div class="grid3">
-            <div><label for="ed-documento">CPF ou CNPJ</label><input id="ed-documento" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
+            <div><label for="ed-endereco">Endereço completo</label><input id="ed-endereco" placeholder="Rua, número, complemento, bairro, cidade - UF, CEP" value="${escapeHtml(c.endereco_completo || '')}"></div>
             <div><label for="ed-cidade">Cidade</label><input id="ed-cidade" value="${escapeHtml(c.cidade || '')}"></div>
             <div><label for="ed-uf">UF</label><input id="ed-uf" maxlength="2" style="text-transform:uppercase" value="${escapeHtml(c.uf || '')}"></div>
           </div>
-          <label for="ed-endereco">Endereço completo</label>
-          <textarea id="ed-endereco" placeholder="Rua, número, complemento, bairro, cidade - UF, CEP">${escapeHtml(c.endereco_completo || '')}</textarea>
           <div class="grid2">
-            <div><label for="ed-segmento">Segmento</label><input id="ed-segmento" value="${escapeHtml(c.segmento || '')}"></div>
-            <div><label for="ed-origem">Origem</label><input id="ed-origem" value="${escapeHtml(c.origem || '')}"></div>
+            <div><label for="ed-segmento">Segmento</label><select id="ed-segmento">${opcoesComboHtml(segmentosOpcoes, c.segmento)}</select></div>
+            <div><label for="ed-origem">Origem</label><select id="ed-origem">${opcoesComboHtml(origensOpcoes, c.origem)}</select></div>
           </div>
-          <label for="ed-observacoes">Observações</label>
-          <textarea id="ed-observacoes">${escapeHtml(c.observacoes || '')}</textarea>
 
           <div class="ficha-secao">
             <h4>Tags</h4>
@@ -178,51 +197,123 @@
             <input type="text" id="ficha-nova-tag" placeholder="+ Nova tag (Enter)" style="margin-top:8px;max-width:220px">
           </div>
 
+          <label for="ed-observacoes">Observações</label>
+          <textarea id="ed-observacoes">${escapeHtml(c.observacoes || '')}</textarea>
+
           <div class="modal-erro" id="ed-erro" style="margin-top:12px"></div>
           <div class="modal-acoes">
-            <button type="button" id="btn-salvar-cliente">Salvar alterações</button>
+            <button type="button" id="btn-salvar-cliente" hidden>Salvar alterações</button>
           </div>
         </div>
 
-        <div class="ficha-metricas">
-          <div class="ficha-metrica"><div class="lbl">Total gasto</div><div class="num">${formatarMoeda(c.metricas.total_gasto)}</div></div>
-          <div class="ficha-metrica"><div class="lbl">Pedidos</div><div class="num">${c.metricas.quantidade_pedidos}</div></div>
-          <div class="ficha-metrica"><div class="lbl">Ticket médio</div><div class="num">${formatarMoeda(c.metricas.ticket_medio)}</div></div>
-          <div class="ficha-metrica"><div class="lbl">Dias sem comprar</div><div class="num">${c.metricas.dias_sem_comprar ?? '—'}</div></div>
+        <div class="card bloco-cliente">
+          <h3 style="margin:0 0 14px">Resumo</h3>
+          <div class="ficha-metricas">
+            <div class="ficha-metrica"><div class="lbl">Total gasto</div><div class="num">${formatarMoeda(c.metricas.total_gasto)}</div></div>
+            <div class="ficha-metrica"><div class="lbl">Pedidos</div><div class="num">${c.metricas.quantidade_pedidos}</div></div>
+            <div class="ficha-metrica"><div class="lbl">Ticket médio</div><div class="num">${formatarMoeda(c.metricas.ticket_medio)}</div></div>
+            <div class="ficha-metrica"><div class="lbl">Dias sem comprar</div><div class="num">${c.metricas.dias_sem_comprar ?? '—'}</div></div>
+          </div>
         </div>
 
         <div class="card bloco-cliente">
-          <h3 style="margin:0 0 4px">Histórico de pedidos (${c.pedidos.length})</h3>
-          ${c.pedidos.length ? c.pedidos.map((p) => `
-            <div class="ficha-pedido-linha">
-              <div class="topo">
-                <span>${escapeHtml(p.etapa_nome)} · <span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span></span>
-                <span>${formatarMoeda(p.valor_total)} <span style="color:var(--muted);font-size:12px">${formatarData(p.criado_em)}</span></span>
-              </div>
-              ${p.arquivos && p.arquivos.length ? `
-              <div class="arquivos">${p.arquivos.map((a) => `<a href="/crm/api/pedidos/${p.id}/arquivos/${a.id}" target="_blank" rel="noopener">${icon('paperclip', 12)} ${escapeHtml(a.nome_arquivo)}</a>`).join('')}</div>
-              ` : ''}
-            </div>
-          `).join('') : '<p class="vazio">Nenhum pedido ainda.</p>'}
+          <h3 style="margin:0 0 14px">Histórico de pedidos</h3>
+          <div id="tabela-pedidos-wrap"></div>
         </div>
 
         <div class="card">
           <h3 style="margin:0 0 4px">Linha do tempo</h3>
-          ${c.eventos.length ? c.eventos.map((e) => `
-            <div class="ficha-evento-linha" style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);font-size:13px">
-              <span>${ROTULO_TIPO_EVENTO[e.tipo] || e.tipo}</span>
-              <span style="color:var(--muted);font-size:11.5px">${formatarDataHora(e.criado_em)}</span>
-            </div>
-          `).join('') : '<p class="vazio">Sem eventos.</p>'}
+          <div id="linha-do-tempo-wrap"></div>
         </div>
       `;
+
+      renderizarPedidos();
+      renderizarLinhaDoTempo();
+      ligarEventosFormulario();
+    }
+
+    function renderizarPedidos() {
+      const c = cliente;
+      const wrap = document.getElementById('tabela-pedidos-wrap');
+      if (!c.pedidos.length) { wrap.innerHTML = '<p class="vazio">Nenhum pedido ainda.</p>'; return; }
+
+      const totalPaginas = Math.ceil(c.pedidos.length / PEDIDOS_POR_PAGINA);
+      const inicio = paginaPedidos * PEDIDOS_POR_PAGINA;
+      const pagina = c.pedidos.slice(inicio, inicio + PEDIDOS_POR_PAGINA);
+
+      wrap.innerHTML = `
+        <table class="tabela-pedidos">
+          <thead><tr><th>Nº</th><th>Produtos</th><th>Quantidade</th><th>Valor</th><th>Data do pedido</th><th>Data de entrega</th></tr></thead>
+          <tbody>
+            ${pagina.map((p) => {
+              const itens = p.itens || [];
+              const produtos = itens.map((i) => escapeHtml(i.descricao || 'Item')).join(', ') || '—';
+              const quantidade = itens.reduce((soma, i) => soma + Number(i.quantidade || 0), 0);
+              return `
+                <tr>
+                  <td>${p.numero}</td>
+                  <td>${produtos}</td>
+                  <td>${quantidade || '—'}</td>
+                  <td>${formatarMoeda(p.valor_total)}</td>
+                  <td>${formatarData(p.criado_em)}</td>
+                  <td>${p.data_entrega ? formatarData(p.data_entrega) : '—'}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        ${totalPaginas > 1 ? `
+          <div class="paginacao-pedidos">
+            <button type="button" class="btn-secundario" id="btn-pedidos-anterior" ${paginaPedidos === 0 ? 'disabled' : ''}>Anterior</button>
+            <span>Página ${paginaPedidos + 1} de ${totalPaginas}</span>
+            <button type="button" class="btn-secundario" id="btn-pedidos-proximo" ${paginaPedidos >= totalPaginas - 1 ? 'disabled' : ''}>Próxima</button>
+          </div>
+        ` : ''}
+      `;
+
+      const btnAnterior = document.getElementById('btn-pedidos-anterior');
+      const btnProximo = document.getElementById('btn-pedidos-proximo');
+      if (btnAnterior) btnAnterior.addEventListener('click', () => { paginaPedidos--; renderizarPedidos(); });
+      if (btnProximo) btnProximo.addEventListener('click', () => { paginaPedidos++; renderizarPedidos(); });
+    }
+
+    function renderizarLinhaDoTempo() {
+      const c = cliente;
+      const wrap = document.getElementById('linha-do-tempo-wrap');
+      if (!c.eventos.length) { wrap.innerHTML = '<p class="vazio">Sem eventos.</p>'; return; }
+
+      const visiveis = c.eventos.slice(0, eventosVisiveis);
+      wrap.innerHTML = `
+        ${visiveis.map((e) => `
+          <div class="linha-tempo-item">
+            <span>${ROTULO_TIPO_EVENTO[e.tipo] || e.tipo}</span>
+            <span style="color:var(--muted);font-size:11.5px">${formatarDataHora(e.criado_em)}</span>
+          </div>
+        `).join('')}
+        ${eventosVisiveis < c.eventos.length ? `<button type="button" class="btn-secundario" id="btn-mais-eventos" style="margin-top:10px">Mostrar mais</button>` : ''}
+      `;
+      const btnMais = document.getElementById('btn-mais-eventos');
+      if (btnMais) btnMais.addEventListener('click', () => { eventosVisiveis += 2; renderizarLinhaDoTempo(); });
+    }
+
+    function ligarEventosFormulario() {
+      const c = cliente;
 
       document.getElementById('btn-bloquear').addEventListener('click', async () => {
         const res = await apiFetch(`/crm/api/clientes/${c.id}`, { method: 'PATCH', body: JSON.stringify({ bloqueado: !c.bloqueado }) });
         if (res.ok) await carregar();
       });
 
-      document.getElementById('btn-salvar-cliente').addEventListener('click', async () => {
+      // Botão "Salvar alterações" só aparece depois de uma mudança de
+      // verdade num campo — pedido do Bruno, 2026-09-25.
+      const btnSalvar = document.getElementById('btn-salvar-cliente');
+      const camposEditaveis = ['ed-nome', 'ed-telefone', 'ed-email', 'ed-documento', 'ed-endereco', 'ed-cidade', 'ed-uf', 'ed-segmento', 'ed-origem', 'ed-observacoes'];
+      camposEditaveis.forEach((id) => {
+        document.getElementById(id).addEventListener('input', () => { btnSalvar.hidden = false; });
+        document.getElementById(id).addEventListener('change', () => { btnSalvar.hidden = false; });
+      });
+
+      btnSalvar.addEventListener('click', async () => {
         const nome = document.getElementById('ed-nome').value.trim();
         if (!nome) { document.getElementById('ed-erro').textContent = 'Nome é obrigatório'; return; }
         const documento = document.getElementById('ed-documento').value.trim();
@@ -242,8 +333,8 @@
             cidade: document.getElementById('ed-cidade').value.trim() || null,
             uf: document.getElementById('ed-uf').value.trim() || null,
             endereco_completo: document.getElementById('ed-endereco').value.trim() || null,
-            segmento: document.getElementById('ed-segmento').value.trim() || null,
-            origem: document.getElementById('ed-origem').value.trim() || null,
+            segmento: document.getElementById('ed-segmento').value || null,
+            origem: document.getElementById('ed-origem').value || null,
             observacoes: document.getElementById('ed-observacoes').value.trim() || null,
           }),
         });
