@@ -25,38 +25,29 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/kyvvo_test
       NODE_ENV: test
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
+      # Único consumidor: a interpolação ${NPM_PACKAGES_TOKEN} no .npmrc do
+      # próprio repo — não passamos mais registry-url pro actions/setup-node
+      # (ver comentário abaixo), então não existe mais NODE_AUTH_TOKEN.
       NPM_PACKAGES_TOKEN: ${{ secrets.NPM_PACKAGES_TOKEN }}
 
     steps:
       - uses: actions/checkout@v7
 
-      # Node 20 (independente da versão do npm — testado com 10.8.2 e 11.20.0,
-      # ambos falharam) reenvia o header Authorization no redirect 302 do
-      # GitHub Packages pro blob storage do Azure — o Azure rejeita esse
-      # header (401), mesmo o token sendo válido e com acesso ao pacote.
-      # Achado 2026-09-24 testando @kyvvohq/whatsapp@1.3.0 (antes não
-      # aparecia porque nada precisava baixar uma versão nova de
-      # kyvvo-integrations). Confirmado que Node 22+ corrige (também remove
-      # o warning EBADENGINE de content-disposition@3.0.0, que já exige
-      # Node >=22).
+      # TENTATIVA (2026-09-25): não passar registry-url/scope pro
+      # actions/setup-node. Essa opção gera um .npmrc temporário
+      # (NPM_CONFIG_USERCONFIG) com always-auth, que força o Authorization a
+      # ser reenviado no redirect 302 do GitHub Packages pro blob storage do
+      # Azure — o Azure rejeita (401), mesmo com token válido. Sem essa
+      # opção, o npm usa o .npmrc do próprio repo (sem always-auth) — o
+      # mesmo que já funciona no container da EC2. Se confirmar, aplicar
+      # nos outros repos e reverter o pin de Node 22/`npm install` (que
+      # tentavam contornar o sintoma, não a causa).
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://npm.pkg.github.com
-          scope: "@kyvvohq"
-          always-auth: false
 
-      - name: Atualizar npm
-        run: npm install -g npm@latest
-
-      # `npm ci` (mesmo já em Node 22 + npm@latest) ainda 401 ao baixar
-      # tarball do GitHub Packages — reenvia Authorization no redirect pro
-      # Azure Blob. `npm install` (mesmo lockfile, caminho de código
-      # diferente) não tem esse problema — confirmado local (Node 24 +
-      # npm 12, `npm install` funcionou).
       - name: Instalar dependências
-        run: npm install
+        run: npm ci
 
       - name: Aplicar migrations do zero
         run: node -e "require('./lib/db').migrar().then(() => { console.log('migrations ok'); process.exit(0); }).catch(e => { console.error(e); process.exit(1); })"
