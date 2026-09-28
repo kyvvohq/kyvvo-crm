@@ -13,13 +13,16 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .form-novo-produto { display:flex; gap:8px; align-items:flex-end; margin-bottom:16px; }
-  .form-novo-produto > div { flex:1; }
+  .form-novo-produto { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:16px; }
+  .form-novo-produto > div { flex:1; min-width:110px; }
   .form-novo-produto input[type="text"] { width:100%; }
   .linha-produto { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
   .linha-produto:first-child { border-top:none; }
-  .linha-produto .nome-produto { cursor:text; flex:1; font-weight:600; }
+  .linha-produto .nome-produto { cursor:text; flex:2; min-width:120px; font-weight:600; }
+  .linha-produto .id-produto { cursor:text; flex:1; min-width:80px; color:var(--muted-strong); font-size:12.5px; }
+  .linha-produto .quantidade-produto { cursor:text; width:70px; color:var(--muted-strong); text-align:right; }
   .linha-produto .preco-produto { cursor:text; width:110px; color:var(--muted-strong); text-align:right; }
+  .linha-produto .observacao-produto { cursor:text; flex:2; min-width:140px; color:var(--muted); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .linha-produto .acoes-linha { display:flex; gap:6px; flex-shrink:0; }
   .linha-produto .acoes-linha button { height:28px; padding:0 10px; font-size:12px; }
   .linha-produto input.editar-nome { font-size:14px; }
@@ -96,7 +99,10 @@
       <div class="card">
         <form class="form-novo-produto" id="form-novo-produto">
           <div><label for="input-novo-produto">Novo produto</label><input type="text" id="input-novo-produto" placeholder="ex.: Vaso decorativo P"></div>
-          <div style="flex:0 0 130px"><label for="input-novo-produto-preco">Preço de referência</label><input type="text" id="input-novo-produto-preco" placeholder="0,00"></div>
+          <div style="flex:0 0 100px"><label for="input-novo-produto-id">ID</label><input type="text" id="input-novo-produto-id" placeholder="SKU"></div>
+          <div style="flex:0 0 90px"><label for="input-novo-produto-quantidade">Quantidade</label><input type="text" inputmode="numeric" id="input-novo-produto-quantidade" placeholder="0"></div>
+          <div style="flex:0 0 130px"><label for="input-novo-produto-preco">Valor</label><input type="text" id="input-novo-produto-preco" placeholder="0,00"></div>
+          <div><label for="input-novo-produto-observacao">Observação</label><input type="text" id="input-novo-produto-observacao" placeholder="opcional"></div>
           <button type="submit">Adicionar</button>
         </form>
         <div id="lista-produtos"><div class="vazio">Carregando…</div></div>
@@ -122,7 +128,10 @@
       el.innerHTML = produtos.length ? produtos.map((p) => `
         <div class="linha-produto">
           <span class="nome-produto" data-editar-produto="${p.id}" data-campo="nome">${escapeHtml(p.nome)}</span>
+          <span class="id-produto" data-editar-produto="${p.id}" data-campo="identificador_externo">${p.identificador_externo ? escapeHtml(p.identificador_externo) : '—'}</span>
+          <span class="quantidade-produto" data-editar-produto="${p.id}" data-campo="quantidade">${p.quantidade ?? 0}</span>
           <span class="preco-produto" data-editar-produto="${p.id}" data-campo="preco_referencia">${p.preco_referencia ? formatarMoeda(p.preco_referencia) : '—'}</span>
+          <span class="observacao-produto" data-editar-produto="${p.id}" data-campo="observacao" title="${p.observacao ? escapeHtml(p.observacao) : ''}">${p.observacao ? escapeHtml(p.observacao) : '—'}</span>
           <div class="acoes-linha">
             <button type="button" class="btn-secundario" data-apagar-produto="${p.id}">Remover</button>
           </div>
@@ -140,6 +149,17 @@
             input.style.width = '110px';
             input.style.textAlign = 'right';
             aplicarMascaraMoeda(input);
+          } else if (campo === 'quantidade') {
+            input.value = produto.quantidade ?? 0;
+            input.style.width = '70px';
+            input.style.textAlign = 'right';
+            input.inputMode = 'numeric';
+          } else if (campo === 'identificador_externo') {
+            input.value = produto.identificador_externo || '';
+            input.style.width = '110px';
+          } else if (campo === 'observacao') {
+            input.value = produto.observacao || '';
+            input.style.width = '220px';
           } else {
             input.value = produto.nome;
           }
@@ -147,7 +167,10 @@
           input.focus();
           input.select();
           const salvar = async () => {
-            const valor = campo === 'preco_referencia' ? (valorMoedaParaNumero(input) || null) : input.value.trim();
+            let valor;
+            if (campo === 'preco_referencia') valor = valorMoedaParaNumero(input) || null;
+            else if (campo === 'quantidade') valor = parseInt(input.value, 10) || 0;
+            else valor = input.value.trim() || null;
             if (campo === 'nome' && !valor) { input.replaceWith(span); return; }
             await apiFetch(`/crm/api/produtos/${produto.id}`, { method: 'PATCH', body: JSON.stringify({ [campo]: valor }) });
             await carregar();
@@ -167,13 +190,28 @@
     document.getElementById('form-novo-produto').addEventListener('submit', async (e) => {
       e.preventDefault();
       const inputNome = document.getElementById('input-novo-produto');
+      const inputId = document.getElementById('input-novo-produto-id');
+      const inputQuantidade = document.getElementById('input-novo-produto-quantidade');
       const inputPreco = document.getElementById('input-novo-produto-preco');
+      const inputObservacao = document.getElementById('input-novo-produto-observacao');
       const nome = inputNome.value.trim();
       if (!nome) return;
       const preco = valorMoedaParaNumero(inputPreco);
-      await apiFetch('/crm/api/produtos', { method: 'POST', body: JSON.stringify({ nome, preco_referencia: preco || null }) });
+      await apiFetch('/crm/api/produtos', {
+        method: 'POST',
+        body: JSON.stringify({
+          nome,
+          identificador_externo: inputId.value.trim() || null,
+          quantidade: parseInt(inputQuantidade.value, 10) || 0,
+          preco_referencia: preco || null,
+          observacao: inputObservacao.value.trim() || null,
+        }),
+      });
       inputNome.value = '';
+      inputId.value = '';
+      inputQuantidade.value = '';
       inputPreco.value = '';
+      inputObservacao.value = '';
       carregar();
     });
     aplicarMascaraMoeda(document.getElementById('input-novo-produto-preco'));

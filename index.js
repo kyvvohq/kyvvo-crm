@@ -1078,19 +1078,19 @@ async function build() {
 
   fastify.post('/crm/api/produtos', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { nome, categoria, preco_referencia, identificador_externo } = request.body || {};
+    const { nome, categoria, preco_referencia, identificador_externo, quantidade, observacao } = request.body || {};
     if (!nome || !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
     const { rows } = await pool.query(
-      `insert into crm_produtos (tenant_id, nome, categoria, preco_referencia, identificador_externo)
-       values ($1, $2, $3, $4, $5) returning *`,
-      [tenantId, nome.trim(), categoria || null, preco_referencia || null, identificador_externo || null]
+      `insert into crm_produtos (tenant_id, nome, categoria, preco_referencia, identificador_externo, quantidade, observacao)
+       values ($1, $2, $3, $4, $5, $6, $7) returning *`,
+      [tenantId, nome.trim(), categoria || null, preco_referencia || null, identificador_externo || null, quantidade || 0, observacao || null]
     );
     return reply.code(201).send(rows[0]);
   });
 
   fastify.patch('/crm/api/produtos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['nome', 'categoria', 'preco_referencia', 'identificador_externo'];
+    const campos = ['nome', 'categoria', 'preco_referencia', 'identificador_externo', 'quantidade', 'observacao'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
