@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Notificações</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .notificacao-linha { padding:14px 0; border-top:1px solid var(--border); }
+  .notificacao-linha:first-child { border-top:none; padding-top:0; }
+  .campo-check { display:flex; align-items:center; gap:8px; }
+  .campo-check input { width:auto; }
+  .campo-check label { margin:0; font-size:14px; font-weight:600; color:var(--text); }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-direita">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <div class="ds-menu-topo">
+        <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Notificações</h1></div>
+          <p class="descricao">Escolha quais avisos aparecem no sino do topo.</p>
+        </div>
+      </div>
+
+      <div class="card" id="lista-notificacoes"><div class="vazio">Carregando…</div></div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    // Mesma lista de lib/notificacoes.js (backend), só com o que o frontend
+    // precisa pra desenhar a tela — chave+título pra cada toggle. Evita um
+    // endpoint só pra listar os tipos existentes.
+    const TIPOS_NOTIFICACAO = [
+      { chave: 'pedidos_parados', titulo: 'Pedidos parados além do prazo da etapa' },
+    ];
+
+    let notificacoesAtivas = {};
+
+    function configAtual(chave) {
+      const cfg = notificacoesAtivas[chave];
+      return cfg && typeof cfg === 'object' ? cfg : {};
+    }
+
+    async function carregar() {
+      const res = await apiFetch('/crm/api/notificacoes/config');
+      const dados = await res.json();
+      notificacoesAtivas = dados.notificacoes_ativas || {};
+      renderizar();
+    }
+
+    function renderizar() {
+      const el = document.getElementById('lista-notificacoes');
+      el.innerHTML = TIPOS_NOTIFICACAO.map((tipo) => {
+        const cfg = configAtual(tipo.chave);
+        const ativo = cfg.ativo !== false;
+        return `
+          <div class="notificacao-linha" data-chave="${tipo.chave}">
+            <div class="campo-check">
+              <input type="checkbox" id="chk-${tipo.chave}" class="notificacao-ativa" data-chave="${tipo.chave}" ${ativo ? 'checked' : ''}>
+              <label for="chk-${tipo.chave}">${escapeHtml(tipo.titulo)}</label>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Manda o objeto INTEIRO daquela chave já mesclado — o PATCH substitui
+      // o objeto completo, não mescla parcial no backend.
+      async function salvar(chave, patchParcial) {
+        const cfgAtual = configAtual(chave);
+        const novo = { ...notificacoesAtivas, [chave]: { ...cfgAtual, ...patchParcial } };
+        const res = await apiFetch('/crm/api/notificacoes/config', { method: 'PATCH', body: JSON.stringify({ notificacoes_ativas: novo }) });
+        if (!res.ok) return false;
+        notificacoesAtivas = (await res.json()).notificacoes_ativas || novo;
+        carregarNotificacoes();
+        return true;
+      }
+
+      el.querySelectorAll('.notificacao-ativa').forEach((chk) => {
+        chk.addEventListener('change', async () => {
+          const ok = await salvar(chk.dataset.chave, { ativo: chk.checked });
+          if (!ok) chk.checked = !chk.checked;
+        });
+      });
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

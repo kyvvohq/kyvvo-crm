@@ -1,8 +1,10 @@
 // Shell compartilhado das telas autenticadas — auth guard, cabeçalho (logo +
-// menu de perfil + tema), sidebar de navegação e helpers de modal. Espera que
-// a página já tenha no DOM: #painel-sidebar, #btn-toggle-sidebar,
-// #topo-perfil, #topo-perfil-gatilho, #menu-perfil, elementos com classe
-// .js-avatar-usuario/.js-nome-usuario/.js-email-usuario/.btn-sair/.toggle-tema.
+// balão de notificações + menu de perfil + tema), sidebar de navegação e
+// helpers de modal. Espera que a página já tenha no DOM: #painel-sidebar,
+// #btn-toggle-sidebar, #topo-perfil, #topo-perfil-gatilho, #menu-perfil,
+// elementos com classe .js-avatar-usuario/.js-nome-usuario/.js-email-usuario/
+// .btn-sair/.toggle-tema. #notificacoes-sino (.ds-notificacoes do design
+// system) é opcional — só liga o polling se a página tiver o balão no <header>.
 // Incluir via <script src="/crm/shell.js"> no fim do <body>, depois de um
 // snippet inline no <head> que já tenha aplicado data-theme no <html> (evita
 // flash do tema errado). Mesmo padrão do kyvvo-people/public/shell.js.
@@ -48,6 +50,7 @@ const ICON_PATHS = {
   lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73z"/><path d="M12 22V12"/><path d="M3.3 7 12 12l8.7-5"/>',
   zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
 };
 
 function icon(name, size = 18) {
@@ -225,4 +228,44 @@ function aplicarMascaraMoeda(input) {
 function valorMoedaParaNumero(input) {
   const digitos = (input.value || '').replace(/\D/g, '');
   return Number(digitos || 0) / 100;
+}
+
+// --- Notificações (balão do topo, #notificacoes-sino) ---
+// Balão (.ds-notificacoes) é componente do design system (/ds/components.js,
+// KyvvoDS.notificacoesAtualizar cuida de abrir/fechar e da pílula de
+// contagem) — aqui só busca os pendentes e desenha a lista, mesmo desenho
+// do kyvvo-studio (server/panel/public/app.js). Só uma tela de destino por
+// enquanto (Quadro); tipo novo que precisar de destino próprio entra aqui.
+function abrirNotificacaoItem(tipo) {
+  if (tipo === 'pedidos_parados') window.location.href = '/crm/quadro.html';
+}
+document.addEventListener('click', (e) => {
+  const item = e.target.closest('.ds-notificacoes-item');
+  if (item) { e.preventDefault(); abrirNotificacaoItem(item.dataset.tipo); }
+});
+
+async function carregarNotificacoes() {
+  const sino = document.getElementById('notificacoes-sino');
+  const lista = document.getElementById('notificacoes-lista');
+  if (!sino || !lista || !window.KyvvoDS) return;
+  const res = await apiFetch('/crm/api/notificacoes');
+  const dados = await res.json();
+  const grupos = dados.notificacoes || [];
+  const total = grupos.reduce((soma, g) => soma + g.itens.length, 0);
+  KyvvoDS.notificacoesAtualizar(sino, total);
+  lista.innerHTML = total === 0
+    ? '<div class="ds-notificacoes-vazio">Nenhuma notificação por enquanto.</div>'
+    : grupos.map((g) => `
+        <div class="ds-notificacoes-grupo-titulo">${escapeHtml(g.titulo)}</div>
+        ${g.itens.map((item) => `
+          <a class="ds-notificacoes-item" href="#" data-tipo="${g.tipo}" data-id="${item.id}">
+            <div class="ds-notificacoes-item-titulo">${escapeHtml(item.titulo)}</div>
+            <div class="ds-notificacoes-item-meta">${escapeHtml(item.detalhe)}</div>
+          </a>
+        `).join('')}
+      `).join('');
+}
+if (document.getElementById('notificacoes-sino')) {
+  carregarNotificacoes();
+  setInterval(carregarNotificacoes, 60000);
 }

@@ -94,6 +94,16 @@
       <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
       <span class="topo-produto-tag">CRM</span>
     </a>
+    <div class="topo-direita">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
     <div class="topo-perfil" id="topo-perfil">
       <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
         <div class="avatar js-avatar-usuario"></div>
@@ -118,6 +128,7 @@
           <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
         </button>
       </div>
+    </div>
     </div>
   </header>
   <div class="app-shell">
@@ -144,6 +155,7 @@
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
           </ul>
         </li>
       </ul>

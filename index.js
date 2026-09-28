@@ -21,6 +21,7 @@ const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio } = r
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
+const { listarNotificacoesPendentes } = require('./lib/notificacoes');
 
 const PORT = process.env.PORT || 3005;
 
@@ -1416,6 +1417,38 @@ async function build() {
       prontos_para_envio: prontosParaEnvio,
       aniversariantes: aniversariantes.rows,
     };
+  });
+
+  // --- Notificações (balão do topo + Configurações > Notificações) -------------
+  // Cálculo dos pendentes por tipo vive em lib/notificacoes.js — aqui é só
+  // leitura (GET) e o save de qual tipo está ativo/config extra (PATCH),
+  // mesmo desenho do kyvvo-studio.
+  fastify.get('/crm/api/notificacoes', { preHandler: fastify.authenticate }, async (request) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query('select notificacoes_ativas from crm_configuracoes where tenant_id = $1', [tenantId]);
+    const notificacoesAtivas = rows[0] && rows[0].notificacoes_ativas;
+    const notificacoes = await listarNotificacoesPendentes(pool, tenantId, notificacoesAtivas);
+    return { notificacoes };
+  });
+
+  fastify.get('/crm/api/notificacoes/config', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select notificacoes_ativas from crm_configuracoes where tenant_id = $1', [request.user.tenantId]);
+    return { notificacoes_ativas: (rows[0] && rows[0].notificacoes_ativas) || {} };
+  });
+
+  fastify.patch('/crm/api/notificacoes/config', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { notificacoes_ativas } = request.body || {};
+    if (!notificacoes_ativas || typeof notificacoes_ativas !== 'object') {
+      return reply.code(400).send({ error: 'notificacoes_ativas é obrigatório' });
+    }
+    const { rows } = await pool.query(
+      `insert into crm_configuracoes (tenant_id, notificacoes_ativas, atualizado_em) values ($1, $2, now())
+       on conflict (tenant_id) do update set notificacoes_ativas = $2, atualizado_em = now()
+       returning notificacoes_ativas`,
+      [tenantId, JSON.stringify(notificacoes_ativas)]
+    );
+    return rows[0];
   });
 
   return fastify;

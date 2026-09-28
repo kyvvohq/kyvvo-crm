@@ -18,6 +18,7 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .topo-produto-tag { font-family:var(--font-ui); font-size:12px; font-weight:700; color:var(--muted-strong);
   background:var(--surface-muted); border-radius:var(--radius-full); padding:3px 9px; }
 
+.topo-direita { display:flex; align-items:center; gap:10px; }
 .topo-perfil { position:relative; }
 .topo-perfil-gatilho { display:flex; align-items:center; gap:8px; background:var(--surface-muted); border:none;
   border-radius:var(--radius-full); height:40px; padding:4px 10px 4px 4px; cursor:pointer; font-family:var(--font-ui); }
