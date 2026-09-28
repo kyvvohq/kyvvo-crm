@@ -21,6 +21,7 @@
   .lista-opcoes-item .acoes-linha { display:flex; gap:6px; flex-shrink:0; }
   .lista-opcoes-item .acoes-linha button { height:28px; padding:0 10px; font-size:12px; }
   .form-nova-opcao { display:flex; gap:8px; margin-top:12px; }
+  .opcao-sistema-selo { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--muted); flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -125,10 +126,16 @@
       el.innerHTML = opcoes.length ? opcoes.map((o) => `
         <div class="lista-opcoes-item${o.ativo ? '' : ' inativa'}">
           <span class="valor">${escapeHtml(o.valor)}</span>
-          <div class="acoes-linha">
-            <button type="button" class="btn-secundario" data-alternar="${o.id}" data-ativo="${!o.ativo}">${o.ativo ? 'Desativar' : 'Ativar'}</button>
-            <button type="button" class="btn-secundario" data-remover="${o.id}">Remover</button>
-          </div>
+          ${o.sistema ? `
+            <span class="opcao-sistema-selo" title="Usada pelo bot — não pode ser alterada">
+              ${icon('lock', 14)} Usada pelo bot
+            </span>
+          ` : `
+            <div class="acoes-linha">
+              <button type="button" class="btn-secundario" data-alternar="${o.id}" data-ativo="${!o.ativo}">${o.ativo ? 'Desativar' : 'Ativar'}</button>
+              <button type="button" class="btn-secundario" data-remover="${o.id}">Remover</button>
+            </div>
+          `}
         </div>
       `).join('') : '<p class="vazio">Nenhuma opção ainda.</p>';
 

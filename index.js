@@ -409,6 +409,17 @@ async function build() {
 
   fastify.patch('/crm/api/opcoes-cadastro/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
+    // Opção "sistema" (ex.: origem "WhatsApp", gravada pelo bot em todo
+    // cliente/pedido que vem por lá) não pode ser editada nem desativada
+    // pelo usuário — senão o bot continuaria gravando um valor que sumiu
+    // da lista, quebrando o combobox de Origem silenciosamente.
+    const { rows: atual } = await pool.query(
+      'select sistema from crm_opcoes_cadastro where id = $1 and tenant_id = $2',
+      [request.params.id, tenantId]
+    );
+    if (!atual[0]) return reply.code(404).send({ error: 'Opção não encontrada' });
+    if (atual[0].sistema) return reply.code(400).send({ error: 'Esta opção é usada pelo bot e não pode ser alterada.' });
+
     const campos = ['valor', 'ativo'];
     const body = request.body || {};
     const sets = [];
@@ -427,8 +438,15 @@ async function build() {
     return rows[0];
   });
 
-  fastify.delete('/crm/api/opcoes-cadastro/:id', { preHandler: fastify.authenticate }, async (request) => {
-    await pool.query('delete from crm_opcoes_cadastro where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+  fastify.delete('/crm/api/opcoes-cadastro/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows: atual } = await pool.query(
+      'select sistema from crm_opcoes_cadastro where id = $1 and tenant_id = $2',
+      [request.params.id, tenantId]
+    );
+    if (!atual[0]) return reply.code(404).send({ error: 'Opção não encontrada' });
+    if (atual[0].sistema) return reply.code(400).send({ error: 'Esta opção é usada pelo bot e não pode ser removida.' });
+    await pool.query('delete from crm_opcoes_cadastro where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
     return { ok: true };
   });
 
