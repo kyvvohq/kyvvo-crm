@@ -293,6 +293,17 @@ test('falha ao baixar mídia: avisa o cliente e não avança de estado', async (
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'recebendo_arquivos');
 });
 
+test('estado desconhecido/corrompido: reinicia a conversa E manda a saudação (bug real, 2026-09-28)', async () => {
+  const { pool, conversas } = poolFalso();
+  // Simula dado corrompido/versão antiga — nunca alcançável pelo fluxo normal.
+  conversas.set(`${TENANT}|${TELEFONE}`, { tenant_id: TENANT, telefone_e164: TELEFONE, estado: 'estado_que_nao_existe_mais', respostas: {} });
+  const envios = await enviar(pool, TENANT, TELEFONE, texto('bom dia'));
+  assert.equal(envios.length, 1, 'antes do fix devolvia [] — cliente mandava mensagem e nunca recebia nada de volta');
+  assert.equal(envios[0].tipo, 'botoes');
+  assert.ok(envios[0].texto.includes('Basic 3D Print'));
+  assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
+});
+
 test('sem etapa configurada: ainda responde ao cliente, mas não cria pedido', async () => {
   const { pool, pedidos } = poolFalso({ semEtapa: true });
   await enviar(pool, TENANT, TELEFONE, texto('oi'));
