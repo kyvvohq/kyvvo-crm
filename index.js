@@ -681,6 +681,10 @@ async function build() {
   // pra Nova"). Quem apagar precisa mover os pedidos primeiro.
   fastify.delete('/crm/api/etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
+    const { rows: etapaAlvo } = await pool.query('select fixa from crm_etapas where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (etapaAlvo[0] && etapaAlvo[0].fixa) {
+      return reply.code(400).send({ error: 'Esta é a etapa fixa de entrada ("A fazer") e não pode ser apagada.' });
+    }
     const { rows: contagem } = await pool.query(
       'select count(*)::int as total from crm_pedidos where etapa_id = $1 and tenant_id = $2',
       [request.params.id, tenantId]
@@ -697,6 +701,13 @@ async function build() {
     const { tenantId } = request.user;
     const ids = request.body?.ids;
     if (!Array.isArray(ids) || !ids.length) return reply.code(400).send({ error: 'ids é obrigatório' });
+    // Etapa fixa ("A fazer") sempre em 1º — o frontend já trava o drag dela,
+    // isso aqui é defesa em profundidade contra uma reordenação vinda de
+    // fora do Quadro (ou de um bug no drag).
+    const { rows: fixaRows } = await pool.query('select id from crm_etapas where tenant_id = $1 and fixa = true limit 1', [tenantId]);
+    if (fixaRows[0] && ids[0] !== fixaRows[0].id) {
+      return reply.code(400).send({ error: 'A etapa fixa ("A fazer") precisa continuar sendo a primeira.' });
+    }
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -791,8 +802,11 @@ async function build() {
     const { telefone, nome_cliente, itens, descricao, quantidade, produto_id, valor_total, origem, tipo_entrega, recurso_id } = request.body || {};
     if (!origem) return reply.code(400).send({ error: 'Origem é obrigatória' });
 
+    // "A fazer" (fixa=true, migration 013) é sempre onde todo pedido novo
+    // entra — não mais "menor ordem entre tipo=aberta", que mudava se o
+    // dono reordenasse as colunas do Quadro.
     const { rows: etapaRows } = await pool.query(
-      `select id from crm_etapas where tenant_id = $1 and tipo = 'aberta' order by ordem asc limit 1`,
+      `select id from crm_etapas where tenant_id = $1 and fixa = true limit 1`,
       [tenantId]
     );
     if (!etapaRows[0]) return reply.code(409).send({ error: 'Conta sem etapas configuradas' });
@@ -867,6 +881,25 @@ async function build() {
     if (!etapaRows[0]) return reply.code(400).send({ error: 'Etapa inválida' });
     if (etapaRows[0].tipo === 'perdida' && !motivo_perda) {
       return reply.code(400).send({ error: 'Motivo é obrigatório ao mover pra Perdido' });
+    }
+
+    // Pedido do Bruno: só sai de "A fazer" (fixa=true) com cliente vinculado
+    // de verdade — sem flag "cadastro real vs. automático" em crm_clientes,
+    // usa nome preenchido e diferente do placeholder de
+    // encontrarOuCriarPorTelefone (lib/clientes.js) como proxy.
+    const { rows: pedidoAtual } = await pool.query(
+      `select p.etapa_id, c.nome as cliente_nome from crm_pedidos p
+       join crm_clientes c on c.id = p.cliente_id
+       where p.id = $1 and p.tenant_id = $2`,
+      [request.params.id, tenantId]
+    );
+    if (!pedidoAtual[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+    if (pedidoAtual[0].etapa_id !== etapa_id) {
+      const { rows: etapaAtualRows } = await pool.query('select fixa from crm_etapas where id = $1', [pedidoAtual[0].etapa_id]);
+      const clienteVinculado = pedidoAtual[0].cliente_nome && pedidoAtual[0].cliente_nome !== 'Sem nome';
+      if (etapaAtualRows[0] && etapaAtualRows[0].fixa && !clienteVinculado) {
+        return reply.code(400).send({ error: 'Vincule um cliente (com nome) antes de mover este pedido pra outra etapa.' });
+      }
     }
 
     const { rows } = await pool.query(
