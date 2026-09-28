@@ -80,6 +80,7 @@
           </button>
           <ul class="ds-menu-sub">
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
           </ul>
         </li>
@@ -205,6 +206,7 @@
                 <button type="button" data-editar-pedido="${p.id}">Editar pedido</button>
                 <button type="button" data-pagamento-confirmado="${p.id}">Confirmar Pagamento</button>
                 <button type="button" data-acionar-cliente="${p.id}">Acionar cliente</button>
+                <button type="button" data-chamar-whatsapp="${p.id}">Chamar WhatsApp</button>
                 <button type="button" class="perigo" data-cancelar-pedido="${p.id}">Cancelar pedido</button>
               </div>
             </div>
@@ -245,10 +247,20 @@
           carregar();
         });
       });
+      // "Acionar cliente" abre a conversa do bot com esse cliente
+      // (Configurações > WhatsApp > Conversas) — "Chamar WhatsApp" preserva
+      // o comportamento antigo (wa.me direto, fora do bot).
       document.querySelectorAll('[data-acionar-cliente]').forEach((btn) => {
         btn.addEventListener('click', () => {
           fecharMenusAbertos();
           const p = pedidos.find((x) => x.id === btn.dataset.acionarCliente);
+          if (p && p.cliente_telefone) window.location.href = `/crm/whatsapp.html?telefone=${encodeURIComponent(p.cliente_telefone)}`;
+        });
+      });
+      document.querySelectorAll('[data-chamar-whatsapp]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          fecharMenusAbertos();
+          const p = pedidos.find((x) => x.id === btn.dataset.chamarWhatsapp);
           if (p && p.cliente_telefone) window.open(linkWhatsapp(p.cliente_telefone), '_blank', 'noopener');
         });
       });
