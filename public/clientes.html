@@ -124,18 +124,30 @@
     let clientes = [];
     let tags = [];
     let formularios = [];
+    let segmentosOpcoes = [];
+    let origensOpcoes = [];
 
     async function carregar(busca) {
       const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
-      const [resClientes, resTags, resFormularios] = await Promise.all([
+      const [resClientes, resTags, resFormularios, resSegmentos, resOrigens] = await Promise.all([
         apiFetch(`/crm/api/clientes${qs}`),
         apiFetch('/crm/api/tags'),
         apiFetch('/crm/api/formularios'),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=segmento'),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=origem'),
       ]);
       clientes = await resClientes.json();
       tags = await resTags.json();
       formularios = await resFormularios.json();
+      segmentosOpcoes = await resSegmentos.json();
+      origensOpcoes = await resOrigens.json();
       renderizar();
+    }
+
+    // Só opções ativas entram no dropdown de Novo Cliente — CRUD de verdade
+    // fica em Configurações > Cadastro.
+    function opcoesSelectHtml(opcoes) {
+      return opcoes.filter((o) => o.ativo).map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
     }
 
     function renderizar() {
@@ -483,9 +495,9 @@
           <div><label for="f-uf">UF</label><input id="f-uf" maxlength="2" style="text-transform:uppercase"></div>
         </div>
         <label for="f-segmento">Segmento</label>
-        <input id="f-segmento" placeholder="ex.: confeitaria, loja de joias, papelaria">
+        <select id="f-segmento"><option value="">Selecione…</option>${opcoesSelectHtml(segmentosOpcoes)}</select>
         <label for="f-origem">Origem</label>
-        <input id="f-origem" placeholder="ex.: whatsapp, shopee, site, indicação">
+        <select id="f-origem"><option value="">Selecione…</option>${opcoesSelectHtml(origensOpcoes)}</select>
         <div class="modal-erro" id="f-erro"></div>
       `;
     }
