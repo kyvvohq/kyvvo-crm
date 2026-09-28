@@ -24,10 +24,6 @@
   .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
   .menu-acoes button:hover { background:var(--surface-muted); }
   .menu-acoes button.perigo { color:var(--danger); }
-  .linha-recurso { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13.5px; }
-  .linha-recurso:first-child { border-top:none; }
-  .linha-recurso .nome-recurso { cursor:text; flex:1; }
-  .linha-recurso .btn-remover-recurso { height:28px; padding:0 10px; font-size:12px; }
 </style>
 </head>
 <body>
@@ -74,6 +70,7 @@
         <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
         <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
         <li class="ds-menu-grupo">
           <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
@@ -96,10 +93,14 @@
           <p class="descricao" id="aviso-filtro-cliente" hidden>Mostrando só os pedidos deste cliente — <a href="/crm/pedidos.html">ver todos</a>.</p>
         </div>
         <div class="acoes">
-          <button type="button" class="btn-secundario" id="btn-importar-upseller">Importar UpSeller</button>
-          <button type="button" class="btn-secundario" id="btn-importar-nfe">Importar NF-e</button>
-          <button type="button" class="btn-secundario" id="btn-gerenciar-produtos">Produtos</button>
-          <button type="button" class="btn-secundario" id="btn-gerenciar-recursos">Recursos</button>
+          <div class="menu-acoes-wrap">
+            <button type="button" class="btn-secundario btn-acoes" id="btn-acoes-pedidos" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" style="width:auto;height:40px;padding:0 12px">⋯</button>
+            <div class="menu-acoes" id="menu-acoes-pedidos" hidden>
+              <button type="button" id="btn-importar-upseller">Importar UpSeller</button>
+              <button type="button" id="btn-importar-nfe">Importar NF-e</button>
+            </div>
+          </div>
+          <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
         </div>
       </div>
 
@@ -202,7 +203,7 @@
               <button type="button" class="btn-acoes" data-abrir-menu="${p.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
               <div class="menu-acoes" data-menu="${p.id}" hidden>
                 <button type="button" data-editar-pedido="${p.id}">Editar pedido</button>
-                <button type="button" data-pagamento-confirmado="${p.id}">Pagamento confirmado</button>
+                <button type="button" data-pagamento-confirmado="${p.id}">Confirmar Pagamento</button>
                 <button type="button" data-acionar-cliente="${p.id}">Acionar cliente</button>
                 <button type="button" class="perigo" data-cancelar-pedido="${p.id}">Cancelar pedido</button>
               </div>
@@ -378,7 +379,11 @@
             if (!motivoPerda) return;
           }
           const res = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }) });
-          if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao mover etapa'; return; }
+          if (!res.ok) {
+            const dados = await res.json().catch(() => ({}));
+            document.getElementById('e-erro').textContent = dados.error || 'Falha ao mover etapa';
+            return;
+          }
         }
         if (novoRecursoId !== (p.recurso_id || null)) {
           const res = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, { method: 'PATCH', body: JSON.stringify({ recurso_id: novoRecursoId }) });
@@ -404,6 +409,7 @@
 
     // --- Importar NF-e (US21) -----------------------------------------------
     document.getElementById('btn-importar-nfe').addEventListener('click', () => {
+      fecharMenusAbertos();
       abrirModal('<h3>Importar NF-e (XML)</h3>', `
         <p class="modal-texto">Selecione um ou mais arquivos XML de NF-e. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada.</p>
         <input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple>
@@ -445,6 +451,7 @@
 
     // --- Importar relatório de pedidos da UpSeller (Excel) (US21) -----------
     document.getElementById('btn-importar-upseller').addEventListener('click', () => {
+      fecharMenusAbertos();
       abrirModal('<h3>Importar pedidos (UpSeller)</h3>', `
         <p class="modal-texto">Selecione o relatório de NF-e exportado do UpSeller (.xlsx). Cria um pedido por nota — devolução de mercadoria é ignorada. Reimportar o mesmo arquivo não duplica.</p>
         <input type="file" id="up-arquivo" accept=".xlsx">
@@ -484,120 +491,90 @@
       });
     });
 
-    // --- Gerenciar recursos (raias do Quadro) -------------------------------
-    document.getElementById('btn-gerenciar-recursos').addEventListener('click', () => abrirModalRecursos());
+    // --- Menu almôndega de topo (Importar UpSeller/NF-e) — mesmo padrão do
+    // kebab por linha, fixo, ligado uma única vez.
+    document.getElementById('btn-acoes-pedidos').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('menu-acoes-pedidos');
+      const jaAberto = !menu.hidden;
+      fecharMenusAbertos();
+      menu.hidden = jaAberto;
+    });
 
-    function abrirModalRecursos() {
-      abrirModal('<h3>Recursos de produção</h3>', `
-        <p class="modal-texto">São as raias do Quadro — ex.: cada impressora 3D, forno, posto de trabalho. Pedido sem recurso fica em "Sem recurso".</p>
-        <div id="lista-recursos"></div>
-        <label for="input-novo-recurso">Novo recurso</label>
-        <input type="text" id="input-novo-recurso" placeholder="ex.: Impressora 1 (Enter pra adicionar)">
-      `, 'modal-card-larga');
-      renderizarListaRecursos();
-      document.getElementById('input-novo-recurso').addEventListener('keydown', async (e) => {
-        if (e.key !== 'Enter') return;
-        const nome = e.target.value.trim();
-        if (!nome) return;
-        e.target.disabled = true;
-        await apiFetch('/crm/api/recursos', { method: 'POST', body: JSON.stringify({ nome }) });
-        await carregar();
-        e.target.value = '';
-        e.target.disabled = false;
-        renderizarListaRecursos();
-      });
-    }
-
-    function renderizarListaRecursos() {
-      const el = document.getElementById('lista-recursos');
-      if (!el) return;
-      el.innerHTML = recursos.length ? recursos.map((r) => `
-        <div class="linha-recurso">
-          <span class="nome-recurso" data-editar-recurso="${r.id}">${escapeHtml(r.nome)}</span>
-          <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-recurso="${r.id}">Remover</button>
-        </div>
-      `).join('') : '<p class="vazio">Nenhum recurso cadastrado ainda.</p>';
-
-      el.querySelectorAll('[data-apagar-recurso]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/recursos/${btn.dataset.apagarRecurso}`, { method: 'DELETE' });
-          await carregar();
-          renderizarListaRecursos();
-        });
-      });
-      el.querySelectorAll('[data-editar-recurso]').forEach((span) => {
-        span.addEventListener('click', () => {
-          const atual = span.textContent;
-          const input = document.createElement('input');
-          input.className = 'editar-nome';
-          input.value = atual;
-          span.replaceWith(input);
-          input.focus();
-          input.select();
-          const salvar = async () => {
-            const novo = input.value.trim();
-            if (novo && novo !== atual) {
-              await apiFetch(`/crm/api/recursos/${span.dataset.editarRecurso}`, { method: 'PATCH', body: JSON.stringify({ nome: novo }) });
-              await carregar();
-              renderizarListaRecursos();
-            } else {
-              input.replaceWith(span);
-            }
-          };
-          input.addEventListener('blur', salvar);
-          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
-        });
-      });
-    }
-
-    // --- Gerenciar produtos (US18) ------------------------------------------
-    document.getElementById('btn-gerenciar-produtos').addEventListener('click', () => abrirModalProdutos());
-
-    function abrirModalProdutos() {
-      abrirModal('<h3>Catálogo de produtos</h3>', `
-        <p class="modal-texto">Cadastre os produtos que você mais vende pra escolher rápido na hora de criar um pedido.</p>
-        <div id="lista-produtos"></div>
+    // --- Novo pedido (US do Bruno: saiu do Quadro, mora só aqui agora) -------
+    document.getElementById('btn-novo-pedido').addEventListener('click', () => {
+      fecharMenusAbertos();
+      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
+      const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
+      abrirModal('<h3>Novo pedido</h3>', `
         <div class="grid2">
-          <div><label for="input-novo-produto">Novo produto</label><input type="text" id="input-novo-produto" placeholder="ex.: Vaso decorativo P"></div>
-          <div><label for="input-novo-produto-preco">Preço de referência</label><input type="text" id="input-novo-produto-preco" placeholder="0,00"></div>
+          <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
+          <div><label for="p-nome-cliente">Nome (se cliente novo)</label><input id="p-nome-cliente"></div>
         </div>
+        ${produtos.length ? `
+        <label for="p-produto">Produto do catálogo (opcional)</label>
+        <select id="p-produto"><option value="">— escolher da lista preenche descrição e valor —</option>${opcoesProduto}</select>
+        ` : ''}
+        <div class="grid2">
+          <div><label for="p-descricao">Item / descrição</label><input id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
+          <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
+        </div>
+        <div class="grid2">
+          <div><label for="p-valor">Valor total</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
+          <div><label for="p-origem">Origem<span class="obrigatorio">*</span></label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
+        </div>
+        <div class="grid2">
+          <div><label for="p-entrega">Tipo de entrega</label><input id="p-entrega" placeholder="retirada, correios, uber…"></div>
+          <div><label for="p-recurso">Recurso</label>
+            <select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
+          </div>
+        </div>
+        <div class="modal-erro" id="p-erro"></div>
         <div class="modal-acoes">
-          <button type="button" id="btn-adicionar-produto">Adicionar produto</button>
+          <button type="button" class="btn-secundario" id="btn-cancelar-pedido">Cancelar</button>
+          <button type="button" id="btn-salvar-pedido">Criar pedido</button>
         </div>
-      `, 'modal-card-larga');
-      aplicarMascaraMoeda(document.getElementById('input-novo-produto-preco'));
-      renderizarListaProdutos();
-      document.getElementById('btn-adicionar-produto').addEventListener('click', async () => {
-        const nome = document.getElementById('input-novo-produto').value.trim();
-        if (!nome) return;
-        const precoInput = document.getElementById('input-novo-produto-preco');
-        const preco = valorMoedaParaNumero(precoInput);
-        await apiFetch('/crm/api/produtos', { method: 'POST', body: JSON.stringify({ nome, preco_referencia: preco || null }) });
-        await carregar();
-        document.getElementById('input-novo-produto').value = '';
-        precoInput.value = '';
-        renderizarListaProdutos();
-      });
-    }
-
-    function renderizarListaProdutos() {
-      const el = document.getElementById('lista-produtos');
-      if (!el) return;
-      el.innerHTML = produtos.length ? produtos.map((p) => `
-        <div class="linha-recurso">
-          <span>${escapeHtml(p.nome)}${p.preco_referencia ? ` <span style="color:var(--muted);font-size:12px">(${formatarMoeda(p.preco_referencia)})</span>` : ''}</span>
-          <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-produto="${p.id}">Remover</button>
-        </div>
-      `).join('') : '<p class="vazio">Nenhum produto cadastrado ainda.</p>';
-
-      el.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
-          await carregar();
-          renderizarListaProdutos();
+      `);
+      const campoValorPedido = document.getElementById('p-valor');
+      aplicarMascaraMoeda(campoValorPedido);
+      const selectProduto = document.getElementById('p-produto');
+      if (selectProduto) {
+        selectProduto.addEventListener('change', () => {
+          const opcao = selectProduto.selectedOptions[0];
+          if (!opcao.value) return;
+          document.getElementById('p-descricao').value = opcao.textContent;
+          if (opcao.dataset.preco) {
+            campoValorPedido.value = Number(opcao.dataset.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
         });
+      }
+      document.getElementById('btn-cancelar-pedido').addEventListener('click', fecharModal);
+      document.getElementById('btn-salvar-pedido').addEventListener('click', async () => {
+        const origem = document.getElementById('p-origem').value.trim();
+        if (!origem) { document.getElementById('p-erro').textContent = 'Origem é obrigatória'; return; }
+        const res = await apiFetch('/crm/api/pedidos', {
+          method: 'POST',
+          body: JSON.stringify({
+            telefone: document.getElementById('p-telefone').value.trim() || null,
+            nome_cliente: document.getElementById('p-nome-cliente').value.trim() || null,
+            produto_id: selectProduto ? (selectProduto.value || null) : null,
+            descricao: document.getElementById('p-descricao').value.trim() || null,
+            quantidade: Number(document.getElementById('p-quantidade').value) || 1,
+            valor_total: valorMoedaParaNumero(campoValorPedido),
+            origem,
+            tipo_entrega: document.getElementById('p-entrega').value.trim() || null,
+            recurso_id: document.getElementById('p-recurso').value || null,
+          }),
+        });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('p-erro').textContent = dados.error || 'Falha ao criar pedido';
+          return;
+        }
+        fecharModal();
+        carregar();
       });
-    }
+    });
 
     carregar();
   </script>

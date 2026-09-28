@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Estoque</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .form-novo-produto { display:flex; gap:8px; align-items:flex-end; margin-bottom:16px; }
+  .form-novo-produto > div { flex:1; }
+  .form-novo-produto input[type="text"] { width:100%; }
+  .linha-produto { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
+  .linha-produto:first-child { border-top:none; }
+  .linha-produto .nome-produto { cursor:text; flex:1; font-weight:600; }
+  .linha-produto .preco-produto { cursor:text; width:110px; color:var(--muted-strong); text-align:right; }
+  .linha-produto .acoes-linha { display:flex; gap:6px; flex-shrink:0; }
+  .linha-produto .acoes-linha button { height:28px; padding:0 10px; font-size:12px; }
+  .linha-produto input.editar-nome { font-size:14px; }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <div class="ds-menu-topo">
+        <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Estoque</h1></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <form class="form-novo-produto" id="form-novo-produto">
+          <div><label for="input-novo-produto">Novo produto</label><input type="text" id="input-novo-produto" placeholder="ex.: Vaso decorativo P"></div>
+          <div style="flex:0 0 130px"><label for="input-novo-produto-preco">Preço de referência</label><input type="text" id="input-novo-produto-preco" placeholder="0,00"></div>
+          <button type="submit">Adicionar</button>
+        </form>
+        <div id="lista-produtos"><div class="vazio">Carregando…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    let produtos = [];
+
+    async function carregar() {
+      const res = await apiFetch('/crm/api/produtos');
+      produtos = await res.json();
+      renderizar();
+    }
+
+    function renderizar() {
+      const el = document.getElementById('lista-produtos');
+      el.innerHTML = produtos.length ? produtos.map((p) => `
+        <div class="linha-produto">
+          <span class="nome-produto" data-editar-produto="${p.id}" data-campo="nome">${escapeHtml(p.nome)}</span>
+          <span class="preco-produto" data-editar-produto="${p.id}" data-campo="preco_referencia">${p.preco_referencia ? formatarMoeda(p.preco_referencia) : '—'}</span>
+          <div class="acoes-linha">
+            <button type="button" class="btn-secundario" data-apagar-produto="${p.id}">Remover</button>
+          </div>
+        </div>
+      `).join('') : '<p class="vazio">Nenhum produto cadastrado ainda.</p>';
+
+      el.querySelectorAll('[data-editar-produto]').forEach((span) => {
+        span.addEventListener('click', () => {
+          const campo = span.dataset.campo;
+          const produto = produtos.find((p) => p.id === span.dataset.editarProduto);
+          const input = document.createElement('input');
+          input.className = 'editar-nome';
+          if (campo === 'preco_referencia') {
+            input.value = produto.preco_referencia ? Number(produto.preco_referencia).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+            input.style.width = '110px';
+            input.style.textAlign = 'right';
+            aplicarMascaraMoeda(input);
+          } else {
+            input.value = produto.nome;
+          }
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          const salvar = async () => {
+            const valor = campo === 'preco_referencia' ? (valorMoedaParaNumero(input) || null) : input.value.trim();
+            if (campo === 'nome' && !valor) { input.replaceWith(span); return; }
+            await apiFetch(`/crm/api/produtos/${produto.id}`, { method: 'PATCH', body: JSON.stringify({ [campo]: valor }) });
+            await carregar();
+          };
+          input.addEventListener('blur', salvar);
+          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+        });
+      });
+      el.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
+          carregar();
+        });
+      });
+    }
+
+    document.getElementById('form-novo-produto').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const inputNome = document.getElementById('input-novo-produto');
+      const inputPreco = document.getElementById('input-novo-produto-preco');
+      const nome = inputNome.value.trim();
+      if (!nome) return;
+      const preco = valorMoedaParaNumero(inputPreco);
+      await apiFetch('/crm/api/produtos', { method: 'POST', body: JSON.stringify({ nome, preco_referencia: preco || null }) });
+      inputNome.value = '';
+      inputPreco.value = '';
+      carregar();
+    });
+    aplicarMascaraMoeda(document.getElementById('input-novo-produto-preco'));
+
+    carregar();
+  </script>
+</body>
+</html>
