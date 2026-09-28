@@ -94,9 +94,14 @@
           <div class="linha-titulo"><h1>Clientes</h1></div>
         </div>
         <div class="acoes">
-          <button type="button" class="btn-secundario" id="btn-importar">Importar CSV</button>
-          <button type="button" class="btn-secundario" id="btn-duplicados">Duplicados</button>
           <button type="button" class="btn-secundario" id="btn-gerenciar-formularios">Formulários</button>
+          <div class="menu-acoes-wrap">
+            <button type="button" class="btn-secundario btn-acoes" id="btn-acoes-clientes" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" style="width:auto;height:40px;padding:0 12px">⋯</button>
+            <div class="menu-acoes" id="menu-acoes-clientes" hidden>
+              <button type="button" id="btn-importar">Importar CSV</button>
+              <button type="button" id="btn-duplicados">Duplicados</button>
+            </div>
+          </div>
           <button type="button" id="btn-novo-cliente"><span data-icon="plus" data-size="16"></span>Novo cliente</button>
         </div>
       </div>
@@ -245,6 +250,19 @@
     // --- Formulário de captação (US22) --------------------------------------
     document.getElementById('btn-gerenciar-formularios').addEventListener('click', () => abrirModalFormularios());
 
+    // --- Menu almôndega de topo (Importar CSV / Duplicados) — mesmo padrão
+    // visual/CSS do kebab por linha, só que fixo (não recriado a cada
+    // renderizar()), por isso ligado uma única vez aqui em vez de dentro de
+    // ligarEventosLinhasClientes(). Fecha sozinho via o listener global de
+    // clique fora já existente (checa .menu-acoes-wrap genericamente).
+    document.getElementById('btn-acoes-clientes').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('menu-acoes-clientes');
+      const jaAberto = !menu.hidden;
+      fecharMenusAbertosClientes();
+      menu.hidden = jaAberto;
+    });
+
     function abrirModalFormularios() {
       const opcoesTag = tags.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
       abrirModal('<h3>Formulários de captação</h3>', `
@@ -357,6 +375,7 @@
     }
 
     document.getElementById('btn-importar').addEventListener('click', () => {
+      fecharMenusAbertosClientes();
       abrirModal('<h3>Importar clientes (CSV)</h3>', `
         <p class="modal-texto">Planilha antiga, exportação do Google Forms etc. Escolha o arquivo e diga qual coluna é qual.</p>
         <input type="file" id="csv-arquivo" accept=".csv,text/csv">
@@ -436,7 +455,7 @@
     });
 
     // --- Duplicados (US17) ---------------------------------------------------
-    document.getElementById('btn-duplicados').addEventListener('click', () => abrirModalDuplicados());
+    document.getElementById('btn-duplicados').addEventListener('click', () => { fecharMenusAbertosClientes(); abrirModalDuplicados(); });
 
     async function abrirModalDuplicados() {
       abrirModal('<h3>Possíveis duplicados</h3>', `
