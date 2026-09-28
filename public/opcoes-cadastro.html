@@ -13,8 +13,6 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .cadastro-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
-  @media(max-width:820px) { .cadastro-grid { grid-template-columns:1fr; } }
   .lista-opcoes-item { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
   .lista-opcoes-item:first-child { border-top:none; }
   .lista-opcoes-item.inativa .valor { color:var(--muted); text-decoration:line-through; }
@@ -89,9 +87,13 @@
         </div>
       </div>
 
-      <div class="cadastro-grid">
-        <div class="card">
-          <h3 style="margin:0 0 6px">Segmentos</h3>
+      <div class="ds-abas" data-ds-abas>
+        <div class="ds-abas-lista">
+          <button type="button" class="ds-aba" id="aba-cadastro-segmentos" aria-controls="painel-cadastro-segmentos" aria-selected="true">Segmentos</button>
+          <button type="button" class="ds-aba" id="aba-cadastro-origens" aria-controls="painel-cadastro-origens" aria-selected="false">Origens</button>
+        </div>
+
+        <div class="ds-abas-painel card" id="painel-cadastro-segmentos" aria-labelledby="aba-cadastro-segmentos">
           <p class="vazio" style="padding:0 0 8px">Opções que aparecem no campo "Segmento" da ficha do cliente.</p>
           <div id="lista-segmentos"><div class="vazio">Carregando…</div></div>
           <form class="form-nova-opcao" id="form-novo-segmento">
@@ -100,8 +102,7 @@
           </form>
         </div>
 
-        <div class="card">
-          <h3 style="margin:0 0 6px">Origens</h3>
+        <div class="ds-abas-painel card" id="painel-cadastro-origens" aria-labelledby="aba-cadastro-origens" hidden>
           <p class="vazio" style="padding:0 0 8px">Opções que aparecem no campo "Origem" da ficha do cliente.</p>
           <div id="lista-origens"><div class="vazio">Carregando…</div></div>
           <form class="form-nova-opcao" id="form-nova-origem">
