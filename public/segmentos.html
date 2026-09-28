@@ -103,7 +103,7 @@
         <div class="grid3">
           <div><label for="f-tag">Tag</label><select id="f-tag"><option value="">Qualquer</option></select></div>
           <div><label for="f-cidade">Cidade</label><input type="text" id="f-cidade" placeholder="ex.: Uberlândia"></div>
-          <div><label for="f-origem">Origem</label><input type="text" id="f-origem" placeholder="ex.: whatsapp"></div>
+          <div><label for="f-origem">Origem</label><select id="f-origem"><option value="">Qualquer</option></select></div>
         </div>
         <div class="grid3">
           <div><label for="f-produto">Produto comprado</label><select id="f-produto"><option value="">Qualquer</option></select></div>
@@ -155,19 +155,22 @@
     let ultimoPreview = [];
 
     async function carregar() {
-      const [resTags, resProdutos, resSegmentos, resSorteios] = await Promise.all([
+      const [resTags, resProdutos, resSegmentos, resSorteios, resOrigens] = await Promise.all([
         apiFetch('/crm/api/tags'),
         apiFetch('/crm/api/produtos'),
         apiFetch('/crm/api/segmentos'),
         apiFetch('/crm/api/sorteios'),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=origem'),
       ]);
       tags = await resTags.json();
       produtos = await resProdutos.json();
       segmentosSalvos = await resSegmentos.json();
       const sorteios = await resSorteios.json();
+      const origens = await resOrigens.json();
 
       document.getElementById('f-tag').innerHTML = '<option value="">Qualquer</option>' + tags.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
       document.getElementById('f-produto').innerHTML = '<option value="">Qualquer</option>' + produtos.map((p) => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
+      document.getElementById('f-origem').innerHTML = '<option value="">Qualquer</option>' + origens.filter((o) => o.ativo).map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
 
       renderizarSegmentosSalvos();
       renderizarSorteios(sorteios);
