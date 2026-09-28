@@ -18,12 +18,33 @@
   .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
 
   .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
-    display:flex; align-items:center; z-index:3; color:var(--text); }
+    display:flex; align-items:center; justify-content:space-between; gap:6px; z-index:3; color:var(--text); }
+  .raia-label .btn-remover-recurso { opacity:0; }
+  .raia-label:hover .btn-remover-recurso { opacity:1; }
 
-  .coluna-header { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
+  .coluna-header { position:relative; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
     display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; color:var(--text); cursor:grab; }
   .coluna-header.arrastando-coluna { opacity:.4; }
   .coluna-header.recebendo-coluna { border-color:var(--accent); }
+  /* Primeira coluna ("A fazer") fixa à esquerda — pedido do Bruno: nunca sai
+     do lugar no drag-and-drop de colunas, todo pedido novo entra nela (ver
+     migration 013_etapas_fixa.sql). left:170px = largura de .raia-label,
+     as duas ficam "coladas" formando a área congelada da rolagem horizontal. */
+  .coluna-header.coluna-fixa,
+  .celula.coluna-fixa { position:sticky; left:170px; z-index:2; }
+  .coluna-header.coluna-fixa { cursor:default; }
+  /* Raio de automação (⚡) — antes ficava dentro do cabeçalho, junto do
+     título; agora fica na borda entre uma coluna e a próxima (pedido do
+     Bruno: "entre os títulos de cada coluna"), roxo pra se destacar dos
+     outros ícones de ação do cabeçalho. */
+  /* Escopado com .coluna-header pra vencer .coluna-header button (que tem a
+     mesma especificidade em classes + 1 elemento a mais — sem isso a cor
+     roxa e o tamanho circular eram sobrescritos pelo estilo genérico dos
+     outros botões do cabeçalho). */
+  .coluna-header .btn-automacao-etapa { position:absolute; right:-14px; top:50%; transform:translateY(-50%); z-index:5;
+    width:26px; height:26px; display:flex; align-items:center; justify-content:center; padding:0;
+    background:var(--card); border:1px solid var(--border-strong); border-radius:50%; color:#7c3aed; font-size:14px; }
+  .coluna-header .btn-automacao-etapa:hover { background:var(--surface-muted); color:#7c3aed; }
   .coluna-header.tipo-ganha .nome-etapa { color:var(--success); }
   .coluna-header.tipo-perdida .nome-etapa { color:var(--danger); }
   .coluna-header .nome-etapa { flex:1; cursor:text; }
@@ -132,7 +153,7 @@
           <div class="linha-titulo"><h1>Quadro</h1></div>
         </div>
         <div class="acoes">
-          <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
+          <button type="button" id="btn-novo-recurso"><span data-icon="plus" data-size="16"></span>Recurso</button>
         </div>
       </div>
 
@@ -221,23 +242,30 @@
       let html = '<div></div>';
       etapas.forEach((et) => {
         html += `
-          <div class="coluna-header tipo-${et.tipo}" draggable="true" data-etapa-header="${et.id}">
+          <div class="coluna-header tipo-${et.tipo}${et.fixa ? ' coluna-fixa' : ''}" draggable="${et.fixa ? 'false' : 'true'}" data-etapa-header="${et.id}" data-fixa="${!!et.fixa}">
             <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
             <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
             <button type="button" class="btn-pronto${et.eh_pronto ? ' ativo' : ''}" data-marcar-pronto="${et.id}" data-valor-pronto="${!et.eh_pronto}" title="${et.eh_pronto ? 'Esta é a etapa de pronto pra envio/retirada (clique pra desmarcar)' : 'Marcar como etapa de pronto pra envio/retirada'}">${icon('package-check', 14)}</button>
-            <button type="button" class="btn-pronto" data-criar-automacao-etapa="${et.id}" title="Criar automação de WhatsApp pra quando um pedido entrar nessa etapa">⚡</button>
             <button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>
+            <button type="button" class="btn-automacao-etapa" data-criar-automacao-etapa="${et.id}" title="Criar automação de WhatsApp pra quando um pedido entrar nessa etapa">⚡</button>
           </div>
         `;
       });
       html += `<div class="coluna-add"><input type="text" id="input-nova-etapa" placeholder="+ Nova etapa (Enter)"></div>`;
 
       linhas.forEach((raia) => {
-        html += `<div class="raia-label${raia.altissima ? ' raia-altissima' : ''}">${escapeHtml(raia.nome)}</div>`;
+        // "Sem recurso"/"Prioridade Altíssima" são raias virtuais, sem CRUD —
+        // só recurso de verdade (nem fixa nem altissima) ganha edição/remoção
+        // inline, mesmo padrão de clique-pra-editar do título de etapa.
+        const conteudoRaia = raia.fixa || raia.altissima
+          ? escapeHtml(raia.nome)
+          : `<span class="nome-recurso" data-editar-recurso="${raia.id}">${escapeHtml(raia.nome)}</span>
+             <button type="button" class="btn-remover-recurso" data-apagar-recurso="${raia.id}" data-nome-recurso="${escapeHtml(raia.nome)}" title="Apagar recurso">✕</button>`;
+        html += `<div class="raia-label${raia.altissima ? ' raia-altissima' : ''}">${conteudoRaia}</div>`;
         etapas.forEach((et) => {
           const cartoes = pedidosDe(raia.id, et.id);
           html += `
-            <div class="celula${raia.altissima ? ' celula-altissima' : ''}" data-raia="${raia.id || ''}" data-etapa="${et.id}" data-tipo-etapa="${et.tipo}">
+            <div class="celula${raia.altissima ? ' celula-altissima' : ''}${et.fixa ? ' coluna-fixa' : ''}" data-raia="${raia.id || ''}" data-etapa="${et.id}" data-tipo-etapa="${et.tipo}">
               ${cartoes.map(cartaoHtml).join('') || '<div class="celula-vazia">—</div>'}
             </div>
           `;
@@ -281,12 +309,14 @@
         header.addEventListener('dragend', () => header.classList.remove('arrastando-coluna'));
         header.addEventListener('dragover', (e) => {
           if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
+          if (header.dataset.fixa === 'true') return; // "A fazer" nunca recebe: sempre a 1ª coluna
           e.preventDefault();
           header.classList.add('recebendo-coluna');
         });
         header.addEventListener('dragleave', () => header.classList.remove('recebendo-coluna'));
         header.addEventListener('drop', async (e) => {
           if (!e.dataTransfer.types.includes(TIPO_ARRASTO_COLUNA)) return;
+          if (header.dataset.fixa === 'true') return;
           e.preventDefault();
           header.classList.remove('recebendo-coluna');
           const idArrastado = e.dataTransfer.getData(TIPO_ARRASTO_COLUNA);
@@ -331,6 +361,39 @@
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           confirmarApagarEtapa(btn.dataset.apagarEtapa, btn.dataset.nomeEtapa);
+        });
+      });
+
+      // Renomear/apagar recurso direto no rótulo da raia — mesmo padrão de
+      // clique-pra-editar do título de etapa acima.
+      document.querySelectorAll('[data-editar-recurso]').forEach((span) => {
+        span.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const atual = span.textContent;
+          const input = document.createElement('input');
+          input.className = 'editar-nome';
+          input.value = atual;
+          span.replaceWith(input);
+          input.focus();
+          input.select();
+          const salvar = async () => {
+            const novo = input.value.trim();
+            if (novo && novo !== atual) {
+              await apiFetch(`/crm/api/recursos/${span.dataset.editarRecurso}`, { method: 'PATCH', body: JSON.stringify({ nome: novo }) });
+              await carregar();
+            } else {
+              input.replaceWith(span);
+            }
+          };
+          input.addEventListener('blur', salvar);
+          input.addEventListener('keydown', (e2) => { if (e2.key === 'Enter') input.blur(); });
+        });
+      });
+
+      document.querySelectorAll('[data-apagar-recurso]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          confirmarApagarRecurso(btn.dataset.apagarRecurso, btn.dataset.nomeRecurso);
         });
       });
 
@@ -448,7 +511,11 @@
           method: 'PATCH',
           body: JSON.stringify({ etapa_id: etapaId, motivo_perda: motivoPerda }),
         });
-        if (!res.ok) { avisar('Erro', 'Falha ao mover pedido de etapa'); return; }
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          avisar('Erro', dados.error || 'Falha ao mover pedido de etapa');
+          return;
+        }
       }
       if (recursoMudou) {
         const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/recurso`, {
@@ -467,79 +534,49 @@
       await carregar();
     }
 
-    // --- Novo pedido ---------------------------------------------------------
-    document.getElementById('btn-novo-pedido').addEventListener('click', () => {
-      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
-      const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
-      const overlay = abrirModal('<h3>Novo pedido</h3>', `
-        <div class="grid2">
-          <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
-          <div><label for="p-nome-cliente">Nome (se cliente novo)</label><input id="p-nome-cliente"></div>
-        </div>
-        ${produtos.length ? `
-        <label for="p-produto">Produto do catálogo (opcional)</label>
-        <select id="p-produto"><option value="">— escolher da lista preenche descrição e valor —</option>${opcoesProduto}</select>
-        ` : ''}
-        <div class="grid2">
-          <div><label for="p-descricao">Item / descrição</label><input id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
-          <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-valor">Valor total</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
-          <div><label for="p-origem">Origem<span class="obrigatorio">*</span></label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-entrega">Tipo de entrega</label><input id="p-entrega" placeholder="retirada, correios, uber…"></div>
-          <div><label for="p-recurso">Recurso</label>
-            <select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
-          </div>
-        </div>
-        <div class="modal-erro" id="p-erro"></div>
+    // --- Novo recurso (raia do quadro — ex.: impressora) ----------------------
+    // Criação de pedido saiu do Quadro (US do Bruno) — continua em Pedidos.
+    // A gestão de recursos (antes só num modal em Pedidos) migrou pra cá:
+    // criar aqui, renomear/apagar direto no rótulo da raia (ver
+    // ligarEventosRaias).
+    document.getElementById('btn-novo-recurso').addEventListener('click', () => {
+      const overlay = abrirModal('<h3>Novo recurso</h3>', `
+        <p class="modal-texto">São as raias do Quadro — ex.: cada impressora 3D, forno, posto de trabalho.</p>
+        <label for="r-nome">Nome</label>
+        <input id="r-nome" placeholder="ex.: Impressora 2" autofocus>
+        <div class="modal-erro" id="r-erro"></div>
         <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="btn-cancelar-pedido">Cancelar</button>
-          <button type="button" id="btn-salvar-pedido">Criar pedido</button>
+          <button type="button" class="btn-secundario" id="btn-cancelar-recurso">Cancelar</button>
+          <button type="button" id="btn-salvar-recurso">Criar</button>
         </div>
       `);
-      const campoValorPedido = document.getElementById('p-valor');
-      aplicarMascaraMoeda(campoValorPedido);
-      const selectProduto = document.getElementById('p-produto');
-      if (selectProduto) {
-        selectProduto.addEventListener('change', () => {
-          const opcao = selectProduto.selectedOptions[0];
-          if (!opcao.value) return;
-          document.getElementById('p-descricao').value = opcao.textContent;
-          if (opcao.dataset.preco) {
-            campoValorPedido.value = Number(opcao.dataset.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-          }
-        });
-      }
-      document.getElementById('btn-cancelar-pedido').addEventListener('click', fecharModal);
-      document.getElementById('btn-salvar-pedido').addEventListener('click', async () => {
-        const origem = document.getElementById('p-origem').value.trim();
-        if (!origem) { document.getElementById('p-erro').textContent = 'Origem é obrigatória'; return; }
-        const res = await apiFetch('/crm/api/pedidos', {
-          method: 'POST',
-          body: JSON.stringify({
-            telefone: document.getElementById('p-telefone').value.trim() || null,
-            nome_cliente: document.getElementById('p-nome-cliente').value.trim() || null,
-            produto_id: selectProduto ? (selectProduto.value || null) : null,
-            descricao: document.getElementById('p-descricao').value.trim() || null,
-            quantidade: Number(document.getElementById('p-quantidade').value) || 1,
-            valor_total: valorMoedaParaNumero(campoValorPedido),
-            origem,
-            tipo_entrega: document.getElementById('p-entrega').value.trim() || null,
-            recurso_id: document.getElementById('p-recurso').value || null,
-          }),
-        });
-        if (!res.ok) {
-          const dados = await res.json().catch(() => ({}));
-          document.getElementById('p-erro').textContent = dados.error || 'Falha ao criar pedido';
-          return;
-        }
+      document.getElementById('btn-cancelar-recurso').addEventListener('click', fecharModal);
+      const salvar = async () => {
+        const nome = document.getElementById('r-nome').value.trim();
+        if (!nome) { document.getElementById('r-erro').textContent = 'Nome é obrigatório'; return; }
+        await apiFetch('/crm/api/recursos', { method: 'POST', body: JSON.stringify({ nome }) });
+        fecharModal();
+        carregar();
+      };
+      document.getElementById('btn-salvar-recurso').addEventListener('click', salvar);
+      document.getElementById('r-nome').addEventListener('keydown', (e) => { if (e.key === 'Enter') salvar(); });
+    });
+
+    function confirmarApagarRecurso(id, nome) {
+      const overlay = abrirModal('<h3>Apagar recurso?</h3>', `
+        <p class="modal-texto">Pedidos em "${escapeHtml(nome)}" voltam pra raia "Sem recurso" — nenhum é apagado.</p>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="cancelar-apagar-recurso">Cancelar</button>
+          <button type="button" class="btn-perigo" id="confirmar-apagar-recurso">Apagar recurso</button>
+        </div>
+      `);
+      document.getElementById('cancelar-apagar-recurso').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-apagar-recurso').addEventListener('click', async () => {
+        await apiFetch(`/crm/api/recursos/${id}`, { method: 'DELETE' });
         fecharModal();
         carregar();
       });
-    });
+    }
 
     // --- Detalhe do pedido -----------------------------------------------------
     // US20: aviso de cartão de recompra — só pra canal próprio. Marketplace
@@ -632,7 +669,11 @@
             method: 'PATCH',
             body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }),
           });
-          if (!resEtapa.ok) { document.getElementById('d-erro').textContent = 'Falha ao mover etapa'; return; }
+          if (!resEtapa.ok) {
+            const dados = await resEtapa.json().catch(() => ({}));
+            document.getElementById('d-erro').textContent = dados.error || 'Falha ao mover etapa';
+            return;
+          }
         }
 
         if (novoRecursoId !== (p.recurso_id || null)) {
