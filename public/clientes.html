@@ -96,10 +96,10 @@
           <div class="linha-titulo"><h1>Clientes</h1></div>
         </div>
         <div class="acoes">
-          <button type="button" class="btn-secundario" id="btn-gerenciar-formularios">Formulários</button>
           <div class="menu-acoes-wrap">
             <button type="button" class="btn-secundario btn-acoes" id="btn-acoes-clientes" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" style="width:auto;height:40px;padding:0 12px">⋯</button>
             <div class="menu-acoes" id="menu-acoes-clientes" hidden>
+              <button type="button" id="btn-gerenciar-formularios">Formulários</button>
               <button type="button" id="btn-importar">Importar CSV</button>
               <button type="button" id="btn-duplicados">Duplicados</button>
             </div>
@@ -250,9 +250,9 @@
     });
 
     // --- Formulário de captação (US22) --------------------------------------
-    document.getElementById('btn-gerenciar-formularios').addEventListener('click', () => abrirModalFormularios());
+    document.getElementById('btn-gerenciar-formularios').addEventListener('click', () => { fecharMenusAbertosClientes(); abrirModalFormularios(); });
 
-    // --- Menu almôndega de topo (Importar CSV / Duplicados) — mesmo padrão
+    // --- Menu almôndega de topo (Formulários / Importar CSV / Duplicados) — mesmo padrão
     // visual/CSS do kebab por linha, só que fixo (não recriado a cada
     // renderizar()), por isso ligado uma única vez aqui em vez de dentro de
     // ligarEventosLinhasClientes(). Fecha sozinho via o listener global de
