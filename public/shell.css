@@ -84,8 +84,12 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 
 .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:var(--space-5); }
 
-button, .btn { background:var(--accent); color:#fff; font-weight:600; border:none; border-radius:var(--radius-md);
-  height:40px; padding:0 20px; font-size:14px; cursor:pointer; text-decoration:none; display:inline-flex;
+/* Tamanho pequeno (32px) é o padrão do CRM — pedido do Bruno pra usar
+   esse tamanho em todos os botões. Mesma escala do .ds-btn-sm do design
+   system (ver kyvvo-design-system/components.css), só que aplicada como
+   padrão aqui em vez de precisar de uma classe extra em cada botão. */
+button, .btn { background:var(--accent); color:#fff; font-weight:600; border:none; border-radius:var(--radius-sm);
+  height:32px; padding:0 12px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-flex;
   align-items:center; justify-content:center; gap:8px; font-family:var(--font-ui); }
 button:hover, .btn:hover { background:var(--accent-dark); }
 .btn-secundario { background:var(--card); color:var(--text-secondary); border:1px solid var(--border-strong); }
