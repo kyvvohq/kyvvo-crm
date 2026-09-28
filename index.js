@@ -17,7 +17,7 @@ const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
-const { processarMensagem } = require('./lib/bot-whatsapp');
+const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
@@ -118,6 +118,7 @@ async function build() {
         if (!tenantId) {
           request.log.warn(`[bot-whatsapp] phone_number_id ${phoneNumberId} sem tenant vinculado (crm_whatsapp_numeros) — mensagem ignorada`);
         } else if (telefoneE164) {
+          registrarMensagem(pool, { tenantId, telefoneE164, direcao: 'recebida', tipo: entrada.tipo, conteudo: textoDaEntrada(entrada) });
           const envios = await processarMensagem(pool, { tenantId, telefoneE164, entrada, nomeWhatsapp });
           for (const envio of envios) {
             if (envio.tipo === 'botoes') {
@@ -127,6 +128,7 @@ async function build() {
             } else {
               await enviarTexto({ to: telefoneE164, texto: envio.texto, phoneNumberId });
             }
+            registrarMensagem(pool, { tenantId, telefoneE164, direcao: 'enviada', tipo: envio.tipo, conteudo: textoDoEnvio(envio) });
           }
         }
       }
@@ -180,6 +182,34 @@ async function build() {
     if (!autenticarAdminInterno(request, reply)) return;
     await pool.query('delete from crm_whatsapp_numeros where phone_number_id = $1', [request.params.phoneNumberId]);
     return { ok: true };
+  });
+
+  // --- Conversas (histórico de mensagens do bot, crm_mensagens_whatsapp) ---
+  // Configurações > WhatsApp > Conversas. Uma linha por telefone (a mensagem
+  // mais recente, pra prévia da lista) — a thread completa vem só ao abrir
+  // uma conversa específica (rota de baixo), não precisa vir tudo de uma vez.
+  fastify.get('/crm/api/conversas', { preHandler: fastify.authenticate }, async (request) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query(
+      `select distinct on (m.telefone_e164) m.telefone_e164, m.conteudo as ultima_mensagem, m.criado_em as ultima_em, c.nome as cliente_nome
+       from crm_mensagens_whatsapp m
+       left join crm_clientes c on c.tenant_id = m.tenant_id and c.telefone = m.telefone_e164
+       where m.tenant_id = $1
+       order by m.telefone_e164, m.criado_em desc`,
+      [tenantId]
+    );
+    rows.sort((a, b) => new Date(b.ultima_em) - new Date(a.ultima_em));
+    return rows;
+  });
+
+  fastify.get('/crm/api/conversas/:telefone/mensagens', { preHandler: fastify.authenticate }, async (request) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query(
+      `select direcao, tipo, conteudo, criado_em from crm_mensagens_whatsapp
+       where tenant_id = $1 and telefone_e164 = $2 order by criado_em asc`,
+      [tenantId, request.params.telefone]
+    );
+    return rows;
   });
 
   // --- Auth ----------------------------------------------------------------

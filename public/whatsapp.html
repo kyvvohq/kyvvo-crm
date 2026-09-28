@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — WhatsApp</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .conversas-shell { display:grid; grid-template-columns:280px 1fr; gap:0; height:calc(100vh - 220px); min-height:420px; }
+  .conversas-lista { border-right:1px solid var(--border); overflow-y:auto; }
+  .conversas-lista-item { display:block; width:100%; text-align:left; background:transparent; border:0; border-bottom:1px solid var(--border);
+    padding:12px 14px; cursor:pointer; height:auto; border-radius:0; color:var(--text); }
+  .conversas-lista-item:hover { background:var(--surface-hover); }
+  .conversas-lista-item.ativa { background:var(--accent-tint); }
+  .conversas-lista-item .nome { font-weight:700; font-size:13.5px; margin-bottom:2px; }
+  .conversas-lista-item .prevista { font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .conversas-lista-item .hora { font-size:11px; color:var(--muted); float:right; }
+  .conversas-thread { display:flex; flex-direction:column; padding:16px; overflow-y:auto; gap:8px; }
+  .bolha { max-width:70%; padding:8px 12px; border-radius:12px; font-size:13.5px; white-space:pre-wrap; }
+  .bolha-recebida { align-self:flex-start; background:var(--surface-muted); color:var(--text); border-bottom-left-radius:2px; }
+  .bolha-enviada { align-self:flex-end; background:var(--accent-tint); color:var(--accent-strong); border-bottom-right-radius:2px; }
+  .bolha-hora { font-size:10px; color:var(--muted); margin-top:3px; }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <div class="ds-menu-topo">
+        <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>WhatsApp</h1></div>
+        </div>
+      </div>
+
+      <div class="ds-abas" data-ds-abas>
+        <div class="ds-abas-lista">
+          <button type="button" class="ds-aba" id="aba-whatsapp-conversas" aria-controls="painel-whatsapp-conversas" aria-selected="true">Conversas</button>
+        </div>
+        <div class="ds-abas-painel" id="painel-whatsapp-conversas" aria-labelledby="aba-whatsapp-conversas">
+          <div class="card" style="padding:0">
+            <div class="conversas-shell">
+              <div class="conversas-lista" id="conversas-lista"><div class="vazio">Carregando…</div></div>
+              <div class="conversas-thread" id="conversas-thread">
+                <div class="vazio">Selecione uma conversa à esquerda.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    let conversas = [];
+    let telefoneAtivo = new URLSearchParams(window.location.search).get('telefone');
+
+    function formatarHoraConversa(iso) {
+      const d = new Date(iso);
+      const hoje = new Date();
+      const mesmoData = d.toDateString() === hoje.toDateString();
+      return mesmoData
+        ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    }
+
+    async function carregarConversas() {
+      const res = await apiFetch('/crm/api/conversas');
+      conversas = await res.json();
+      renderizarLista();
+      if (telefoneAtivo) {
+        abrirConversa(telefoneAtivo);
+      } else if (conversas.length) {
+        abrirConversa(conversas[0].telefone_e164);
+      }
+    }
+
+    function renderizarLista() {
+      const el = document.getElementById('conversas-lista');
+      el.innerHTML = conversas.length ? conversas.map((c) => `
+        <button type="button" class="conversas-lista-item${c.telefone_e164 === telefoneAtivo ? ' ativa' : ''}" data-telefone="${c.telefone_e164}">
+          <span class="hora">${formatarHoraConversa(c.ultima_em)}</span>
+          <div class="nome">${escapeHtml(c.cliente_nome || c.telefone_e164)}</div>
+          <div class="prevista">${escapeHtml(c.ultima_mensagem)}</div>
+        </button>
+      `).join('') : '<div class="vazio" style="padding:16px">Nenhuma conversa ainda.</div>';
+
+      el.querySelectorAll('[data-telefone]').forEach((btn) => {
+        btn.addEventListener('click', () => abrirConversa(btn.dataset.telefone));
+      });
+    }
+
+    async function abrirConversa(telefone) {
+      telefoneAtivo = telefone;
+      renderizarLista();
+      const thread = document.getElementById('conversas-thread');
+      thread.innerHTML = '<div class="vazio">Carregando…</div>';
+      const res = await apiFetch(`/crm/api/conversas/${encodeURIComponent(telefone)}/mensagens`);
+      const mensagens = await res.json();
+      thread.innerHTML = mensagens.map((m) => `
+        <div class="bolha bolha-${m.direcao}">
+          ${escapeHtml(m.conteudo)}
+          <div class="bolha-hora">${new Date(m.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+        </div>
+      `).join('');
+      thread.scrollTop = thread.scrollHeight;
+    }
+
+    carregarConversas();
+  </script>
+</body>
+</html>

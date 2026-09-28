@@ -1,6 +1,35 @@
-const { test } = require('node:test');
+const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES } = require('../lib/bot-whatsapp');
+const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio } = require('../lib/bot-whatsapp');
+
+describe('textoDaEntrada (histórico de mensagens — o que o cliente mandou)', () => {
+  test('texto: devolve o texto puro', () => {
+    assert.equal(textoDaEntrada({ tipo: 'texto', texto: 'Oi, quero fazer um pedido' }), 'Oi, quero fazer um pedido');
+  });
+  test('botão: identifica o id clicado', () => {
+    assert.equal(textoDaEntrada({ tipo: 'botao', id: 'fazer_pedido' }), '[clicou: fazer_pedido]');
+  });
+  test('arquivo: usa o nome do arquivo quando existe', () => {
+    assert.equal(textoDaEntrada({ tipo: 'arquivo', mediaId: 'media-1', nomeArquivo: 'peca.stl' }), '[arquivo enviado: peca.stl]');
+  });
+  test('arquivo sem nome: cai pro mediaId', () => {
+    assert.equal(textoDaEntrada({ tipo: 'arquivo', mediaId: 'media-1', nomeArquivo: null }), '[arquivo enviado: media-1]');
+  });
+});
+
+describe('textoDoEnvio (histórico de mensagens — o que o bot respondeu)', () => {
+  test('texto: devolve o texto puro', () => {
+    assert.equal(textoDoEnvio({ tipo: 'texto', texto: 'Perfeito!' }), 'Perfeito!');
+  });
+  test('botões: junta o texto com os rótulos', () => {
+    const r = textoDoEnvio({ tipo: 'botoes', texto: 'Escolha:', botoes: [{ id: 'a', titulo: 'Opção A' }, { id: 'b', titulo: 'Opção B' }] });
+    assert.equal(r, 'Escolha:\n[Opção A | Opção B]');
+  });
+  test('lista: junta o texto com os rótulos das opções', () => {
+    const r = textoDoEnvio({ tipo: 'lista', texto: 'Tipo da peça:', tituloBotao: 'Escolher', opcoes: [{ id: 'x', titulo: 'Brinde' }] });
+    assert.equal(r, 'Tipo da peça:\n[Brinde]');
+  });
+});
 
 function poolFalso({ semEtapa, clienteExistente } = {}) {
   const conversas = new Map();
