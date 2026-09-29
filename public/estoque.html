@@ -192,9 +192,12 @@
         });
       });
       el.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
-          carregar();
+        btn.addEventListener('click', () => {
+          const produto = produtos.find((p) => p.id === btn.dataset.apagarProduto);
+          confirmarAcao('Excluir produto?', `Deseja excluir "${escapeHtml(produto ? produto.nome : '')}"? Essa ação não pode ser desfeita.`, async () => {
+            await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
+            carregar();
+          });
         });
       });
     }
