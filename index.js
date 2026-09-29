@@ -49,12 +49,6 @@ async function build() {
     prefix: '/crm/',
   });
 
-  fastify.register(fastifyStatic, {
-    root: path.join(__dirname, 'node_modules', '@kyvvohq', 'design-system'),
-    prefix: '/ds/',
-    decorateReply: false,
-  });
-
   fastify.register(fastifyMultipart, {
     limits: { fileSize: 10 * 1024 * 1024, files: 20 },
   });
