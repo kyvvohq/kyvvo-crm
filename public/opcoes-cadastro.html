@@ -106,6 +106,7 @@
         <div class="ds-abas-lista">
           <button type="button" class="ds-aba" id="aba-cadastro-segmentos" aria-controls="painel-cadastro-segmentos" aria-selected="true">Segmentos</button>
           <button type="button" class="ds-aba" id="aba-cadastro-origens" aria-controls="painel-cadastro-origens" aria-selected="false">Origens</button>
+          <button type="button" class="ds-aba" id="aba-cadastro-tipo-entrega" aria-controls="painel-cadastro-tipo-entrega" aria-selected="false">Tipo de frete</button>
         </div>
 
         <div class="ds-abas-painel card" id="painel-cadastro-segmentos" aria-labelledby="aba-cadastro-segmentos">
@@ -122,6 +123,15 @@
           <div id="lista-origens"><div class="vazio">Carregando…</div></div>
           <form class="form-nova-opcao" id="form-nova-origem">
             <input type="text" id="nova-origem" placeholder="ex.: Indicação" style="flex:1">
+            <button type="submit">Adicionar</button>
+          </form>
+        </div>
+
+        <div class="ds-abas-painel card" id="painel-cadastro-tipo-entrega" aria-labelledby="aba-cadastro-tipo-entrega" hidden>
+          <p class="vazio" style="padding:0 0 8px">Opções que aparecem no campo "Tipo de frete" do pedido.</p>
+          <div id="lista-tipo-entrega"><div class="vazio">Carregando…</div></div>
+          <form class="form-nova-opcao" id="form-novo-tipo-entrega">
+            <input type="text" id="novo-tipo-entrega" placeholder="ex.: Correios" style="flex:1">
             <button type="submit">Adicionar</button>
           </form>
         </div>
@@ -188,9 +198,19 @@
       input.value = '';
       carregarTipo('origem', 'lista-origens');
     });
+    document.getElementById('form-novo-tipo-entrega').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = document.getElementById('novo-tipo-entrega');
+      const valor = input.value.trim();
+      if (!valor) return;
+      await apiFetch('/crm/api/opcoes-cadastro', { method: 'POST', body: JSON.stringify({ tipo: 'tipo_entrega', valor }) });
+      input.value = '';
+      carregarTipo('tipo_entrega', 'lista-tipo-entrega');
+    });
 
     carregarTipo('segmento', 'lista-segmentos');
     carregarTipo('origem', 'lista-origens');
+    carregarTipo('tipo_entrega', 'lista-tipo-entrega');
   </script>
 </body>
 </html>

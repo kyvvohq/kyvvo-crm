@@ -13,8 +13,11 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .filtros { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
-  .filtros select { width:auto; min-width:150px; }
+  .filtros { display:grid; grid-template-columns:repeat(4,1fr); gap:0 16px; margin-bottom:8px; }
+  .filtros > div { min-width:0; }
+  .filtros label { margin-top:0; }
+  @media(max-width:900px) { .filtros { grid-template-columns:1fr 1fr; } }
+  @media(max-width:520px) { .filtros { grid-template-columns:1fr; } }
   tr.linha-pedido td { position:relative; }
   .menu-acoes-wrap { position:relative; display:inline-block; }
   .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
@@ -118,27 +121,31 @@
       </div>
 
       <div class="filtros">
-        <select id="f-etapa"><option value="">Etapa — qualquer</option></select>
-        <select id="f-recurso"><option value="">Recurso — qualquer</option></select>
-        <select id="f-pagamento">
-          <option value="">Pagamento — qualquer</option>
-          <option value="pendente">Pendente</option>
-          <option value="parcial">Parcial</option>
-          <option value="pago">Pago</option>
-        </select>
-        <select id="f-prioridade">
-          <option value="">Prioridade — qualquer</option>
-          <option value="altissima">Altíssima</option>
-          <option value="alta">Alta</option>
-          <option value="media">Média</option>
-          <option value="baixa">Baixa</option>
-        </select>
+        <div><label for="f-etapa">Etapa</label><select id="f-etapa"><option value="">Qualquer</option></select></div>
+        <div><label for="f-recurso">Recurso</label><select id="f-recurso"><option value="">Qualquer</option></select></div>
+        <div><label for="f-pagamento">Pagamento</label>
+          <select id="f-pagamento">
+            <option value="">Qualquer</option>
+            <option value="pendente">Pendente</option>
+            <option value="parcial">Parcial</option>
+            <option value="pago">Pago</option>
+          </select>
+        </div>
+        <div><label for="f-prioridade">Prioridade</label>
+          <select id="f-prioridade">
+            <option value="">Qualquer</option>
+            <option value="altissima">Altíssima</option>
+            <option value="alta">Alta</option>
+            <option value="media">Média</option>
+            <option value="baixa">Baixa</option>
+          </select>
+        </div>
       </div>
 
       <div class="card" style="padding:0">
         <table>
           <thead>
-            <tr><th>Cliente</th><th>Etapa</th><th>Prioridade</th><th>Pagamento</th><th>Valor</th><th>Data</th><th></th></tr>
+            <tr><th>Cliente</th><th>Etapa</th><th>Prioridade</th><th>Pagamento</th><th>Valor do pedido</th><th>Data do pedido</th><th></th></tr>
           </thead>
           <tbody id="tbody-pedidos"></tbody>
         </table>
@@ -155,6 +162,7 @@
     let etapas = [];
     let recursos = [];
     let produtos = [];
+    let tiposEntrega = [];
 
     // Atalho "Pedidos" no menu de ações de um cliente (tela de Clientes)
     // chega aqui como ?cliente_id=... — filtro fixo, não aparece nos
@@ -171,19 +179,21 @@
       if (document.getElementById('f-prioridade').value) params.set('prioridade', document.getElementById('f-prioridade').value);
       const qs = params.toString();
 
-      const [resPedidos, resEtapas, resRecursos, resProdutos] = await Promise.all([
+      const [resPedidos, resEtapas, resRecursos, resProdutos, resTiposEntrega] = await Promise.all([
         apiFetch(`/crm/api/pedidos${qs ? '?' + qs : ''}`),
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
         apiFetch('/crm/api/produtos'),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=tipo_entrega'),
       ]);
       pedidos = await resPedidos.json();
       etapas = await resEtapas.json();
       recursos = await resRecursos.json();
       produtos = await resProdutos.json();
+      tiposEntrega = (await resTiposEntrega.json()).filter((o) => o.ativo);
 
-      document.getElementById('f-etapa').innerHTML = '<option value="">Etapa — qualquer</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
-      document.getElementById('f-recurso').innerHTML = '<option value="">Recurso — qualquer</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
+      document.getElementById('f-etapa').innerHTML = '<option value="">Qualquer</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
+      document.getElementById('f-recurso').innerHTML = '<option value="">Qualquer</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
 
       renderizar();
     }
@@ -375,9 +385,15 @@
         </div>
         <div class="grid2">
           <div><label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal"></div>
+          <div><label for="e-tipo-entrega">Tipo de frete</label>
+            <select id="e-tipo-entrega"><option value="">Selecione…</option>${tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === p.tipo_entrega ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="grid2">
+          <div><label for="e-frete">Valor de frete</label><input id="e-frete" inputmode="decimal" placeholder="0,00"></div>
           <div><label for="e-entrega">Data de entrega</label><input id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
         </div>
-        <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
+        <p class="modal-texto">Valor do pedido: ${formatarMoeda(p.valor_total)}</p>
         <div class="modal-erro" id="e-erro"></div>
         <div class="modal-acoes">
           ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
@@ -387,6 +403,9 @@
       const campoRecebido = document.getElementById('e-recebido');
       campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       aplicarMascaraMoeda(campoRecebido);
+      const campoFreteEdicao = document.getElementById('e-frete');
+      campoFreteEdicao.value = p.frete ? Number(p.frete).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      aplicarMascaraMoeda(campoFreteEdicao);
 
       document.getElementById('btn-salvar-edicao').addEventListener('click', async () => {
         const novaEtapaId = document.getElementById('e-etapa').value;
@@ -421,9 +440,17 @@
         if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar pagamento'; return; }
 
         const novaEntrega = document.getElementById('e-entrega').value || null;
-        if (novaEntrega !== (p.data_entrega ? p.data_entrega.slice(0, 10) : null)) {
-          const resEntrega = await apiFetch(`/crm/api/pedidos/${p.id}/entrega`, { method: 'PATCH', body: JSON.stringify({ data_entrega: novaEntrega }) });
-          if (!resEntrega.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar data de entrega'; return; }
+        const novoTipoEntrega = document.getElementById('e-tipo-entrega').value || null;
+        const novoFrete = valorMoedaParaNumero(campoFreteEdicao) || null;
+        const entregaMudou = novaEntrega !== (p.data_entrega ? p.data_entrega.slice(0, 10) : null)
+          || novoTipoEntrega !== (p.tipo_entrega || null)
+          || novoFrete !== (p.frete != null ? Number(p.frete) : null);
+        if (entregaMudou) {
+          const resEntrega = await apiFetch(`/crm/api/pedidos/${p.id}/entrega`, {
+            method: 'PATCH',
+            body: JSON.stringify({ data_entrega: novaEntrega, tipo_entrega: novoTipoEntrega, frete: novoFrete }),
+          });
+          if (!resEntrega.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar dados de entrega'; return; }
         }
 
         fecharModal();
@@ -530,6 +557,7 @@
       fecharMenusAbertos();
       const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
       const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
+      const opcoesTipoEntrega = tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
       abrirModal('<h3>Novo pedido</h3>', `
         <div class="grid2">
           <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
@@ -544,11 +572,17 @@
           <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
         </div>
         <div class="grid2">
-          <div><label for="p-valor">Valor total</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
+          <div><label for="p-valor">Valor do pedido</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
           <div><label for="p-origem">Origem<span class="obrigatorio">*</span></label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
         </div>
         <div class="grid2">
-          <div><label for="p-entrega">Tipo de entrega</label><input id="p-entrega" placeholder="retirada, correios, uber…"></div>
+          <div><label for="p-tipo-entrega">Tipo de frete</label>
+            <select id="p-tipo-entrega"><option value="">Selecione…</option>${opcoesTipoEntrega}</select>
+          </div>
+          <div><label for="p-frete">Valor de frete</label><input id="p-frete" inputmode="decimal" placeholder="0,00"></div>
+        </div>
+        <div class="grid2">
+          <div><label for="p-data-entrega">Data de entrega</label><input id="p-data-entrega" type="date"></div>
           <div><label for="p-recurso">Recurso</label>
             <select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
           </div>
@@ -561,6 +595,8 @@
       `);
       const campoValorPedido = document.getElementById('p-valor');
       aplicarMascaraMoeda(campoValorPedido);
+      const campoFrete = document.getElementById('p-frete');
+      aplicarMascaraMoeda(campoFrete);
       const selectProduto = document.getElementById('p-produto');
       if (selectProduto) {
         selectProduto.addEventListener('change', () => {
@@ -586,7 +622,9 @@
             quantidade: Number(document.getElementById('p-quantidade').value) || 1,
             valor_total: valorMoedaParaNumero(campoValorPedido),
             origem,
-            tipo_entrega: document.getElementById('p-entrega').value.trim() || null,
+            tipo_entrega: document.getElementById('p-tipo-entrega').value || null,
+            frete: valorMoedaParaNumero(campoFrete) || null,
+            data_entrega: document.getElementById('p-data-entrega').value || null,
             recurso_id: document.getElementById('p-recurso').value || null,
           }),
         });
