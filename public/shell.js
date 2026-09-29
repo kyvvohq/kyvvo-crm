@@ -51,6 +51,8 @@ const ICON_PATHS = {
   package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73z"/><path d="M12 22V12"/><path d="M3.3 7 12 12l8.7-5"/>',
   zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
   bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+  'eye-off': '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
 };
 
 function icon(name, size = 18) {
@@ -190,6 +192,30 @@ function avisar(titulo, mensagem) {
     `
   );
   document.getElementById('btn-ok-aviso').addEventListener('click', fecharModal);
+}
+
+// Toda ação de excluir/cancelar/remover passa por aqui antes de executar —
+// mesmo modal genérico (estilo danger no botão de confirmar), texto e
+// rótulos configuráveis por chamada. `aoConfirmar` só roda se o usuário
+// confirmar; erro nele mantém o modal aberto (não fecha silenciosamente).
+function confirmarAcao(titulo, mensagem, aoConfirmar, opts = {}) {
+  const textoConfirmar = opts.textoConfirmar || 'Excluir';
+  const textoCancelar = opts.textoCancelar || 'Cancelar';
+  abrirModal(
+    `<h3>${titulo}</h3>`,
+    `
+      <p class="modal-texto">${mensagem}</p>
+      <div class="modal-acoes">
+        <button type="button" class="btn-secundario" id="confirmar-acao-cancelar">${textoCancelar}</button>
+        <button type="button" class="btn-perigo" id="confirmar-acao-confirmar">${textoConfirmar}</button>
+      </div>
+    `
+  );
+  document.getElementById('confirmar-acao-cancelar').addEventListener('click', fecharModal);
+  document.getElementById('confirmar-acao-confirmar').addEventListener('click', async () => {
+    await aoConfirmar();
+    fecharModal();
+  });
 }
 
 // --- Helpers de formatação reaproveitados entre telas ---

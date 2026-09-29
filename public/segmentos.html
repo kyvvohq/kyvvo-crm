@@ -111,7 +111,12 @@
       </div>
 
       <div class="card">
-        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Nova campanha</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <h2 style="font-size:15px;margin:0;color:var(--text)">Nova campanha</h2>
+          <button type="button" class="btn-secundario" id="btn-privacidade" title="Ocultar dados dos clientes na tela" aria-pressed="false" style="width:36px;height:36px;padding:0">
+            <span data-icon="eye" data-size="16"></span>
+          </button>
+        </div>
         <div class="grid3">
           <div><label for="f-tag">Tag</label><select id="f-tag"><option value="">Qualquer</option></select></div>
           <div><label for="f-cidade">Cidade</label><input type="text" id="f-cidade" placeholder="ex.: Uberlândia"></div>
@@ -165,6 +170,24 @@
     let produtos = [];
     let segmentosSalvos = [];
     let ultimoPreview = [];
+    let modoPrivacidade = false;
+
+    // Modo privacidade (ícone de olho) — mostra só primeiro nome + últimos 4
+    // dígitos do celular, pra quem for compartilhar a tela sem expor dados
+    // completos de cliente. Afeta a pré-visualização inteira, não linha a linha.
+    function primeiroNome(nome) {
+      return ((nome || '').trim().split(/\s+/)[0]) || '—';
+    }
+    function mascararTelefone(telefone) {
+      const digitos = String(telefone || '').replace(/\D/g, '');
+      return digitos ? `•••• ${digitos.slice(-4)}` : '—';
+    }
+    document.getElementById('btn-privacidade').addEventListener('click', (e) => {
+      modoPrivacidade = !modoPrivacidade;
+      e.currentTarget.setAttribute('aria-pressed', String(modoPrivacidade));
+      e.currentTarget.innerHTML = icon(modoPrivacidade ? 'eye-off' : 'eye', 16);
+      if (!document.getElementById('resultado-preview').hidden) renderizarPreview(ultimoPreview);
+    });
 
     async function carregar() {
       const [resTags, resProdutos, resSegmentos, resSorteios, resOrigens] = await Promise.all([
@@ -206,7 +229,7 @@
       document.getElementById('resultado-preview').hidden = false;
       document.getElementById('preview-contagem').textContent = clientes.length;
       document.getElementById('preview-lista').innerHTML = clientes.slice(0, 30).map((c) => `
-        <div class="linha-item"><span>${escapeHtml(c.nome)}</span><span style="color:var(--muted)">${escapeHtml(c.telefone || '—')}</span></div>
+        <div class="linha-item"><span>${modoPrivacidade ? escapeHtml(primeiroNome(c.nome)) : escapeHtml(c.nome)}</span><span style="color:var(--muted)">${modoPrivacidade ? mascararTelefone(c.telefone) : escapeHtml(c.telefone || '—')}</span></div>
       `).join('') || '<p class="vazio">Nenhum cliente bate com esses filtros.</p>';
       document.getElementById('btn-exportar-csv').disabled = clientes.length === 0;
       document.getElementById('btn-salvar-segmento').disabled = false;
@@ -262,11 +285,14 @@
       el.innerHTML = segmentosSalvos.length ? segmentosSalvos.map((s) => `
         <div class="lista-segmentos-item">
           <div class="topo">
-            <span class="nome">${escapeHtml(s.nome)}</span>
+            <div>
+              <div class="nome">${escapeHtml(s.nome)}</div>
+              <div style="color:var(--muted);font-size:12px">${formatarDataHora(s.criado_em)}</div>
+            </div>
             <div class="acoes-linha">
               <button type="button" class="btn-secundario" data-ver-segmento="${s.id}">Ver</button>
               <button type="button" data-sortear-segmento="${s.id}" data-nome-segmento="${escapeHtml(s.nome)}">Sortear</button>
-              <button type="button" class="btn-secundario" data-apagar-segmento="${s.id}">Remover</button>
+              <button type="button" class="btn-perigo" data-apagar-segmento="${s.id}">Excluir</button>
             </div>
           </div>
         </div>
@@ -281,9 +307,11 @@
         });
       });
       el.querySelectorAll('[data-apagar-segmento]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/segmentos/${btn.dataset.apagarSegmento}`, { method: 'DELETE' });
-          carregar();
+        btn.addEventListener('click', () => {
+          confirmarAcao('Excluir campanha?', 'Deseja excluir a campanha?', async () => {
+            await apiFetch(`/crm/api/segmentos/${btn.dataset.apagarSegmento}`, { method: 'DELETE' });
+            carregar();
+          }, { textoConfirmar: 'Confirmar', textoCancelar: 'Sair' });
         });
       });
       el.querySelectorAll('[data-sortear-segmento]').forEach((btn) => {

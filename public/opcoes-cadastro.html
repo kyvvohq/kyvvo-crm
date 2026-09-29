@@ -161,9 +161,11 @@
         });
       });
       el.querySelectorAll('[data-remover]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/opcoes-cadastro/${btn.dataset.remover}`, { method: 'DELETE' });
-          carregarTipo(tipo, elId);
+        btn.addEventListener('click', () => {
+          confirmarAcao('Excluir opção?', 'Deseja excluir esta opção? Essa ação não pode ser desfeita.', async () => {
+            await apiFetch(`/crm/api/opcoes-cadastro/${btn.dataset.remover}`, { method: 'DELETE' });
+            carregarTipo(tipo, elId);
+          });
         });
       });
     }

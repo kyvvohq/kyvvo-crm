@@ -351,10 +351,12 @@
         });
       });
       el.querySelectorAll('[data-apagar-formulario]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/formularios/${btn.dataset.apagarFormulario}`, { method: 'DELETE' });
-          await carregar();
-          renderizarListaFormularios();
+        btn.addEventListener('click', () => {
+          confirmarAcao('Excluir formulário?', 'Deseja excluir este formulário? Essa ação não pode ser desfeita.', async () => {
+            await apiFetch(`/crm/api/formularios/${btn.dataset.apagarFormulario}`, { method: 'DELETE' });
+            await carregar();
+            renderizarListaFormularios();
+          });
         });
       });
     }
