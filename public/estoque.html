@@ -13,19 +13,19 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .form-novo-produto { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; margin-bottom:16px; }
-  .form-novo-produto > div { flex:1; min-width:110px; }
-  .form-novo-produto input[type="text"] { width:100%; }
-  .linha-produto { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
-  .linha-produto:first-child { border-top:none; }
-  .linha-produto .nome-produto { cursor:text; flex:2; min-width:120px; font-weight:600; }
-  .linha-produto .id-produto { cursor:text; flex:1; min-width:80px; color:var(--muted-strong); font-size:12.5px; }
-  .linha-produto .quantidade-produto { cursor:text; width:70px; color:var(--muted-strong); text-align:right; }
-  .linha-produto .preco-produto { cursor:text; width:110px; color:var(--muted-strong); text-align:right; }
-  .linha-produto .observacao-produto { cursor:text; flex:2; min-width:140px; color:var(--muted); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .linha-produto .acoes-linha { display:flex; gap:6px; flex-shrink:0; }
-  .linha-produto .acoes-linha button { height:28px; padding:0 10px; font-size:12px; }
-  .linha-produto input.editar-nome { font-size:14px; }
+  .busca { max-width:360px; }
+  tr.linha-produto-item { cursor:pointer; }
+  tr.linha-produto-item:hover td { background:var(--surface-hover); }
+  tr.linha-produto-item td { position:relative; }
+  .menu-acoes-wrap { position:relative; display:inline-block; }
+  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
+  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
+    box-shadow:var(--shadow-md); min-width:150px; z-index:20; padding:6px; }
+  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
+  .menu-acoes button:hover { background:var(--surface-muted); }
+  .menu-acoes button.perigo { color:var(--danger); }
+  td.col-observacao { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -106,18 +106,22 @@
         <div class="textos">
           <div class="linha-titulo"><h1>Estoque</h1></div>
         </div>
+        <div class="acoes">
+          <button type="button" id="btn-novo-produto"><span data-icon="plus" data-size="16"></span>Novo produto</button>
+        </div>
       </div>
 
-      <div class="card">
-        <form class="form-novo-produto" id="form-novo-produto">
-          <div><label for="input-novo-produto">Novo produto</label><input type="text" id="input-novo-produto" placeholder="ex.: Vaso decorativo P"></div>
-          <div style="flex:0 0 100px"><label for="input-novo-produto-id">ID</label><input type="text" id="input-novo-produto-id" placeholder="SKU"></div>
-          <div style="flex:0 0 90px"><label for="input-novo-produto-quantidade">Quantidade</label><input type="text" inputmode="numeric" id="input-novo-produto-quantidade" placeholder="0"></div>
-          <div style="flex:0 0 130px"><label for="input-novo-produto-preco">Valor</label><input type="text" id="input-novo-produto-preco" placeholder="0,00"></div>
-          <div><label for="input-novo-produto-observacao">Observação</label><input type="text" id="input-novo-produto-observacao" placeholder="opcional"></div>
-          <button type="submit">Adicionar</button>
-        </form>
-        <div id="lista-produtos"><div class="vazio">Carregando…</div></div>
+      <div class="busca">
+        <input type="search" id="input-busca-produto" placeholder="Buscar por nome, ID, valor ou observação…">
+      </div>
+
+      <div class="card" style="padding:0">
+        <table>
+          <thead>
+            <tr><th>Nome</th><th>ID</th><th>Quantidade</th><th>Valor</th><th>Observação</th><th></th></tr>
+          </thead>
+          <tbody id="tbody-produtos"><tr><td colspan="6"><div class="vazio">Carregando…</div></td></tr></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -128,6 +132,7 @@
   <script src="/crm/shell.js"></script>
   <script>
     let produtos = [];
+    let termoBusca = '';
 
     async function carregar() {
       const res = await apiFetch('/crm/api/produtos');
@@ -135,101 +140,137 @@
       renderizar();
     }
 
-    function renderizar() {
-      const el = document.getElementById('lista-produtos');
-      el.innerHTML = produtos.length ? produtos.map((p) => `
-        <div class="linha-produto">
-          <span class="nome-produto" data-editar-produto="${p.id}" data-campo="nome">${escapeHtml(p.nome)}</span>
-          <span class="id-produto" data-editar-produto="${p.id}" data-campo="identificador_externo">${p.identificador_externo ? escapeHtml(p.identificador_externo) : '—'}</span>
-          <span class="quantidade-produto" data-editar-produto="${p.id}" data-campo="quantidade">${p.quantidade ?? 0}</span>
-          <span class="preco-produto" data-editar-produto="${p.id}" data-campo="preco_referencia">${p.preco_referencia ? formatarMoeda(p.preco_referencia) : '—'}</span>
-          <span class="observacao-produto" data-editar-produto="${p.id}" data-campo="observacao" title="${p.observacao ? escapeHtml(p.observacao) : ''}">${p.observacao ? escapeHtml(p.observacao) : '—'}</span>
-          <div class="acoes-linha">
-            <button type="button" class="btn-secundario" data-apagar-produto="${p.id}">Remover</button>
-          </div>
-        </div>
-      `).join('') : '<p class="vazio">Nenhum produto cadastrado ainda.</p>';
+    function produtoBateNaBusca(p, termo) {
+      const alvo = [p.nome, p.identificador_externo, p.observacao, p.preco_referencia != null ? formatarMoeda(p.preco_referencia) : '']
+        .filter(Boolean).join(' ').toLowerCase();
+      return alvo.includes(termo);
+    }
 
-      el.querySelectorAll('[data-editar-produto]').forEach((span) => {
-        span.addEventListener('click', () => {
-          const campo = span.dataset.campo;
-          const produto = produtos.find((p) => p.id === span.dataset.editarProduto);
-          const input = document.createElement('input');
-          input.className = 'editar-nome';
-          if (campo === 'preco_referencia') {
-            input.value = produto.preco_referencia ? Number(produto.preco_referencia).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-            input.style.width = '110px';
-            input.style.textAlign = 'right';
-            aplicarMascaraMoeda(input);
-          } else if (campo === 'quantidade') {
-            input.value = produto.quantidade ?? 0;
-            input.style.width = '70px';
-            input.style.textAlign = 'right';
-            input.inputMode = 'numeric';
-          } else if (campo === 'identificador_externo') {
-            input.value = produto.identificador_externo || '';
-            input.style.width = '110px';
-          } else if (campo === 'observacao') {
-            input.value = produto.observacao || '';
-            input.style.width = '220px';
-          } else {
-            input.value = produto.nome;
-          }
-          span.replaceWith(input);
-          input.focus();
-          input.select();
-          const salvar = async () => {
-            let valor;
-            if (campo === 'preco_referencia') valor = valorMoedaParaNumero(input) || null;
-            else if (campo === 'quantidade') valor = parseInt(input.value, 10) || 0;
-            else valor = input.value.trim() || null;
-            if (campo === 'nome' && !valor) { input.replaceWith(span); return; }
-            await apiFetch(`/crm/api/produtos/${produto.id}`, { method: 'PATCH', body: JSON.stringify({ [campo]: valor }) });
-            await carregar();
-          };
-          input.addEventListener('blur', salvar);
-          input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    function renderizar() {
+      const tbody = document.getElementById('tbody-produtos');
+      const termo = termoBusca.trim().toLowerCase();
+      const lista = termo ? produtos.filter((p) => produtoBateNaBusca(p, termo)) : produtos;
+
+      if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="vazio">${produtos.length ? 'Nenhum produto bate com essa busca.' : 'Nenhum produto cadastrado ainda.'}</div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = lista.map((p) => `
+        <tr class="linha-produto-item" data-id="${p.id}">
+          <td>${escapeHtml(p.nome)} ${p.ativo === false ? '<span class="badge neutro">Desativado</span>' : ''}</td>
+          <td>${p.identificador_externo ? escapeHtml(p.identificador_externo) : '—'}</td>
+          <td>${p.quantidade ?? 0}</td>
+          <td>${p.preco_referencia ? formatarMoeda(p.preco_referencia) : '—'}</td>
+          <td class="col-observacao" title="${p.observacao ? escapeHtml(p.observacao) : ''}">${p.observacao ? escapeHtml(p.observacao) : '—'}</td>
+          <td>
+            <div class="menu-acoes-wrap">
+              <button type="button" class="btn-acoes" data-abrir-menu="${p.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
+              <div class="menu-acoes" data-menu="${p.id}" hidden>
+                <button type="button" data-alternar-produto="${p.id}" data-ativo="${p.ativo === false}">${p.ativo === false ? 'Ativar' : 'Desativar'}</button>
+                <button type="button" class="perigo" data-apagar-produto="${p.id}">Excluir</button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      tbody.querySelectorAll('.linha-produto-item').forEach((tr) => {
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('.menu-acoes-wrap')) return;
+          abrirModalProduto(produtos.find((p) => p.id === tr.dataset.id));
         });
       });
-      el.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const produto = produtos.find((p) => p.id === btn.dataset.apagarProduto);
-          confirmarAcao('Excluir produto?', `Deseja excluir "${escapeHtml(produto ? produto.nome : '')}"? Essa ação não pode ser desfeita.`, async () => {
+      ligarEventosLinhasProdutos();
+    }
+
+    function fecharMenusAbertosProdutos() {
+      document.querySelectorAll('.menu-acoes').forEach((m) => { m.hidden = true; });
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.menu-acoes-wrap')) fecharMenusAbertosProdutos();
+    });
+
+    function ligarEventosLinhasProdutos() {
+      document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = document.querySelector(`[data-menu="${btn.dataset.abrirMenu}"]`);
+          const jaAberto = !menu.hidden;
+          fecharMenusAbertosProdutos();
+          menu.hidden = jaAberto;
+        });
+      });
+      document.querySelectorAll('[data-alternar-produto]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          fecharMenusAbertosProdutos();
+          await apiFetch(`/crm/api/produtos/${btn.dataset.alternarProduto}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ ativo: btn.dataset.ativo === 'true' }),
+          });
+          carregar();
+        });
+      });
+      document.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          fecharMenusAbertosProdutos();
+          confirmarAcao('Excluir produto?', 'Deseja excluir o produto?', async () => {
             await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
             carregar();
-          });
+          }, { textoConfirmar: 'Confirmar', textoCancelar: 'Sair' });
         });
       });
     }
 
-    document.getElementById('form-novo-produto').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const inputNome = document.getElementById('input-novo-produto');
-      const inputId = document.getElementById('input-novo-produto-id');
-      const inputQuantidade = document.getElementById('input-novo-produto-quantidade');
-      const inputPreco = document.getElementById('input-novo-produto-preco');
-      const inputObservacao = document.getElementById('input-novo-produto-observacao');
-      const nome = inputNome.value.trim();
-      if (!nome) return;
-      const preco = valorMoedaParaNumero(inputPreco);
-      await apiFetch('/crm/api/produtos', {
-        method: 'POST',
-        body: JSON.stringify({
-          nome,
-          identificador_externo: inputId.value.trim() || null,
-          quantidade: parseInt(inputQuantidade.value, 10) || 0,
-          preco_referencia: preco || null,
-          observacao: inputObservacao.value.trim() || null,
-        }),
-      });
-      inputNome.value = '';
-      inputId.value = '';
-      inputQuantidade.value = '';
-      inputPreco.value = '';
-      inputObservacao.value = '';
-      carregar();
+    let debounceBuscaProduto;
+    document.getElementById('input-busca-produto').addEventListener('input', (e) => {
+      clearTimeout(debounceBuscaProduto);
+      debounceBuscaProduto = setTimeout(() => { termoBusca = e.target.value; renderizar(); }, 200);
     });
-    aplicarMascaraMoeda(document.getElementById('input-novo-produto-preco'));
+
+    function abrirModalProduto(produto) {
+      const overlay = abrirModal(`<h3>${produto ? 'Editar produto' : 'Novo produto'}</h3>`, `
+        <label for="pr-nome">Nome</label>
+        <input type="text" id="pr-nome" placeholder="ex.: Vaso decorativo P" value="${produto ? escapeHtml(produto.nome) : ''}">
+        <label for="pr-id">ID</label>
+        <input type="text" id="pr-id" placeholder="SKU" value="${produto && produto.identificador_externo ? escapeHtml(produto.identificador_externo) : ''}">
+        <label for="pr-quantidade">Quantidade</label>
+        <input type="text" inputmode="numeric" id="pr-quantidade" placeholder="0" value="${produto ? (produto.quantidade ?? 0) : ''}">
+        <label for="pr-preco">Valor</label>
+        <input type="text" id="pr-preco" placeholder="0,00" value="${produto && produto.preco_referencia ? Number(produto.preco_referencia).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}">
+        <label for="pr-observacao">Observação</label>
+        <input type="text" id="pr-observacao" placeholder="opcional" value="${produto && produto.observacao ? escapeHtml(produto.observacao) : ''}">
+        <div class="modal-erro" id="pr-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="pr-cancelar">Cancelar</button>
+          <button type="button" id="pr-salvar">Salvar</button>
+        </div>
+      `);
+      aplicarMascaraMoeda(document.getElementById('pr-preco'));
+      document.getElementById('pr-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('pr-salvar').addEventListener('click', async () => {
+        const nome = document.getElementById('pr-nome').value.trim();
+        if (!nome) { document.getElementById('pr-erro').textContent = 'Nome é obrigatório'; return; }
+        const corpo = {
+          nome,
+          identificador_externo: document.getElementById('pr-id').value.trim() || null,
+          quantidade: parseInt(document.getElementById('pr-quantidade').value, 10) || 0,
+          preco_referencia: valorMoedaParaNumero(document.getElementById('pr-preco')) || null,
+          observacao: document.getElementById('pr-observacao').value.trim() || null,
+        };
+        const res = produto
+          ? await apiFetch(`/crm/api/produtos/${produto.id}`, { method: 'PATCH', body: JSON.stringify(corpo) })
+          : await apiFetch('/crm/api/produtos', { method: 'POST', body: JSON.stringify(corpo) });
+        if (!res.ok) { document.getElementById('pr-erro').textContent = 'Falha ao salvar'; return; }
+        fecharModal();
+        carregar();
+      });
+      return overlay;
+    }
+
+    document.getElementById('btn-novo-produto').addEventListener('click', () => abrirModalProduto(null));
 
     carregar();
   </script>

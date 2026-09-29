@@ -1085,7 +1085,7 @@ async function build() {
 
   fastify.patch('/crm/api/produtos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['nome', 'categoria', 'preco_referencia', 'identificador_externo', 'quantidade', 'observacao'];
+    const campos = ['nome', 'categoria', 'preco_referencia', 'identificador_externo', 'quantidade', 'observacao', 'ativo'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
