@@ -403,11 +403,11 @@ async function build() {
     return rows[0];
   });
 
-  // --- Opções de cadastro (Segmento/Origem do cliente viram combobox,
-  // pedido do Bruno 2026-09-25) — CRUD gerenciado em Configurações >
-  // Cadastro. `tipo` é sempre 'segmento' ou 'origem' (mesma tabela pros
-  // dois, ver db/011_opcoes_cadastro.sql).
-  const TIPOS_OPCAO_CADASTRO = ['segmento', 'origem'];
+  // --- Opções de cadastro (Segmento/Origem do cliente e Tipo de frete do
+  // pedido viram combobox) — CRUD gerenciado em Configurações > Cadastro.
+  // `tipo` é 'segmento', 'origem' ou 'tipo_entrega' (mesma tabela pros três,
+  // ver db/011_opcoes_cadastro.sql e db/018_opcoes_cadastro_tipo_entrega.sql).
+  const TIPOS_OPCAO_CADASTRO = ['segmento', 'origem', 'tipo_entrega'];
   fastify.get('/crm/api/opcoes-cadastro', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tipo } = request.query || {};
     if (!TIPOS_OPCAO_CADASTRO.includes(tipo)) return reply.code(400).send({ error: `tipo inválido. Válidos: ${TIPOS_OPCAO_CADASTRO.join(', ')}` });
@@ -824,7 +824,7 @@ async function build() {
   // (raia) opcional. Resto é opcional.
   fastify.post('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { telefone, nome_cliente, itens, descricao, quantidade, produto_id, valor_total, origem, tipo_entrega, recurso_id } = request.body || {};
+    const { telefone, nome_cliente, itens, descricao, quantidade, produto_id, valor_total, origem, tipo_entrega, frete, data_entrega, recurso_id } = request.body || {};
     if (!origem) return reply.code(400).send({ error: 'Origem é obrigatória' });
 
     // "A fazer" (fixa=true, migration 013) é sempre onde todo pedido novo
@@ -843,9 +843,9 @@ async function build() {
       await client.query('BEGIN');
       const numero = await proximoNumeroPedido(client, tenantId);
       const { rows: pedidoRows } = await client.query(
-        `insert into crm_pedidos (tenant_id, cliente_id, etapa_id, origem, valor_total, tipo_entrega, recurso_id, numero)
-         values ($1, $2, $3, $4, $5, $6, $7, $8) returning *`,
-        [tenantId, cliente.id, etapaRows[0].id, origem, valor_total || 0, tipo_entrega || null, recurso_id || null, numero]
+        `insert into crm_pedidos (tenant_id, cliente_id, etapa_id, origem, valor_total, tipo_entrega, frete, data_entrega, recurso_id, numero)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
+        [tenantId, cliente.id, etapaRows[0].id, origem, valor_total || 0, tipo_entrega || null, frete || null, data_entrega || null, recurso_id || null, numero]
       );
       const pedido = pedidoRows[0];
 
@@ -963,15 +963,24 @@ async function build() {
     return rows[0];
   });
 
-  // Data de entrega (pedido do Bruno, 2026-09-25 — mostrada no histórico de
-  // pedidos da ficha do cliente). Sem evento próprio — não é uma mudança de
-  // etapa nem de pagamento, é só um dado informativo.
+  // Dados de entrega/frete (data de entrega, tipo de frete, valor do frete)
+  // — mostrados no histórico de pedidos da ficha do cliente. Sem evento
+  // próprio — não é mudança de etapa nem de pagamento, é só informativo.
   fastify.patch('/crm/api/pedidos/:id/entrega', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { data_entrega: dataEntrega } = request.body || {};
+    const campos = ['data_entrega', 'tipo_entrega', 'frete'];
+    const body = request.body || {};
+    const sets = [];
+    const params = [request.params.id, tenantId];
+    for (const campo of campos) {
+      if (body[campo] === undefined) continue;
+      params.push(body[campo] || null);
+      sets.push(`${campo} = $${params.length}`);
+    }
+    if (!sets.length) return reply.code(400).send({ error: 'Nenhum campo pra atualizar' });
     const { rows } = await pool.query(
-      `update crm_pedidos set data_entrega = $1, atualizado_em = now() where id = $2 and tenant_id = $3 returning *`,
-      [dataEntrega || null, request.params.id, tenantId]
+      `update crm_pedidos set ${sets.join(', ')}, atualizado_em = now() where id = $1 and tenant_id = $2 returning *`,
+      params
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
     return rows[0];
