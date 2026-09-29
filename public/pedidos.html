@@ -13,11 +13,15 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .filtros { display:grid; grid-template-columns:repeat(4,1fr); gap:0 16px; margin-bottom:8px; }
+  .filtros { display:grid; grid-template-columns:repeat(5,1fr); gap:0 12px; margin-bottom:8px; }
   .filtros > div { min-width:0; }
-  .filtros label { margin-top:0; }
-  @media(max-width:900px) { .filtros { grid-template-columns:1fr 1fr; } }
-  @media(max-width:520px) { .filtros { grid-template-columns:1fr; } }
+  .filtros label { margin-top:0; font-size:12px; }
+  .filtros input, .filtros select { height:36px; font-size:13px; }
+  @media(max-width:1100px) { .filtros { grid-template-columns:repeat(3,1fr); } }
+  @media(max-width:640px) { .filtros { grid-template-columns:1fr 1fr; } }
+  @media(max-width:420px) { .filtros { grid-template-columns:1fr; } }
+  tr.linha-pedido { cursor:pointer; }
+  tr.linha-pedido:hover td { background:var(--surface-hover); }
   tr.linha-pedido td { position:relative; }
   .menu-acoes-wrap { position:relative; display:inline-block; }
   .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
@@ -27,6 +31,15 @@
   .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
   .menu-acoes button:hover { background:var(--surface-muted); }
   .menu-acoes button.perigo { color:var(--danger); }
+  #tbody-pedidos .badge::before { display:none; }
+  .badge-prioridade-altissima { background:color-mix(in srgb, var(--danger) 20%, transparent); color:var(--danger); }
+  .badge-prioridade-alta { background:var(--warning-bg); color:var(--warning-text); }
+  .badge-prioridade-media { background:color-mix(in srgb, #eab308 20%, transparent); color:#a16207; }
+  .badge-prioridade-baixa { background:var(--success-bg); color:var(--success); }
+  .modal-compacto input, .modal-compacto select { height:38px; }
+  .lista-itens-pedido { border:1px solid var(--border); border-radius:var(--radius-md); padding:2px 10px; margin-top:6px; }
+  .linha-item-pedido { padding:7px 0; border-top:1px solid var(--border); font-size:13px; color:var(--text-secondary); }
+  .linha-item-pedido:first-child { border-top:none; }
 </style>
 </head>
 <body>
@@ -97,6 +110,7 @@
             <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
           </ul>
         </li>
       </ul>
@@ -109,18 +123,12 @@
           <p class="descricao" id="aviso-filtro-cliente" hidden>Mostrando só os pedidos deste cliente — <a href="/crm/pedidos.html">ver todos</a>.</p>
         </div>
         <div class="acoes">
-          <div class="menu-acoes-wrap">
-            <button type="button" class="btn-secundario btn-acoes" id="btn-acoes-pedidos" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" style="width:auto">⋯</button>
-            <div class="menu-acoes" id="menu-acoes-pedidos" hidden>
-              <button type="button" id="btn-importar-upseller">Importar UpSeller</button>
-              <button type="button" id="btn-importar-nfe">Importar NF-e</button>
-            </div>
-          </div>
           <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
         </div>
       </div>
 
       <div class="filtros">
+        <div><label for="f-cliente">Cliente</label><input type="search" id="f-cliente" placeholder="Buscar cliente…"></div>
         <div><label for="f-etapa">Etapa</label><select id="f-etapa"><option value="">Qualquer</option></select></div>
         <div><label for="f-recurso">Recurso</label><select id="f-recurso"><option value="">Qualquer</option></select></div>
         <div><label for="f-pagamento">Pagamento</label>
@@ -163,6 +171,7 @@
     let recursos = [];
     let produtos = [];
     let tiposEntrega = [];
+    let termoBuscaCliente = '';
 
     // Atalho "Pedidos" no menu de ações de um cliente (tela de Clientes)
     // chega aqui como ?cliente_id=... — filtro fixo, não aparece nos
@@ -202,22 +211,31 @@
       document.getElementById(id).addEventListener('change', carregar);
     });
 
+    let debounceBuscaCliente;
+    document.getElementById('f-cliente').addEventListener('input', (e) => {
+      clearTimeout(debounceBuscaCliente);
+      debounceBuscaCliente = setTimeout(() => { termoBuscaCliente = e.target.value; renderizar(); }, 200);
+    });
+
     const ROTULO_PRIORIDADE = { altissima: 'Altíssima', alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+    const BADGE_PRIORIDADE = { altissima: 'badge-prioridade-altissima', alta: 'badge-prioridade-alta', media: 'badge-prioridade-media', baixa: 'badge-prioridade-baixa' };
     const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
 
     function renderizar() {
       const tbody = document.getElementById('tbody-pedidos');
-      if (!pedidos.length) {
-        tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">Nenhum pedido com esses filtros.</div></td></tr>`;
+      const termo = termoBuscaCliente.trim().toLowerCase();
+      const lista = termo ? pedidos.filter((p) => (p.cliente_nome || '').toLowerCase().includes(termo)) : pedidos;
+      if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">${pedidos.length ? 'Nenhum pedido bate com essa busca.' : 'Nenhum pedido com esses filtros.'}</div></td></tr>`;
         return;
       }
-      tbody.innerHTML = pedidos.map((p) => {
+      tbody.innerHTML = lista.map((p) => {
         const etapa = etapas.find((e) => e.id === p.etapa_id);
         return `
         <tr class="linha-pedido" data-id="${p.id}">
           <td>${escapeHtml(p.cliente_nome)}</td>
           <td>${escapeHtml(etapa ? etapa.nome : '—')}</td>
-          <td>${p.prioridade ? `<span class="badge${p.prioridade === 'altissima' ? ' badge-prioridade-altissima' : ''}">${ROTULO_PRIORIDADE[p.prioridade]}</span>` : '—'}</td>
+          <td>${p.prioridade ? `<span class="badge ${BADGE_PRIORIDADE[p.prioridade]}">${ROTULO_PRIORIDADE[p.prioridade]}</span>` : '—'}</td>
           <td><span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span></td>
           <td>${formatarMoeda(p.valor_total)}</td>
           <td>${formatarData(p.criado_em)}</td>
@@ -227,8 +245,8 @@
               <div class="menu-acoes" data-menu="${p.id}" hidden>
                 <button type="button" data-editar-pedido="${p.id}">Editar pedido</button>
                 <button type="button" data-pagamento-confirmado="${p.id}">Confirmar Pagamento</button>
-                <button type="button" data-acionar-cliente="${p.id}">Acionar cliente</button>
-                <button type="button" data-chamar-whatsapp="${p.id}">Chamar WhatsApp</button>
+                <button type="button" data-acionar-cliente="${p.id}">Chamar Agente</button>
+                <button type="button" data-chamar-whatsapp="${p.id}">WhatsApp</button>
                 <button type="button" class="perigo" data-cancelar-pedido="${p.id}">Cancelar pedido</button>
               </div>
             </div>
@@ -247,6 +265,12 @@
     });
 
     function ligarEventosLinhas() {
+      document.querySelectorAll('.linha-pedido').forEach((tr) => {
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('.menu-acoes-wrap')) return;
+          abrirEdicaoPedido(tr.dataset.id);
+        });
+      });
       document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -257,7 +281,7 @@
         });
       });
       document.querySelectorAll('[data-editar-pedido]').forEach((btn) => {
-        btn.addEventListener('click', () => { fecharMenusAbertos(); abrirEdicaoPedido(btn.dataset.editarPedido); });
+        btn.addEventListener('click', (e) => { e.stopPropagation(); fecharMenusAbertos(); abrirEdicaoPedido(btn.dataset.editarPedido); });
       });
       document.querySelectorAll('[data-pagamento-confirmado]').forEach((btn) => {
         btn.addEventListener('click', async () => {
@@ -269,8 +293,8 @@
           carregar();
         });
       });
-      // "Acionar cliente" abre a conversa do bot com esse cliente
-      // (Configurações > WhatsApp > Conversas) — "Chamar WhatsApp" preserva
+      // "Chamar Agente" abre a conversa do bot com esse cliente
+      // (Configurações > WhatsApp > Conversas) — "WhatsApp" preserva
       // o comportamento antigo (wa.me direto, fora do bot).
       document.querySelectorAll('[data-acionar-cliente]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -353,7 +377,6 @@
     function abrirEdicaoPedido(pedidoId) {
       const p = pedidos.find((x) => x.id === pedidoId);
       if (!p) return;
-      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
       abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
         <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}</p>
         ${ehOrigemPropria(p.origem) ? `<div class="banner-assinatura" style="margin-top:12px"><span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span></div>` : ''}
@@ -361,11 +384,6 @@
           <div><label for="e-etapa">Etapa</label>
             <select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>
           </div>
-          <div><label for="e-recurso">Recurso</label>
-            <select id="e-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
-          </div>
-        </div>
-        <div class="grid2">
           <div><label for="e-prioridade">Prioridade</label>
             <select id="e-prioridade">
               <option value="">Nenhuma</option>
@@ -375,6 +393,8 @@
               <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
             </select>
           </div>
+        </div>
+        <div class="grid2">
           <div><label for="e-status">Pagamento</label>
             <select id="e-status">
               <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
@@ -382,24 +402,29 @@
               <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
             </select>
           </div>
+          <div><label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal"></div>
         </div>
         <div class="grid2">
-          <div><label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal"></div>
           <div><label for="e-tipo-entrega">Tipo de frete</label>
             <select id="e-tipo-entrega"><option value="">Selecione…</option>${tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === p.tipo_entrega ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}</select>
           </div>
-        </div>
-        <div class="grid2">
           <div><label for="e-frete">Valor de frete</label><input id="e-frete" inputmode="decimal" placeholder="0,00"></div>
-          <div><label for="e-entrega">Data de entrega</label><input id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
         </div>
-        <p class="modal-texto">Valor do pedido: ${formatarMoeda(p.valor_total)}</p>
+        <label for="e-entrega">Data de entrega</label><input id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}">
+        <label for="e-observacoes">Observação</label>
+        <textarea id="e-observacoes" placeholder="opcional">${p.observacoes ? escapeHtml(p.observacoes) : ''}</textarea>
+        ${p.itens && p.itens.length ? `
+          <label>Itens do pedido</label>
+          <div class="lista-itens-pedido">
+            ${p.itens.map((i) => `<div class="linha-item-pedido">${i.quantidade}x ${escapeHtml(i.descricao || 'Item sem descrição')}</div>`).join('')}
+          </div>
+        ` : ''}
+        <p class="modal-texto" style="margin-top:14px">Valor do pedido: ${formatarMoeda(p.valor_total)}</p>
         <div class="modal-erro" id="e-erro"></div>
-        <div class="modal-acoes">
-          ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
+        <div class="modal-acoes" style="justify-content:flex-end">
           <button type="button" id="btn-salvar-edicao">Salvar</button>
         </div>
-      `);
+      `, 'modal-compacto');
       const campoRecebido = document.getElementById('e-recebido');
       campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       aplicarMascaraMoeda(campoRecebido);
@@ -409,7 +434,6 @@
 
       document.getElementById('btn-salvar-edicao').addEventListener('click', async () => {
         const novaEtapaId = document.getElementById('e-etapa').value;
-        const novoRecursoId = document.getElementById('e-recurso').value || null;
         const novaPrioridade = document.getElementById('e-prioridade').value || null;
         const novoStatus = document.getElementById('e-status').value;
         const novoRecebido = valorMoedaParaNumero(campoRecebido);
@@ -428,10 +452,6 @@
             return;
           }
         }
-        if (novoRecursoId !== (p.recurso_id || null)) {
-          const res = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, { method: 'PATCH', body: JSON.stringify({ recurso_id: novoRecursoId }) });
-          if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atribuir recurso'; return; }
-        }
         if (novaPrioridade !== (p.prioridade || null)) {
           const res = await apiFetch(`/crm/api/pedidos/${p.id}/prioridade`, { method: 'PATCH', body: JSON.stringify({ prioridade: novaPrioridade }) });
           if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atualizar prioridade'; return; }
@@ -442,13 +462,15 @@
         const novaEntrega = document.getElementById('e-entrega').value || null;
         const novoTipoEntrega = document.getElementById('e-tipo-entrega').value || null;
         const novoFrete = valorMoedaParaNumero(campoFreteEdicao) || null;
+        const novaObservacao = document.getElementById('e-observacoes').value.trim() || null;
         const entregaMudou = novaEntrega !== (p.data_entrega ? p.data_entrega.slice(0, 10) : null)
           || novoTipoEntrega !== (p.tipo_entrega || null)
-          || novoFrete !== (p.frete != null ? Number(p.frete) : null);
+          || novoFrete !== (p.frete != null ? Number(p.frete) : null)
+          || novaObservacao !== (p.observacoes || null);
         if (entregaMudou) {
           const resEntrega = await apiFetch(`/crm/api/pedidos/${p.id}/entrega`, {
             method: 'PATCH',
-            body: JSON.stringify({ data_entrega: novaEntrega, tipo_entrega: novoTipoEntrega, frete: novoFrete }),
+            body: JSON.stringify({ data_entrega: novaEntrega, tipo_entrega: novoTipoEntrega, frete: novoFrete, observacoes: novaObservacao }),
           });
           if (!resEntrega.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar dados de entrega'; return; }
         }
@@ -457,100 +479,6 @@
         carregar();
       });
     }
-
-    // --- Importar NF-e (US21) -----------------------------------------------
-    document.getElementById('btn-importar-nfe').addEventListener('click', () => {
-      fecharMenusAbertos();
-      abrirModal('<h3>Importar NF-e (XML)</h3>', `
-        <p class="modal-texto">Selecione um ou mais arquivos XML de NF-e. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada.</p>
-        <input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple>
-        <div id="nfe-resultado" style="margin-top:12px"></div>
-        <div class="modal-erro" id="nfe-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="nfe-importar" disabled>Importar</button>
-        </div>
-      `, 'modal-card-larga');
-
-      document.getElementById('nfe-arquivos').addEventListener('change', (e) => {
-        document.getElementById('nfe-importar').disabled = !e.target.files.length;
-      });
-
-      document.getElementById('nfe-importar').addEventListener('click', async () => {
-        const arquivos = document.getElementById('nfe-arquivos').files;
-        if (!arquivos.length) return;
-        const btn = document.getElementById('nfe-importar');
-        btn.disabled = true;
-        btn.textContent = 'Importando…';
-        const formData = new FormData();
-        Array.from(arquivos).forEach((a) => formData.append('arquivo', a));
-        const res = await apiFetch('/crm/api/importacoes/nfe', { method: 'POST', body: formData });
-        const dados = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          document.getElementById('nfe-erro').textContent = dados.error || 'Falha ao importar';
-          btn.disabled = false;
-          btn.textContent = 'Importar';
-          return;
-        }
-        document.getElementById('nfe-resultado').innerHTML = `
-          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
-          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
-        `;
-        btn.hidden = true;
-        await carregar();
-      });
-    });
-
-    // --- Importar relatório de pedidos da UpSeller (Excel) (US21) -----------
-    document.getElementById('btn-importar-upseller').addEventListener('click', () => {
-      fecharMenusAbertos();
-      abrirModal('<h3>Importar pedidos (UpSeller)</h3>', `
-        <p class="modal-texto">Selecione o relatório de NF-e exportado do UpSeller (.xlsx). Cria um pedido por nota — devolução de mercadoria é ignorada. Reimportar o mesmo arquivo não duplica.</p>
-        <input type="file" id="up-arquivo" accept=".xlsx">
-        <div id="up-resultado" style="margin-top:12px"></div>
-        <div class="modal-erro" id="up-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="up-importar" disabled>Importar</button>
-        </div>
-      `, 'modal-card-larga');
-
-      document.getElementById('up-arquivo').addEventListener('change', (e) => {
-        document.getElementById('up-importar').disabled = !e.target.files.length;
-      });
-
-      document.getElementById('up-importar').addEventListener('click', async () => {
-        const arquivo = document.getElementById('up-arquivo').files[0];
-        if (!arquivo) return;
-        const btn = document.getElementById('up-importar');
-        btn.disabled = true;
-        btn.textContent = 'Importando…';
-        const formData = new FormData();
-        formData.append('arquivo', arquivo);
-        const res = await apiFetch('/crm/api/importacoes/upseller', { method: 'POST', body: formData });
-        const dados = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          document.getElementById('up-erro').textContent = dados.error || 'Falha ao importar';
-          btn.disabled = false;
-          btn.textContent = 'Importar';
-          return;
-        }
-        document.getElementById('up-resultado').innerHTML = `
-          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> já existente(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
-          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
-        `;
-        btn.hidden = true;
-        await carregar();
-      });
-    });
-
-    // --- Menu almôndega de topo (Importar UpSeller/NF-e) — mesmo padrão do
-    // kebab por linha, fixo, ligado uma única vez.
-    document.getElementById('btn-acoes-pedidos').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const menu = document.getElementById('menu-acoes-pedidos');
-      const jaAberto = !menu.hidden;
-      fecharMenusAbertos();
-      menu.hidden = jaAberto;
-    });
 
     // --- Novo pedido (US do Bruno: saiu do Quadro, mora só aqui agora) -------
     document.getElementById('btn-novo-pedido').addEventListener('click', () => {

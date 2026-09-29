@@ -808,7 +808,11 @@ async function build() {
     const { rows } = await pool.query(
       `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
               extract(day from now() - p.entrou_na_etapa_em)::int as dias_na_etapa,
-              coalesce((select sum(quantidade) from crm_pedidos_itens where pedido_id = p.id), 0) as quantidade_itens
+              coalesce((select sum(quantidade) from crm_pedidos_itens where pedido_id = p.id), 0) as quantidade_itens,
+              coalesce((
+                select json_agg(json_build_object('descricao', coalesce(pr.nome, i.descricao), 'quantidade', i.quantidade))
+                from crm_pedidos_itens i left join crm_produtos pr on pr.id = i.produto_id where i.pedido_id = p.id
+              ), '[]') as itens
        from crm_pedidos p
        join crm_clientes c on c.id = p.cliente_id
        left join crm_recursos r on r.id = p.recurso_id
@@ -963,12 +967,13 @@ async function build() {
     return rows[0];
   });
 
-  // Dados de entrega/frete (data de entrega, tipo de frete, valor do frete)
-  // — mostrados no histórico de pedidos da ficha do cliente. Sem evento
-  // próprio — não é mudança de etapa nem de pagamento, é só informativo.
+  // Dados de entrega/frete (data de entrega, tipo de frete, valor do frete,
+  // observações) — mostrados no histórico de pedidos da ficha do cliente.
+  // Sem evento próprio — não é mudança de etapa nem de pagamento, é só
+  // informativo.
   fastify.patch('/crm/api/pedidos/:id/entrega', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['data_entrega', 'tipo_entrega', 'frete'];
+    const campos = ['data_entrega', 'tipo_entrega', 'frete', 'observacoes'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];

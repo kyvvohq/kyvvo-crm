@@ -97,6 +97,7 @@
             <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
           </ul>
         </li>
       </ul>
@@ -112,7 +113,6 @@
             <button type="button" class="btn-secundario btn-acoes" id="btn-acoes-clientes" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" style="width:auto">⋯</button>
             <div class="menu-acoes" id="menu-acoes-clientes" hidden>
               <button type="button" id="btn-gerenciar-formularios">Formulários</button>
-              <button type="button" id="btn-importar">Importar CSV</button>
               <button type="button" id="btn-duplicados">Duplicados</button>
             </div>
           </div>
@@ -360,115 +360,6 @@
         });
       });
     }
-
-    // --- Importação CSV (US21) ------------------------------------------------
-    const CAMPOS_IMPORTACAO = [
-      { campo: 'nome', label: 'Nome', obrigatorio: true },
-      { campo: 'telefone', label: 'Telefone (WhatsApp)' },
-      { campo: 'email', label: 'E-mail' },
-      { campo: 'cpf', label: 'CPF' },
-      { campo: 'cidade', label: 'Cidade' },
-      { campo: 'uf', label: 'UF' },
-      { campo: 'segmento', label: 'Segmento' },
-      { campo: 'origem', label: 'Origem' },
-    ];
-    let csvArquivo = null, csvCabecalho = [], csvLinhas = [];
-
-    function parseCsvLinhaSimples(linha, delimitador) {
-      const campos = [];
-      let campo = '', dentroAspas = false;
-      for (let i = 0; i < linha.length; i++) {
-        const ch = linha[i];
-        if (dentroAspas) {
-          if (ch === '"') { if (linha[i + 1] === '"') { campo += '"'; i++; } else dentroAspas = false; }
-          else campo += ch;
-        } else if (ch === '"') dentroAspas = true;
-        else if (ch === delimitador) { campos.push(campo); campo = ''; }
-        else campo += ch;
-      }
-      campos.push(campo);
-      return campos;
-    }
-
-    document.getElementById('btn-importar').addEventListener('click', () => {
-      fecharMenusAbertosClientes();
-      abrirModal('<h3>Importar clientes (CSV)</h3>', `
-        <p class="modal-texto">Planilha antiga, exportação do Google Forms etc. Escolha o arquivo e diga qual coluna é qual.</p>
-        <input type="file" id="csv-arquivo" accept=".csv,text/csv">
-        <div id="csv-mapeamento" hidden>
-          <div id="csv-campos-mapeamento" style="margin-top:14px"></div>
-          <div id="csv-preview" style="margin-top:12px"></div>
-        </div>
-        <div class="modal-erro" id="csv-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="csv-importar" disabled>Importar</button>
-        </div>
-      `, 'modal-card-larga');
-
-      document.getElementById('csv-arquivo').addEventListener('change', async (e) => {
-        const arquivo = e.target.files[0];
-        if (!arquivo) return;
-        csvArquivo = arquivo;
-        const texto = await arquivo.text();
-        const s = texto.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const primeiraLinha = s.split('\n')[0] || '';
-        const delimitador = (primeiraLinha.match(/;/g) || []).length > (primeiraLinha.match(/,/g) || []).length ? ';' : ',';
-        const linhasTexto = s.split('\n').filter((l) => l.trim() !== '');
-        csvCabecalho = parseCsvLinhaSimples(linhasTexto[0], delimitador);
-        csvLinhas = linhasTexto.slice(1, 6).map((l) => parseCsvLinhaSimples(l, delimitador));
-
-        const opcoes = ['<option value="">Não importar</option>', ...csvCabecalho.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)].join('');
-        document.getElementById('csv-campos-mapeamento').innerHTML = CAMPOS_IMPORTACAO.map((c) => `
-          <div class="grid2" style="align-items:center;margin-bottom:6px">
-            <label style="margin:0">${c.label}${c.obrigatorio ? '<span class="obrigatorio">*</span>' : ''}</label>
-            <select data-campo-mapeado="${c.campo}">${opcoes}</select>
-          </div>
-        `).join('');
-        // Tenta casar automaticamente por nome parecido da coluna.
-        CAMPOS_IMPORTACAO.forEach((c) => {
-          const select = document.querySelector(`[data-campo-mapeado="${c.campo}"]`);
-          const achado = csvCabecalho.find((h) => h.toLowerCase().trim().includes(c.campo === 'telefone' ? 'telefone' : c.campo) || (c.campo === 'telefone' && h.toLowerCase().includes('whatsapp')));
-          if (achado) select.value = achado;
-        });
-
-        document.getElementById('csv-preview').innerHTML = `
-          <p class="modal-texto" style="margin-bottom:6px">Prévia (${linhasTexto.length - 1} linha(s) no total):</p>
-          <div class="card" style="padding:0;overflow:auto">
-            <table><thead><tr>${csvCabecalho.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
-            <tbody>${csvLinhas.map((l) => `<tr>${l.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
-          </div>
-        `;
-        document.getElementById('csv-mapeamento').hidden = false;
-        document.getElementById('csv-importar').disabled = false;
-      });
-
-      document.getElementById('csv-importar').addEventListener('click', async () => {
-        const mapeamento = {};
-        document.querySelectorAll('[data-campo-mapeado]').forEach((sel) => { mapeamento[sel.dataset.campoMapeado] = sel.value || null; });
-        if (!mapeamento.nome) { document.getElementById('csv-erro').textContent = 'Mapeie pelo menos o campo Nome'; return; }
-
-        const btn = document.getElementById('csv-importar');
-        btn.disabled = true;
-        btn.textContent = 'Importando…';
-        const formData = new FormData();
-        formData.append('arquivo', csvArquivo);
-        formData.append('mapeamento', JSON.stringify(mapeamento));
-        const res = await apiFetch('/crm/api/importacoes/csv', { method: 'POST', body: formData });
-        const dados = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          document.getElementById('csv-erro').textContent = dados.error || 'Falha ao importar';
-          btn.disabled = false;
-          btn.textContent = 'Importar';
-          return;
-        }
-        document.getElementById('csv-mapeamento').innerHTML = `
-          <p class="modal-texto"><strong>${dados.criados}</strong> criado(s), <strong>${dados.atualizados}</strong> atualizado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
-          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px">${escapeHtml(dados.erro)}</p>` : ''}
-        `;
-        btn.hidden = true;
-        await carregar();
-      });
-    });
 
     // --- Duplicados (US17) ---------------------------------------------------
     document.getElementById('btn-duplicados').addEventListener('click', () => { fecharMenusAbertosClientes(); abrirModalDuplicados(); });

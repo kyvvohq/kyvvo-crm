@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Importação</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .card-importacao h2 { font-size:15px; margin:0 0 6px; color:var(--text); }
+  .card-importacao p.modal-texto { margin:0 0 14px; }
+</style>
+</head>
+<body>
+  <header class="topo-app">
+    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
+      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
+      <span class="topo-produto-tag">CRM</span>
+    </a>
+    <div class="topo-direita">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="avatar js-avatar-usuario"></div>
+        <span class="nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <div class="ds-menu-topo">
+        <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Importação</h1></div>
+        </div>
+      </div>
+
+      <div class="card card-importacao">
+        <h2>Clientes (CSV)</h2>
+        <p class="modal-texto">Planilha antiga, exportação do Google Forms etc.</p>
+        <button type="button" id="btn-importar-csv">Importar CSV</button>
+      </div>
+
+      <div class="card card-importacao">
+        <h2>Pedidos (UpSeller)</h2>
+        <p class="modal-texto">Relatório de NF-e exportado do UpSeller (.xlsx).</p>
+        <button type="button" id="btn-importar-upseller">Importar UpSeller</button>
+      </div>
+
+      <div class="card card-importacao">
+        <h2>Pedidos (NF-e)</h2>
+        <p class="modal-texto">Um ou mais arquivos XML de NF-e — concilia com pedido existente pelo número, ou cria um novo.</p>
+        <button type="button" id="btn-importar-nfe">Importar NF-e</button>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    // --- Importação CSV de clientes (movida de Clientes) ----------------------
+    const CAMPOS_IMPORTACAO = [
+      { campo: 'nome', label: 'Nome', obrigatorio: true },
+      { campo: 'telefone', label: 'Telefone (WhatsApp)' },
+      { campo: 'email', label: 'E-mail' },
+      { campo: 'cpf', label: 'CPF' },
+      { campo: 'cidade', label: 'Cidade' },
+      { campo: 'uf', label: 'UF' },
+      { campo: 'segmento', label: 'Segmento' },
+      { campo: 'origem', label: 'Origem' },
+    ];
+    let csvArquivo = null, csvCabecalho = [], csvLinhas = [];
+
+    function parseCsvLinhaSimples(linha, delimitador) {
+      const campos = [];
+      let campo = '', dentroAspas = false;
+      for (let i = 0; i < linha.length; i++) {
+        const ch = linha[i];
+        if (dentroAspas) {
+          if (ch === '"') { if (linha[i + 1] === '"') { campo += '"'; i++; } else dentroAspas = false; }
+          else campo += ch;
+        } else if (ch === '"') dentroAspas = true;
+        else if (ch === delimitador) { campos.push(campo); campo = ''; }
+        else campo += ch;
+      }
+      campos.push(campo);
+      return campos;
+    }
+
+    document.getElementById('btn-importar-csv').addEventListener('click', () => {
+      abrirModal('<h3>Importar clientes (CSV)</h3>', `
+        <p class="modal-texto">Planilha antiga, exportação do Google Forms etc. Escolha o arquivo e diga qual coluna é qual.</p>
+        <input type="file" id="csv-arquivo" accept=".csv,text/csv">
+        <div id="csv-mapeamento" hidden>
+          <div id="csv-campos-mapeamento" style="margin-top:14px"></div>
+          <div id="csv-preview" style="margin-top:12px"></div>
+        </div>
+        <div class="modal-erro" id="csv-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" id="csv-importar" disabled>Importar</button>
+        </div>
+      `, 'modal-card-larga');
+
+      document.getElementById('csv-arquivo').addEventListener('change', async (e) => {
+        const arquivo = e.target.files[0];
+        if (!arquivo) return;
+        csvArquivo = arquivo;
+        const texto = await arquivo.text();
+        const s = texto.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const primeiraLinha = s.split('\n')[0] || '';
+        const delimitador = (primeiraLinha.match(/;/g) || []).length > (primeiraLinha.match(/,/g) || []).length ? ';' : ',';
+        const linhasTexto = s.split('\n').filter((l) => l.trim() !== '');
+        csvCabecalho = parseCsvLinhaSimples(linhasTexto[0], delimitador);
+        csvLinhas = linhasTexto.slice(1, 6).map((l) => parseCsvLinhaSimples(l, delimitador));
+
+        const opcoes = ['<option value="">Não importar</option>', ...csvCabecalho.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)].join('');
+        document.getElementById('csv-campos-mapeamento').innerHTML = CAMPOS_IMPORTACAO.map((c) => `
+          <div class="grid2" style="align-items:center;margin-bottom:6px">
+            <label style="margin:0">${c.label}${c.obrigatorio ? '<span class="obrigatorio">*</span>' : ''}</label>
+            <select data-campo-mapeado="${c.campo}">${opcoes}</select>
+          </div>
+        `).join('');
+        // Tenta casar automaticamente por nome parecido da coluna.
+        CAMPOS_IMPORTACAO.forEach((c) => {
+          const select = document.querySelector(`[data-campo-mapeado="${c.campo}"]`);
+          const achado = csvCabecalho.find((h) => h.toLowerCase().trim().includes(c.campo === 'telefone' ? 'telefone' : c.campo) || (c.campo === 'telefone' && h.toLowerCase().includes('whatsapp')));
+          if (achado) select.value = achado;
+        });
+
+        document.getElementById('csv-preview').innerHTML = `
+          <p class="modal-texto" style="margin-bottom:6px">Prévia (${linhasTexto.length - 1} linha(s) no total):</p>
+          <div class="card" style="padding:0;overflow:auto">
+            <table><thead><tr>${csvCabecalho.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+            <tbody>${csvLinhas.map((l) => `<tr>${l.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+          </div>
+        `;
+        document.getElementById('csv-mapeamento').hidden = false;
+        document.getElementById('csv-importar').disabled = false;
+      });
+
+      document.getElementById('csv-importar').addEventListener('click', async () => {
+        const mapeamento = {};
+        document.querySelectorAll('[data-campo-mapeado]').forEach((sel) => { mapeamento[sel.dataset.campoMapeado] = sel.value || null; });
+        if (!mapeamento.nome) { document.getElementById('csv-erro').textContent = 'Mapeie pelo menos o campo Nome'; return; }
+
+        const btn = document.getElementById('csv-importar');
+        btn.disabled = true;
+        btn.textContent = 'Importando…';
+        const formData = new FormData();
+        formData.append('arquivo', csvArquivo);
+        formData.append('mapeamento', JSON.stringify(mapeamento));
+        const res = await apiFetch('/crm/api/importacoes/csv', { method: 'POST', body: formData });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          document.getElementById('csv-erro').textContent = dados.error || 'Falha ao importar';
+          btn.disabled = false;
+          btn.textContent = 'Importar';
+          return;
+        }
+        document.getElementById('csv-mapeamento').innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> criado(s), <strong>${dados.atualizados}</strong> atualizado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px">${escapeHtml(dados.erro)}</p>` : ''}
+        `;
+        btn.hidden = true;
+      });
+    });
+
+    // --- Importar NF-e (movida de Pedidos) -----------------------------------
+    document.getElementById('btn-importar-nfe').addEventListener('click', () => {
+      abrirModal('<h3>Importar NF-e (XML)</h3>', `
+        <p class="modal-texto">Selecione um ou mais arquivos XML de NF-e. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada.</p>
+        <input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple>
+        <div id="nfe-resultado" style="margin-top:12px"></div>
+        <div class="modal-erro" id="nfe-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" id="nfe-importar" disabled>Importar</button>
+        </div>
+      `, 'modal-card-larga');
+
+      document.getElementById('nfe-arquivos').addEventListener('change', (e) => {
+        document.getElementById('nfe-importar').disabled = !e.target.files.length;
+      });
+
+      document.getElementById('nfe-importar').addEventListener('click', async () => {
+        const arquivos = document.getElementById('nfe-arquivos').files;
+        if (!arquivos.length) return;
+        const btn = document.getElementById('nfe-importar');
+        btn.disabled = true;
+        btn.textContent = 'Importando…';
+        const formData = new FormData();
+        Array.from(arquivos).forEach((a) => formData.append('arquivo', a));
+        const res = await apiFetch('/crm/api/importacoes/nfe', { method: 'POST', body: formData });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          document.getElementById('nfe-erro').textContent = dados.error || 'Falha ao importar';
+          btn.disabled = false;
+          btn.textContent = 'Importar';
+          return;
+        }
+        document.getElementById('nfe-resultado').innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
+        `;
+        btn.hidden = true;
+      });
+    });
+
+    // --- Importar relatório de pedidos da UpSeller (movida de Pedidos) ------
+    document.getElementById('btn-importar-upseller').addEventListener('click', () => {
+      abrirModal('<h3>Importar pedidos (UpSeller)</h3>', `
+        <p class="modal-texto">Selecione o relatório de NF-e exportado do UpSeller (.xlsx). Cria um pedido por nota — devolução de mercadoria é ignorada. Reimportar o mesmo arquivo não duplica.</p>
+        <input type="file" id="up-arquivo" accept=".xlsx">
+        <div id="up-resultado" style="margin-top:12px"></div>
+        <div class="modal-erro" id="up-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" id="up-importar" disabled>Importar</button>
+        </div>
+      `, 'modal-card-larga');
+
+      document.getElementById('up-arquivo').addEventListener('change', (e) => {
+        document.getElementById('up-importar').disabled = !e.target.files.length;
+      });
+
+      document.getElementById('up-importar').addEventListener('click', async () => {
+        const arquivo = document.getElementById('up-arquivo').files[0];
+        if (!arquivo) return;
+        const btn = document.getElementById('up-importar');
+        btn.disabled = true;
+        btn.textContent = 'Importando…';
+        const formData = new FormData();
+        formData.append('arquivo', arquivo);
+        const res = await apiFetch('/crm/api/importacoes/upseller', { method: 'POST', body: formData });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          document.getElementById('up-erro').textContent = dados.error || 'Falha ao importar';
+          btn.disabled = false;
+          btn.textContent = 'Importar';
+          return;
+        }
+        document.getElementById('up-resultado').innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> já existente(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
+        `;
+        btn.hidden = true;
+      });
+    });
+  </script>
+</body>
+</html>
