@@ -31,6 +31,16 @@ const PORT = process.env.PORT || 3005;
 // checagem servidor-a-servidor e emite seu próprio JWT interno depois.
 const PLATFORM_URL = process.env.PLATFORM_URL || 'http://platform:3003';
 
+// "Trocar de produto" no menu de perfil: outros produtos Kyvvo que o mesmo
+// tenant também tem ativo (ex.: um salão que também usa o CRM). Resolvido
+// uma vez no login (não a cada request) usando o token RS256 do kyvvo-
+// platform que já temos em mãos naquele momento — o CRM nunca guarda esse
+// token, só o resultado já filtrado, embutido no próprio JWT do CRM.
+const PRODUTOS_CRUZADOS_CRM = {
+  agenda_inteligente: { nome: 'Studio', url: 'https://studio.kyvvo.com.br' },
+  people: { nome: 'People', url: 'https://people.kyvvo.com.br' },
+};
+
 async function build() {
   const fastify = Fastify({ logger: true });
 
@@ -265,7 +275,23 @@ async function build() {
     await inicializarModelosPadrao(pool, tenantId);
     const onboardingPendente = await tenantPrecisaOnboarding(pool, tenantId);
 
-    const token = fastify.jwt.sign({ tenantId, userId, email, nome }, { expiresIn: '12h' });
+    // Best-effort: nunca impede o login se o kyvvo-platform estiver
+    // instável nesse instante — "trocar de produto" é só um atalho de UX.
+    let outrosProdutos = [];
+    try {
+      const entRes = await fetch(`${PLATFORM_URL}/entitlements/${tenantId}`, {
+        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (entRes.ok) {
+        const { modulos } = await entRes.json();
+        outrosProdutos = (modulos || []).map((m) => PRODUTOS_CRUZADOS_CRM[m]).filter(Boolean);
+      }
+    } catch (err) {
+      request.log.warn(`Falha ao buscar outros produtos do tenant: ${err.message}`);
+    }
+
+    const token = fastify.jwt.sign({ tenantId, userId, email, nome, outrosProdutos }, { expiresIn: '12h' });
     return { token, nome, onboarding_pendente: onboardingPendente };
   });
 

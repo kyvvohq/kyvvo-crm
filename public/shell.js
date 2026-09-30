@@ -139,12 +139,25 @@ document.querySelectorAll('.js-avatar-usuario').forEach((el) => { el.textContent
 document.querySelectorAll('.js-nome-usuario').forEach((el) => { el.textContent = nomeUsuario; });
 
 let emailUsuario = '';
+let outrosProdutosUsuario = [];
 try {
-  emailUsuario = JSON.parse(atob(token.split('.')[1])).email || '';
+  const payloadToken = JSON.parse(atob(token.split('.')[1]));
+  emailUsuario = payloadToken.email || '';
+  outrosProdutosUsuario = payloadToken.outrosProdutos || [];
 } catch {
   emailUsuario = '';
 }
 document.querySelectorAll('.js-email-usuario').forEach((el) => { el.textContent = emailUsuario; });
+
+// "Trocar de produto" — outros produtos Kyvvo que o mesmo tenant também tem
+// ativo (embutido no token no login, ver kyvvo-crm/index.js). Logo acima de
+// "Sair da conta" (CRM não tem um item "Meu Perfil" pra ancorar embaixo).
+const menuOutrosProdutos = document.getElementById('menu-perfil-outros-produtos');
+if (menuOutrosProdutos) {
+  menuOutrosProdutos.innerHTML = outrosProdutosUsuario
+    .map((p) => `<a class="menu-perfil-item" href="${p.url}">${icon('package')}<span class="rotulo">${p.nome}</span></a>`)
+    .join('');
+}
 
 document.querySelectorAll('.btn-sair').forEach((btn) => {
   btn.addEventListener('click', () => {
