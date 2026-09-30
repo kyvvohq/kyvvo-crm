@@ -29,12 +29,12 @@
 </style>
 </head>
 <body>
-  <header class="topo-app">
-    <a class="topo-logo" href="/crm/painel.html" aria-label="Ir para o início">
-      <img class="topo-logo-img js-logo-kyvvo" src="/ds/logo.svg" alt="Kyvvo">
-      <span class="topo-produto-tag">CRM</span>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
     </a>
-    <div class="topo-direita">
+    <div class="ds-topbar-acoes">
     <div class="ds-notificacoes" id="notificacoes-sino">
       <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
         <span data-icon="bell" data-size="20"></span>
@@ -45,9 +45,9 @@
       </div>
     </div>
     <div class="topo-perfil" id="topo-perfil">
-      <button class="topo-perfil-gatilho" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
-        <div class="avatar js-avatar-usuario"></div>
-        <span class="nome js-nome-usuario"></span>
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
         <span data-icon="chevron-down" data-size="14"></span>
       </button>
       <div class="menu-perfil" id="menu-perfil" hidden>

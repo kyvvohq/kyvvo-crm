@@ -11,21 +11,15 @@ body { background:var(--bg); color:var(--text); font-family:var(--font-ui); disp
 a { color: inherit; }
 h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 
-.topo-app { position:sticky; top:0; z-index:40; height:64px; flex-shrink:0; display:flex; align-items:center;
-  justify-content:space-between; padding:0 var(--space-5); background:var(--card); border-bottom:1px solid var(--border); }
-.topo-logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
-.topo-logo-img { height:20px; width:auto; display:block; }
-.topo-produto-tag { font-family:var(--font-ui); font-size:12px; font-weight:700; color:var(--muted-strong);
-  background:var(--surface-muted); border-radius:var(--radius-full); padding:3px 9px; }
-
-.topo-direita { display:flex; align-items:center; gap:10px; }
+/* Cabeçalho — migrado pro componente `.ds-topbar` do DS (v2.16.0): marca do
+   produto à esquerda, sino + gatilho do menu de perfil à direita
+   (`.ds-topbar-acoes`). `.topo-perfil`/`.topo-perfil-gatilho`/`.menu-perfil`
+   continuam locais (o dropdown não é coberto pelo componente) — só o visual
+   de marca/avatar/nome vem do DS agora (`.ds-topbar-marca`/
+   `.ds-topbar-avatar`/`.ds-topbar-nome`, aplicadas direto na marcação). */
 .topo-perfil { position:relative; }
-.topo-perfil-gatilho { display:flex; align-items:center; gap:8px; background:var(--surface-muted); border:none;
+.topo-perfil-gatilho { background:var(--surface-muted); border:none;
   border-radius:var(--radius-full); height:40px; padding:4px 10px 4px 4px; cursor:pointer; font-family:var(--font-ui); }
-.topo-perfil-gatilho .avatar { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff;
-  font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.topo-perfil-gatilho .nome { font-size:13px; font-weight:600; color:var(--text); max-width:140px; overflow:hidden;
-  text-overflow:ellipsis; white-space:nowrap; }
 .topo-perfil-gatilho svg { color:var(--muted); flex-shrink:0; }
 
 .menu-perfil { position:absolute; top:calc(100% + 8px); right:0; width:280px; background:var(--card);
@@ -67,8 +61,8 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .banner-assinatura a { color:var(--accent-strong); font-weight:600; text-decoration:none; white-space:nowrap; }
 
 @media(max-width:860px) {
-  .topo-app { padding:0 var(--space-3); }
-  .topo-perfil-gatilho .nome { display:none; }
+  .ds-topbar { padding:0 var(--space-3); }
+  .ds-topbar-nome { display:none; }
   .app-shell { flex-direction:column; padding:var(--space-3); }
   .painel-sidebar { width:100%; }
   .btn-toggle-sidebar { display:none; }
