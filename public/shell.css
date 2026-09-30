@@ -21,6 +21,12 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .topo-perfil-gatilho { background:var(--surface-muted); border:none;
   border-radius:var(--radius-full); height:40px; padding:4px 10px 4px 4px; cursor:pointer; font-family:var(--font-ui); }
 .topo-perfil-gatilho svg { color:var(--muted); flex-shrink:0; }
+/* Bug real em produção (2026-09-30): `.ds-topbar-marca` aqui é um <a> (o
+   Studio usa <button>, sem esse problema) — sem isso, o sublinhado padrão de
+   link do navegador aparecia embaixo de "CRM kyvvo" inteiro, brigando com o
+   sublinhado em gradiente que já é parte do componente (.ds-topbar-produto::
+   after). */
+.ds-topbar-marca { text-decoration: none; }
 
 .menu-perfil { position:absolute; top:calc(100% + 8px); right:0; width:280px; background:var(--card);
   border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:0 12px 32px rgba(var(--shadow-rgb),.18);

@@ -15,12 +15,30 @@
 <style>
   .painel-main { overflow-x:hidden; }
   .quadro-scroll { overflow-x:auto; padding-bottom:12px; }
-  .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:start; }
+  /* align-items:stretch (não "start") — pedido do Bruno: quando o título de
+     uma etapa quebra linha (fica mais alto), as outras colunas da MESMA
+     linha (cabeçalho ou célula) precisam acompanhar a altura, não ficar
+     "flutuando" mais baixas que a vizinha mais alta. É o comportamento
+     padrão de CSS Grid quando não se sobrescreve align-items — só precisou
+     tirar o "start" que já estava aqui. */
+  .quadro-grid { display:grid; grid-auto-rows:min-content; gap:10px; align-items:stretch; }
 
   .raia-label { position:sticky; left:0; background:var(--bg); padding:10px 8px; font-weight:700; font-size:13px;
     display:flex; align-items:center; justify-content:space-between; gap:6px; z-index:3; color:var(--text); }
   .raia-label .btn-remover-recurso { opacity:0; }
   .raia-label:hover .btn-remover-recurso { opacity:1; }
+
+  /* Recolher a coluna de recursos — botão no canto superior esquerdo do
+     quadro (1ª célula da grade, antes um <div></div> vazio) e "avatar" com
+     iniciais no lugar do nome completo em cada raia (ver iniciaisRecurso() e
+     --largura-raia, setada em renderizar()). */
+  .btn-recolher-recursos { position:sticky; left:0; z-index:4; width:100%; height:100%; min-height:38px;
+    display:flex; align-items:center; justify-content:center; background:var(--sunken); border:1px solid var(--border);
+    border-radius:var(--radius-md); color:var(--muted-strong); padding:0; }
+  .btn-recolher-recursos:hover { background:var(--surface-muted); color:var(--text); }
+  .quadro-grid.recursos-recolhido .raia-label { justify-content:center; padding:10px 4px; }
+  .raia-avatar { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
+    border-radius:50%; background:var(--accent-tint); color:var(--accent-strong); font-size:12px; font-weight:700; flex-shrink:0; }
 
   .coluna-header { position:relative; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px;
     display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; min-width:220px; color:var(--text); cursor:grab; }
@@ -28,10 +46,12 @@
   .coluna-header.recebendo-coluna { border-color:var(--accent); }
   /* Primeira coluna ("A fazer") fixa à esquerda — pedido do Bruno: nunca sai
      do lugar no drag-and-drop de colunas, todo pedido novo entra nela (ver
-     migration 013_etapas_fixa.sql). left:170px = largura de .raia-label,
-     as duas ficam "coladas" formando a área congelada da rolagem horizontal. */
+     migration 013_etapas_fixa.sql). left = --largura-raia (setada em
+     renderizar(), 170px expandida / 56px recolhida) = largura de
+     .raia-label, as duas ficam "coladas" formando a área congelada da
+     rolagem horizontal. */
   .coluna-header.coluna-fixa,
-  .celula.coluna-fixa { position:sticky; left:170px; z-index:2; }
+  .celula.coluna-fixa { position:sticky; left:var(--largura-raia, 170px); z-index:2; }
   .coluna-header.coluna-fixa { cursor:default; }
   /* Raio de automação (⚡) — antes ficava dentro do cabeçalho, junto do
      título; agora fica na borda entre uma coluna e a próxima (pedido do
@@ -59,8 +79,18 @@
   .coluna-header .btn-pronto:hover { color:var(--accent); }
   .coluna-header .btn-pronto.ativo { color:var(--accent-strong); }
 
-  .coluna-add { display:flex; align-items:center; min-width:180px; }
-  .coluna-add input { font-size:13px; height:38px; padding:0 10px; }
+  /* "+ Recurso" — fica dentro do cabeçalho da coluna fixa "A fazer" (pedido
+     do Bruno), no lugar onde ficaria o "✕ apagar etapa" das outras colunas
+     (ela nunca ganha esse botão, ver renderizar()). Cor de destaque própria
+     — sem isso herdaria o hover vermelho genérico de .coluna-header button,
+     que é pensado pra ação de apagar. */
+  .coluna-header .btn-novo-recurso-coluna { display:flex; align-items:center; gap:4px; color:var(--accent-strong); font-weight:600; }
+  .coluna-header .btn-novo-recurso-coluna:hover { background:var(--accent-tint); color:var(--accent-strong); }
+
+  .coluna-add { display:flex; align-items:center; justify-content:center; min-width:60px; }
+  .coluna-add button { width:36px; height:36px; border-radius:50%; font-size:18px; line-height:1; padding:0;
+    background:var(--surface-muted); color:var(--text); }
+  .coluna-add button:hover { background:var(--accent-tint); color:var(--accent-strong); }
 
   .celula { background:var(--bg); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px;
     min-width:220px; min-height:60px; display:flex; flex-direction:column; gap:6px; }
@@ -143,7 +173,7 @@
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
         <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
-        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
         <li class="ds-menu-grupo">
           <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
             <span class="ds-menu-icone" data-icon="settings"></span>
@@ -166,9 +196,6 @@
         <div class="textos">
           <div class="linha-titulo"><h1>Quadro</h1></div>
         </div>
-        <div class="acoes">
-          <button type="button" id="btn-novo-recurso"><span data-icon="plus" data-size="16"></span>Recurso</button>
-        </div>
       </div>
 
       <div class="quadro-scroll">
@@ -187,6 +214,21 @@
     let pedidos = [];
     let produtos = [];
     const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
+
+    // Recolher a coluna de recursos (raias) — botão manual no canto superior
+    // esquerdo do quadro, estado lembrado entre sessões (mesmo padrão de
+    // crm_sidebar_oculta em shell.js). Recolhida, a coluna mostra só um
+    // "avatar" com as iniciais do recurso em vez do nome completo — útil pra
+    // telas menores ou com muitos recursos cadastrados.
+    let recursosRecolhido = localStorage.getItem('crm_quadro_recursos_recolhido') === '1';
+    const LARGURA_RAIA_EXPANDIDA = 170;
+    const LARGURA_RAIA_RECOLHIDA = 56;
+
+    function iniciaisRecurso(nome) {
+      const partes = (nome || '').trim().split(/\s+/).filter(Boolean);
+      if (!partes.length) return '?';
+      return (partes[0][0] + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
+    }
 
     async function carregar() {
       const [resEtapas, resRecursos, resPedidos, resProdutos] = await Promise.all([
@@ -251,30 +293,43 @@
     function renderizar() {
       const linhas = raias();
       const grid = document.getElementById('quadro-grid');
-      grid.style.gridTemplateColumns = `170px repeat(${etapas.length}, minmax(230px, 1fr)) 190px`;
+      const larguraRaia = recursosRecolhido ? LARGURA_RAIA_RECOLHIDA : LARGURA_RAIA_EXPANDIDA;
+      grid.style.gridTemplateColumns = `${larguraRaia}px repeat(${etapas.length}, minmax(230px, 1fr)) 190px`;
+      grid.style.setProperty('--largura-raia', `${larguraRaia}px`);
+      grid.classList.toggle('recursos-recolhido', recursosRecolhido);
 
-      let html = '<div></div>';
+      let html = `
+        <button type="button" id="btn-recolher-recursos" class="btn-recolher-recursos"
+          title="${recursosRecolhido ? 'Expandir coluna de recursos' : 'Recolher coluna de recursos'}"
+          aria-label="${recursosRecolhido ? 'Expandir' : 'Recolher'} coluna de recursos">
+          ${icon(recursosRecolhido ? 'chevrons-right' : 'chevrons-left', 16)}
+        </button>
+      `;
       etapas.forEach((et) => {
         html += `
           <div class="coluna-header tipo-${et.tipo}${et.fixa ? ' coluna-fixa' : ''}" draggable="${et.fixa ? 'false' : 'true'}" data-etapa-header="${et.id}" data-fixa="${!!et.fixa}">
             <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
             <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
             <button type="button" class="btn-pronto${et.eh_pronto ? ' ativo' : ''}" data-marcar-pronto="${et.id}" data-valor-pronto="${!et.eh_pronto}" title="${et.eh_pronto ? 'Esta é a etapa de pronto pra envio/retirada (clique pra desmarcar)' : 'Marcar como etapa de pronto pra envio/retirada'}">${icon('package-check', 14)}</button>
-            <button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>
+            ${et.fixa
+              ? `<button type="button" id="btn-novo-recurso" class="btn-novo-recurso-coluna" title="Novo recurso">${icon('plus', 14)}Recurso</button>`
+              : `<button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>`}
             <button type="button" class="btn-automacao-etapa" data-criar-automacao-etapa="${et.id}" title="Criar automação de WhatsApp pra quando um pedido entrar nessa etapa">${icon('zap', 14)}</button>
           </div>
         `;
       });
-      html += `<div class="coluna-add"><input type="text" id="input-nova-etapa" placeholder="+ Nova etapa (Enter)"></div>`;
+      html += `<div class="coluna-add"><button type="button" id="btn-nova-etapa" aria-label="Nova etapa" title="Nova etapa">+</button></div>`;
 
       linhas.forEach((raia) => {
         // "Sem recurso"/"Prioridade Altíssima" são raias virtuais, sem CRUD —
         // só recurso de verdade (nem fixa nem altissima) ganha edição/remoção
         // inline, mesmo padrão de clique-pra-editar do título de etapa.
-        const conteudoRaia = raia.fixa || raia.altissima
-          ? escapeHtml(raia.nome)
-          : `<span class="nome-recurso" data-editar-recurso="${raia.id}">${escapeHtml(raia.nome)}</span>
-             <button type="button" class="btn-remover-recurso" data-apagar-recurso="${raia.id}" data-nome-recurso="${escapeHtml(raia.nome)}" title="Apagar recurso">✕</button>`;
+        const conteudoRaia = recursosRecolhido
+          ? `<span class="raia-avatar" title="${escapeHtml(raia.nome)}">${iniciaisRecurso(raia.nome)}</span>`
+          : raia.fixa || raia.altissima
+            ? escapeHtml(raia.nome)
+            : `<span class="nome-recurso" data-editar-recurso="${raia.id}">${escapeHtml(raia.nome)}</span>
+               <button type="button" class="btn-remover-recurso" data-apagar-recurso="${raia.id}" data-nome-recurso="${escapeHtml(raia.nome)}" title="Apagar recurso">✕</button>`;
         html += `<div class="raia-label${raia.altissima ? ' raia-altissima' : ''}">${conteudoRaia}</div>`;
         etapas.forEach((et) => {
           const cartoes = pedidosDe(raia.id, et.id);
@@ -371,6 +426,15 @@
         });
       });
 
+      const btnNovoRecurso = document.getElementById('btn-novo-recurso');
+      if (btnNovoRecurso) btnNovoRecurso.addEventListener('click', abrirModalNovoRecurso);
+
+      document.getElementById('btn-recolher-recursos').addEventListener('click', () => {
+        recursosRecolhido = !recursosRecolhido;
+        localStorage.setItem('crm_quadro_recursos_recolhido', recursosRecolhido ? '1' : '0');
+        renderizar();
+      });
+
       document.querySelectorAll('[data-apagar-etapa]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -429,14 +493,15 @@
         });
       });
 
-      const inputNova = document.getElementById('input-nova-etapa');
-      if (inputNova) {
-        inputNova.addEventListener('keydown', async (e) => {
-          if (e.key !== 'Enter') return;
-          const nome = inputNova.value.trim();
-          if (!nome) return;
-          inputNova.disabled = true;
-          await apiFetch('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome }) });
+      // "+ Nova etapa" cria direto com um nome padrão (pedido do Bruno: sem
+      // formulário/prompt no meio do caminho) — o título já é editável com um
+      // clique (data-editar-etapa, mesmo listener acima), então o usuário só
+      // renomeia depois de ver a coluna criada.
+      const btnNova = document.getElementById('btn-nova-etapa');
+      if (btnNova) {
+        btnNova.addEventListener('click', async () => {
+          btnNova.disabled = true;
+          await apiFetch('/crm/api/etapas', { method: 'POST', body: JSON.stringify({ nome: 'NOVA ETAPA' }) });
           await carregar();
         });
       }
@@ -552,8 +617,11 @@
     // Criação de pedido saiu do Quadro (US do Bruno) — continua em Pedidos.
     // A gestão de recursos (antes só num modal em Pedidos) migrou pra cá:
     // criar aqui, renomear/apagar direto no rótulo da raia (ver
-    // ligarEventosRaias).
-    document.getElementById('btn-novo-recurso').addEventListener('click', () => {
+    // ligarEventosRaias). O botão em si vive dentro do cabeçalho da coluna
+    // fixa "A fazer" (pedido do Bruno: "ao lado da etapa A fazer") — refeito
+    // a cada renderizar(), por isso o listener é ligado de novo em
+    // ligarEventosGrid() (função abaixo), não uma vez só no load.
+    function abrirModalNovoRecurso() {
       const overlay = abrirModal('<h3>Novo recurso</h3>', `
         <p class="modal-texto">São as raias do Quadro — ex.: cada impressora 3D, forno, posto de trabalho.</p>
         <label for="r-nome">Nome</label>
@@ -574,7 +642,7 @@
       };
       document.getElementById('btn-salvar-recurso').addEventListener('click', salvar);
       document.getElementById('r-nome').addEventListener('keydown', (e) => { if (e.key === 'Enter') salvar(); });
-    });
+    }
 
     function confirmarApagarRecurso(id, nome) {
       const overlay = abrirModal('<h3>Apagar recurso?</h3>', `
