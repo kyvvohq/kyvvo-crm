@@ -310,16 +310,26 @@ async function build() {
   // sessão já autenticada (ver GET /crm/sso abaixo e o par simétrico em
   // kyvvo-studio/kyvvo-people).
   fastify.post('/crm/api/meus-produtos/handoff', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const destino = PRODUTOS_HANDOFF_DESTINO[(request.body || {}).produto];
+    const produtoDestino = (request.body || {}).produto;
+    const destino = PRODUTOS_HANDOFF_DESTINO[produtoDestino];
     if (!destino) {
       return reply.code(400).send({ error: 'Produto inválido' });
     }
     const { tenantId, userId, email, nome } = request.user;
+    // outrosProdutos do PONTO DE VISTA DO DESTINO (bug real em produção,
+    // 2026-09-30) — o CRM não tem como consultar /entitlements aqui (o token
+    // RS256 do platform só existe no momento do login, já descartado), mas
+    // já tem a resposta de quando logou, embutida no próprio JWT
+    // (request.user.outrosProdutos) — só repassa, tirando o destino da
+    // lista (ele não precisa linkar pra si mesmo). Pode estar levemente
+    // desatualizado (até 12h, mesma janela do token) — aceitável, mesmo
+    // trade-off já feito pro resto do "trocar de produto".
+    const outrosProdutos = (request.user.outrosProdutos || []).filter((p) => p.chave !== produtoDestino);
     try {
       const res = await fetch(`${PLATFORM_URL}/internal/handoff`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_HANDOFF_TOKEN },
-        body: JSON.stringify({ tenantId, userId, email, nome }),
+        body: JSON.stringify({ tenantId, userId, email, nome, outrosProdutos }),
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) throw new Error(`platform respondeu ${res.status}`);
@@ -336,10 +346,10 @@ async function build() {
   // exatamente o ponto de entrada de quem ainda não tem sessão no CRM. O CRM
   // nunca vê/toca usuarios/tenants (mesmo princípio do login normal acima) —
   // confia direto no que o platform devolveu, sem checagem local extra.
-  // outrosProdutos fica vazio aqui de propósito (o handoff não carrega um
-  // token RS256 do platform pra consultar /entitlements como o login faz) —
-  // o item "trocar de produto" só reaparece no próximo login de verdade,
-  // dentro da janela de 12h do token.
+  // outrosProdutos vem do próprio payload do handoff (quem gerou o código já
+  // manda a lista pronta, do ponto de vista do CRM — ver POST acima e o par
+  // em kyvvo-studio/kyvvo-people). Fallback [] só pra payload antigo/de outra
+  // origem que não mande esse campo.
   fastify.get('/crm/sso', async (request, reply) => {
     const { code } = request.query || {};
     if (!code) return reply.redirect('/crm/login.html');
@@ -352,9 +362,9 @@ async function build() {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return reply.redirect('/crm/login.html');
-      const { tenantId, userId, email, nome } = await res.json();
+      const { tenantId, userId, email, nome, outrosProdutos } = await res.json();
 
-      const token = fastify.jwt.sign({ tenantId, userId, email, nome, outrosProdutos: [] }, { expiresIn: '12h' });
+      const token = fastify.jwt.sign({ tenantId, userId, email, nome, outrosProdutos: outrosProdutos || [] }, { expiresIn: '12h' });
       reply.type('text/html');
       return `<!doctype html><html><body><script>
         localStorage.setItem('crm_token', ${JSON.stringify(token)});
