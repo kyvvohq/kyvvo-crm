@@ -155,9 +155,25 @@ document.querySelectorAll('.js-email-usuario').forEach((el) => { el.textContent 
 const menuOutrosProdutos = document.getElementById('menu-perfil-outros-produtos');
 if (menuOutrosProdutos) {
   menuOutrosProdutos.innerHTML = outrosProdutosUsuario
-    .map((p) => `<a class="menu-perfil-item" href="${p.url}">${icon('package')}<span class="rotulo">${p.nome}</span></a>`)
+    .map((p) => `<a class="menu-perfil-item" href="${p.url}" data-produto-chave="${p.chave}">${icon('package')}<span class="rotulo">${p.nome}</span></a>`)
     .join('');
 }
+
+// Clicar num item de "trocar de produto" tenta primeiro o login automático
+// (handoff via kyvvo-platform) — só cai no link puro (landing pública pra
+// logar de novo) se o handoff falhar por qualquer motivo. `href` já aponta
+// pro link puro de propósito: clique com botão do meio/Ctrl (nova aba)
+// continua funcionando normal.
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-produto-chave]');
+  if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  const destinoDireto = link.href;
+  apiFetch('/crm/api/meus-produtos/handoff', { method: 'POST', body: JSON.stringify({ produto: link.dataset.produtoChave }) })
+    .then((res) => res.json())
+    .then((dados) => { window.location.href = (dados && dados.url) || destinoDireto; })
+    .catch(() => { window.location.href = destinoDireto; });
+});
 
 document.querySelectorAll('.btn-sair').forEach((btn) => {
   btn.addEventListener('click', () => {
