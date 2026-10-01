@@ -21,6 +21,7 @@ const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio } = r
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
+const metaWhatsappService = require('./lib/meta-whatsapp-service');
 const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
@@ -231,6 +232,96 @@ async function build() {
       [tenantId, request.params.telefone]
     );
     return rows;
+  });
+
+  // --- Self-service de conexão do WhatsApp (Embedded Signup da Meta) -------
+  // Mesmo fluxo do kyvvo-studio (server/panel/routes/whatsapp-config.js),
+  // adaptado pro modelo multi-número do CRM (crm_whatsapp_numeros em vez de
+  // uma coluna em tenants). Fica em Configurações > WhatsApp > Conectar.
+  // appId/configId não são secretos — só inicializam o SDK do Facebook no
+  // frontend.
+  fastify.get('/crm/api/whatsapp/config-publica', { preHandler: fastify.authenticate }, async () => {
+    return { appId: process.env.META_APP_ID || null, configId: process.env.META_CONFIG_ID || null };
+  });
+
+  fastify.get('/crm/api/whatsapp/status', { preHandler: fastify.authenticate }, async (request) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query('select phone_number_id, numero_exibido from crm_whatsapp_numeros where tenant_id = $1 limit 1', [tenantId]);
+    const numero = rows[0];
+    if (!numero) return { conectado: false };
+
+    if (!process.env.META_WHATSAPP_TOKEN) {
+      return { conectado: false, phoneNumberId: numero.phone_number_id, erro: 'META_WHATSAPP_TOKEN não configurado no servidor.' };
+    }
+    try {
+      const info = await metaWhatsappService.buscarInfoNumero(numero.phone_number_id);
+      return {
+        conectado: true,
+        phoneNumberId: numero.phone_number_id,
+        numeroExibido: info.display_phone_number || numero.numero_exibido,
+        nomeVerificado: info.verified_name || null,
+        qualidade: info.quality_rating || null,
+      };
+    } catch (erro) {
+      return { conectado: false, phoneNumberId: numero.phone_number_id, erro: erro.message };
+    }
+  });
+
+  // Recebe o resultado do Embedded Signup (code + waba_id + phone_number_id,
+  // vindos do postMessage/callback do FB.login no frontend) — ver
+  // whatsapp.html. V1: um número por tenant (mesma premissa já usada em
+  // lib/automacoes.js#buscarPhoneNumberId) — conectar um número novo troca o
+  // anterior, não acumula.
+  fastify.post('/crm/api/whatsapp/conectar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { code, wabaId, phoneNumberId } = request.body || {};
+    if (!code || !wabaId || !phoneNumberId) {
+      return reply.code(400).send({ error: 'Dados incompletos retornados pelo WhatsApp. Tente conectar novamente.' });
+    }
+
+    let numeroExibido = null;
+    try {
+      const { access_token: tokenCliente } = await metaWhatsappService.trocarCodePorToken(code);
+      await metaWhatsappService.assinarWebhooks(wabaId, tokenCliente);
+      try {
+        await metaWhatsappService.atribuirUsuarioSistema(wabaId, tokenCliente);
+      } catch (erroAtribuicao) {
+        // Best-effort — pode depender de aprovação/config pendente do lado da
+        // Meta; não impede a conexão de ser salva (mesmo critério do Studio).
+        request.log.error(`[whatsapp] falha ao atribuir Usuário do Sistema à waba ${wabaId} do tenant ${tenantId}: ${erroAtribuicao.message}`);
+      }
+      try {
+        await metaWhatsappService.registrarNumero(phoneNumberId);
+      } catch (erroRegistro) {
+        request.log.error(`[whatsapp] falha ao registrar número ${phoneNumberId} do tenant ${tenantId}: ${erroRegistro.message}`);
+      }
+      try {
+        const info = await metaWhatsappService.buscarInfoNumero(phoneNumberId);
+        numeroExibido = info.display_phone_number || null;
+      } catch {
+        // segue sem o número formatado — status.conectado ainda funciona
+      }
+    } catch (erro) {
+      return reply.code(400).send({ error: `Não foi possível conectar o WhatsApp: ${erro.message}` });
+    }
+
+    try {
+      await pool.query('delete from crm_whatsapp_numeros where tenant_id = $1 and phone_number_id != $2', [tenantId, phoneNumberId]);
+      await pool.query(
+        `insert into crm_whatsapp_numeros (phone_number_id, tenant_id, meta_waba_id, numero_exibido)
+         values ($1, $2, $3, $4)
+         on conflict (phone_number_id) do update set tenant_id = excluded.tenant_id, meta_waba_id = excluded.meta_waba_id,
+           numero_exibido = coalesce(excluded.numero_exibido, crm_whatsapp_numeros.numero_exibido)`,
+        [phoneNumberId, tenantId, wabaId, numeroExibido]
+      );
+    } catch (erro) {
+      if (erro.code === '23505') {
+        return reply.code(409).send({ error: 'Esse número de WhatsApp já está conectado a outra conta Kyvvo.' });
+      }
+      throw erro;
+    }
+
+    return { conectado: true, phoneNumberId, wabaId };
   });
 
   // --- Auth ----------------------------------------------------------------

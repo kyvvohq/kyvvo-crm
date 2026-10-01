@@ -106,9 +106,16 @@
 
       <div class="ds-abas" data-ds-abas>
         <div class="ds-abas-lista">
-          <button type="button" class="ds-aba" id="aba-whatsapp-conversas" aria-controls="painel-whatsapp-conversas" aria-selected="true">Conversas</button>
+          <button type="button" class="ds-aba" id="aba-whatsapp-conectar" aria-controls="painel-whatsapp-conectar" aria-selected="true">Conectar</button>
+          <button type="button" class="ds-aba" id="aba-whatsapp-conversas" aria-controls="painel-whatsapp-conversas" aria-selected="false">Conversas</button>
         </div>
-        <div class="ds-abas-painel" id="painel-whatsapp-conversas" aria-labelledby="aba-whatsapp-conversas">
+        <div class="ds-abas-painel" id="painel-whatsapp-conectar" aria-labelledby="aba-whatsapp-conectar">
+          <div class="card" id="whatsapp-status-card">
+            <p class="vazio">Carregando status da conexão…</p>
+          </div>
+          <div class="msg" id="whatsapp-conectar-msg"></div>
+        </div>
+        <div class="ds-abas-painel" id="painel-whatsapp-conversas" aria-labelledby="aba-whatsapp-conversas" hidden>
           <div class="tabela-wrapper">
             <table class="tabela-tenants">
               <thead><tr><th>Conversa</th><th>WhatsApp</th><th>Última mensagem</th><th>Quando</th></tr></thead>
@@ -185,6 +192,122 @@
       chat.scrollTop = chat.scrollHeight;
     }
 
+    // --- Conectar (Embedded Signup da Meta) -----------------------------------
+    // Porta de kyvvo-studio/server/panel/public/app.js (iniciarConexaoWhatsapp/
+    // conectarWhatsapp/carregarFacebookSdk) — mesmo fluxo, só troca os
+    // endpoints pra /crm/api/whatsapp/* e usa apiFetch em vez do helper
+    // `api()` do Studio.
+    let fbSdkPromise = null;
+    function carregarFacebookSdk(appId) {
+      if (fbSdkPromise) return fbSdkPromise;
+      fbSdkPromise = new Promise((resolve) => {
+        window.fbAsyncInit = function () {
+          FB.init({ appId, cookie: true, xfbml: false, version: 'v26.0' });
+          resolve();
+        };
+        const script = document.createElement('script');
+        script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+      });
+      return fbSdkPromise;
+    }
+
+    async function renderConectar() {
+      const card = document.getElementById('whatsapp-status-card');
+      const msg = document.getElementById('whatsapp-conectar-msg');
+      msg.textContent = '';
+      card.innerHTML = '<p class="vazio">Carregando status da conexão…</p>';
+      const res = await apiFetch('/crm/api/whatsapp/status');
+      const status = await res.json();
+
+      let badge, texto;
+      if (status.conectado) {
+        badge = '<span class="badge sucesso">Conectado</span>';
+        texto = [status.numeroExibido || 'número não informado', status.nomeVerificado, status.qualidade ? `Qualidade: ${status.qualidade}` : null]
+          .filter(Boolean).join(' · ');
+      } else if (status.erro) {
+        badge = '<span class="badge aviso">Erro de conexão</span>';
+        texto = status.erro;
+      } else {
+        badge = '<span class="badge neutro">Não conectado</span>';
+        texto = 'Conecte o WhatsApp Business da sua empresa pra ativar o bot de atendimento automático.';
+      }
+
+      card.innerHTML = `
+        <div style="margin-bottom:12px">${badge}</div>
+        <p class="modal-texto" style="margin:0 0 16px">${escapeHtml(texto)}</p>
+        <button type="button" id="btn-conectar-whatsapp" disabled>Carregando conexão...</button>
+      `;
+      iniciarConexaoWhatsapp();
+    }
+
+    async function iniciarConexaoWhatsapp() {
+      const btn = document.getElementById('btn-conectar-whatsapp');
+      const res = await apiFetch('/crm/api/whatsapp/config-publica');
+      const config = await res.json();
+      if (!btn) return; // usuário já trocou de aba enquanto isso carregava
+
+      if (!config || !config.appId || !config.configId) {
+        btn.textContent = 'Conexão indisponível no momento';
+        return;
+      }
+
+      await carregarFacebookSdk(config.appId);
+      if (!document.getElementById('btn-conectar-whatsapp')) return;
+      btn.textContent = 'Conectar WhatsApp';
+      btn.disabled = false;
+
+      let dadosSignup = null;
+      function ouvirMensagem(event) {
+        if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
+        try {
+          const dados = JSON.parse(event.data);
+          if (dados.type === 'WA_EMBEDDED_SIGNUP' && dados.event === 'FINISH') dadosSignup = dados.data;
+        } catch {
+          // mensagem de outra origem/formato inesperado — ignora
+        }
+      }
+      window.addEventListener('message', ouvirMensagem);
+
+      btn.addEventListener('click', () => {
+        btn.disabled = true;
+        btn.textContent = 'Conectando…';
+        FB.login(
+          (response) => {
+            window.removeEventListener('message', ouvirMensagem);
+            const code = response.authResponse && response.authResponse.code;
+            if (!code || !dadosSignup) {
+              document.getElementById('whatsapp-conectar-msg').textContent = 'Conexão cancelada ou incompleta. Tente novamente.';
+              document.getElementById('whatsapp-conectar-msg').className = 'msg erro';
+              renderConectar();
+              return;
+            }
+            conectarWhatsapp(code, dadosSignup.waba_id, dadosSignup.phone_number_id);
+          },
+          { config_id: config.configId, response_type: 'code', override_default_response_type: true, extras: { setup: {} } }
+        );
+      }, { once: true });
+    }
+
+    async function conectarWhatsapp(code, wabaId, phoneNumberId) {
+      const res = await apiFetch('/crm/api/whatsapp/conectar', {
+        method: 'POST',
+        body: JSON.stringify({ code, wabaId, phoneNumberId }),
+      });
+      const dados = await res.json().catch(() => ({}));
+      const msg = document.getElementById('whatsapp-conectar-msg');
+      msg.className = res.ok ? 'msg ok' : 'msg erro';
+      msg.textContent = res.ok ? 'WhatsApp conectado com sucesso!' : (dados.error || 'Erro ao conectar o WhatsApp.');
+      renderConectar();
+    }
+
+    document.querySelector('.ds-abas').addEventListener('ds-abas-alterar', (e) => {
+      if (e.detail.id === 'painel-whatsapp-conversas') carregarConversas();
+    });
+
+    renderConectar();
     carregarConversas();
   </script>
 </body>
