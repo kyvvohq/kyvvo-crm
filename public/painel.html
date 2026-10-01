@@ -82,7 +82,7 @@
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
         <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
-        <li><a class="ds-menu-link" href="/crm/segmentos.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
         <li class="ds-menu-grupo">
           <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
             <span class="ds-menu-icone" data-icon="settings"></span>
@@ -104,9 +104,6 @@
       <div class="cabecalho-pagina">
         <div class="textos">
           <div class="linha-titulo"><h1 id="saudacao">Painel Hoje</h1></div>
-        </div>
-        <div class="acoes">
-          <button type="button" class="btn-secundario" id="btn-editar-mensagens">Mensagens</button>
         </div>
       </div>
 
@@ -200,38 +197,6 @@
         mensagem: preencherModelo('aniversario', a.nome),
       })), 'Nenhum aniversariante hoje.');
     }
-
-    const ROTULO_MODELO = {
-      orcamento_parado: 'Orçamento parado',
-      pagamento_pendente: 'Pagamento pendente',
-      pedido_pronto: 'Pedido pronto',
-      aniversario: 'Aniversário',
-    };
-
-    document.getElementById('btn-editar-mensagens').addEventListener('click', () => {
-      const overlay = abrirModal('<h3>Mensagens do Painel Hoje</h3>', `
-        <p class="modal-texto">Use <code>{{nome}}</code> pra entrar com o primeiro nome da pessoa.</p>
-        ${Object.values(modelosMensagem).map((m) => `
-          <label for="modelo-${m.id}">${ROTULO_MODELO[m.chave] || m.chave}</label>
-          <textarea id="modelo-${m.id}" data-modelo-id="${m.id}">${escapeHtml(m.texto)}</textarea>
-        `).join('')}
-        <div class="modal-erro" id="modelos-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="btn-salvar-modelos">Salvar</button>
-        </div>
-      `, 'modal-card-larga');
-      document.getElementById('btn-salvar-modelos').addEventListener('click', async () => {
-        const campos = overlay.querySelectorAll('[data-modelo-id]');
-        for (const campo of campos) {
-          await apiFetch(`/crm/api/modelos-mensagem/${campo.dataset.modeloId}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ texto: campo.value }),
-          });
-        }
-        fecharModal();
-        carregar();
-      });
-    });
 
     carregar();
   </script>
