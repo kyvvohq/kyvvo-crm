@@ -241,31 +241,49 @@
         </div>
       `, 'modal-card-larga');
 
+      // Limite real do servidor (index.js: fastifyMultipart `files: 20`) — sem
+      // avisar aqui, selecionar mais do que isso só falhava sem explicação
+      // nenhuma lá na hora de importar.
+      const NFE_MAX_ARQUIVOS = 20;
       document.getElementById('nfe-arquivos').addEventListener('change', (e) => {
-        document.getElementById('nfe-importar').disabled = !e.target.files.length;
+        const erroEl = document.getElementById('nfe-erro');
+        const excedeu = e.target.files.length > NFE_MAX_ARQUIVOS;
+        erroEl.textContent = excedeu ? `Selecione no máximo ${NFE_MAX_ARQUIVOS} arquivos por vez (você selecionou ${e.target.files.length}).` : '';
+        document.getElementById('nfe-importar').disabled = !e.target.files.length || excedeu;
       });
 
       document.getElementById('nfe-importar').addEventListener('click', async () => {
         const arquivos = document.getElementById('nfe-arquivos').files;
-        if (!arquivos.length) return;
+        if (!arquivos.length || arquivos.length > NFE_MAX_ARQUIVOS) return;
         const btn = document.getElementById('nfe-importar');
+        const erroEl = document.getElementById('nfe-erro');
         btn.disabled = true;
         btn.textContent = 'Importando…';
-        const formData = new FormData();
-        Array.from(arquivos).forEach((a) => formData.append('arquivo', a));
-        const res = await apiFetch('/crm/api/importacoes/nfe', { method: 'POST', body: formData });
-        const dados = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          document.getElementById('nfe-erro').textContent = dados.error || 'Falha ao importar';
-          btn.disabled = false;
-          btn.textContent = 'Importar';
+        erroEl.textContent = '';
+        try {
+          const formData = new FormData();
+          Array.from(arquivos).forEach((a) => formData.append('arquivo', a));
+          const res = await apiFetch('/crm/api/importacoes/nfe', { method: 'POST', body: formData });
+          const dados = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            erroEl.textContent = dados.error || 'Falha ao importar';
+            return;
+          }
+          document.getElementById('nfe-resultado').innerHTML = `
+            <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+            ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
+          `;
+          btn.hidden = true;
           return;
+        } catch (erro) {
+          // Sem isso, qualquer falha de rede/timeout numa importação de várias
+          // notas (demora mais, mais chance de cair) deixava o botão travado
+          // em "Importando…" pra sempre, sem nenhuma mensagem — exatamente o
+          // sintoma "não evolui e não apresenta erro".
+          erroEl.textContent = 'Falha de conexão ao importar — tente novamente com menos arquivos por vez.';
         }
-        document.getElementById('nfe-resultado').innerHTML = `
-          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
-          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
-        `;
-        btn.hidden = true;
+        btn.disabled = false;
+        btn.textContent = 'Importar';
       });
     });
 
