@@ -15,7 +15,7 @@ const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
-const { parseCsv, importarClientesCsv, parseNfeXml, importarNfe, importarRelatorioUpseller } = require('./lib/importacoes');
+const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
@@ -72,8 +72,11 @@ async function build() {
     prefix: '/crm/',
   });
 
+  // `files` subiu de 20 pra 300 — a importação de NF-e processa em segundo
+  // plano agora (fila, ver /crm/api/importacoes/nfe), não tem mais motivo
+  // pra limitar quantos arquivos o usuário manda de uma vez.
   fastify.register(fastifyMultipart, {
-    limits: { fileSize: 10 * 1024 * 1024, files: 20 },
+    limits: { fileSize: 10 * 1024 * 1024, files: 300 },
   });
 
   fastify.get('/', async (request, reply) => reply.sendFile('index.html'));
@@ -671,6 +674,13 @@ async function build() {
     return reply.code(201).send(resultado);
   });
 
+  // Processa em segundo plano (lib/importacoes.js#processarImportacaoNfeEmSegundoPlano)
+  // — responde 202 assim que os arquivos chegam, sem esperar o lote inteiro
+  // terminar. A tela faz polling em GET /crm/api/importacoes/:id (abaixo)
+  // pra mostrar progresso real ("7 de 14") e ganha a notificação de
+  // conclusão (sucesso/erro) no sininho quando terminar — achado real:
+  // antes disso, um lote grande deixava a tela presa em "Importando…" sem
+  // feedback nenhum até o fetch() do navegador completar.
   fastify.post('/crm/api/importacoes/nfe', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
     const arquivos = [];
@@ -679,27 +689,26 @@ async function build() {
     }
     if (!arquivos.length) return reply.code(400).send({ error: 'Envie ao menos um arquivo XML' });
 
-    let criados = 0, atualizados = 0, comErro = 0;
-    const notas = [];
-    for (const arquivo of arquivos) {
-      try {
-        const nfeData = parseNfeXml(arquivo.buffer.toString('utf8'));
-        const resultado = await importarNfe(pool, tenantId, nfeData, arquivo.nome);
-        if (resultado.status === 'criado') criados++;
-        else if (resultado.status === 'conciliado') atualizados++;
-        notas.push(`${arquivo.nome}: ${resultado.status}`);
-      } catch (erro) {
-        comErro++;
-        notas.push(`${arquivo.nome}: erro — ${erro.message}`);
-      }
-    }
-
     const { rows } = await pool.query(
-      `insert into crm_importacoes (tenant_id, tipo, arquivo, status, criados, atualizados, com_erro, erro, concluido_em)
-       values ($1, 'nfe_xml', $2, 'concluido', $3, $4, $5, $6, now()) returning *`,
-      [tenantId, arquivos.length === 1 ? arquivos[0].nome : `${arquivos.length} arquivos`, criados, atualizados, comErro, notas.join(' | ') || null]
+      `insert into crm_importacoes (tenant_id, tipo, arquivo, status, total_arquivos)
+       values ($1, 'nfe_xml', $2, 'processando', $3) returning *`,
+      [tenantId, arquivos.length === 1 ? arquivos[0].nome : `${arquivos.length} arquivos`, arquivos.length]
     );
-    return reply.code(201).send(rows[0]);
+    const importacao = rows[0];
+
+    processarImportacaoNfeEmSegundoPlano(pool, tenantId, importacao.id, arquivos).catch((erro) => {
+      fastify.log.error(`[importacao nfe ${importacao.id}] falha inesperada: ${erro.message}`);
+    });
+
+    return reply.code(202).send(importacao);
+  });
+
+  // Polling de progresso (ver rota acima) — tenant_id no WHERE evita um
+  // tenant consultar o id de importação de outro só adivinhando o uuid.
+  fastify.get('/crm/api/importacoes/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query('select * from crm_importacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Importação não encontrada' });
+    return rows[0];
   });
 
   // Relatório de pedidos da UpSeller (Excel) — colunas fixas, sem tela de

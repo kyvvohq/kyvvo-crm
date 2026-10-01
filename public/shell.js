@@ -297,6 +297,7 @@ function valorMoedaParaNumero(input) {
 function abrirNotificacaoItem(tipo) {
   if (tipo === 'pedidos_parados') window.location.href = '/crm/quadro.html';
   else if (tipo === 'pedido_criado' || tipo === 'pedido_pronto') window.location.href = '/crm/pedidos.html';
+  else if (tipo === 'importacao_concluida') window.location.href = '/crm/importacao.html';
 }
 
 async function marcarNotificacaoLida(id) {
