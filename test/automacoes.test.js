@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   dispararMudancaEtapa, dispararPedidoCriado, checarPedidosParados, checarAniversariantes,
-  montarParametros, renderizarCorpoTemplate,
+  checarLimiteDisparos, montarParametros, renderizarCorpoTemplate,
 } = require('../lib/automacoes');
 
 // @kyvvohq/whatsapp cai em modo dev (sem META_WHATSAPP_TOKEN/META_PHONE_NUMBER_ID
@@ -188,4 +188,36 @@ test('checarAniversariantes: cliente aniversariante hoje dispara, sem telefone �
 
   assert.equal(pool.disparos.length, 1);
   assert.equal(pool.disparos[0].telefoneE164, '+5534999996666');
+});
+
+test('checarLimiteDisparos: sem META_WHATSAPP_TOKEN (ambiente de teste) não quebra e não notifica ninguém', async () => {
+  // Mesmo raciocínio do comentário no topo do arquivo: sem o token, a
+  // própria chamada à Meta (buscarLimiteMensagens) nem acontece de verdade
+  // — a função devolve null e o tenant é pulado. Esse é o caminho real que
+  // roda sempre que o checador periódico executa num ambiente sem a env var
+  // (CI, dev local), então vale testar explicitamente que é seguro.
+  let notificacoesChamadas = 0;
+  const pool = {
+    query: async (sql) => {
+      if (/^select distinct tenant_id, phone_number_id from crm_whatsapp_numeros/.test(sql)) {
+        return { rows: [{ tenant_id: 'tenant-1', phone_number_id: 'phone-123' }] };
+      }
+      notificacoesChamadas++;
+      throw new Error('não deveria chegar aqui sem um limite conhecido: ' + sql);
+    },
+  };
+
+  await checarLimiteDisparos(pool);
+
+  assert.equal(notificacoesChamadas, 0);
+});
+
+test('checarLimiteDisparos: sem nenhum número vinculado, não faz nada', async () => {
+  const pool = {
+    query: async (sql) => {
+      assert.match(sql, /^select distinct tenant_id, phone_number_id from crm_whatsapp_numeros/);
+      return { rows: [] };
+    },
+  };
+  await checarLimiteDisparos(pool); // não deve lançar
 });
