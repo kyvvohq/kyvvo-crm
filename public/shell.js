@@ -291,12 +291,30 @@ function valorMoedaParaNumero(input) {
 // Balão (.ds-notificacoes) é componente do design system (/ds/components.js,
 // KyvvoDS.notificacoesAtualizar cuida de abrir/fechar e da pílula de
 // contagem) — aqui só busca os pendentes e desenha a lista, mesmo desenho
-// do kyvvo-studio (server/panel/public/app.js). Só uma tela de destino por
-// enquanto (Quadro); tipo novo que precisar de destino próprio entra aqui.
+// do kyvvo-studio (server/panel/public/app.js), incluindo marcar como lida.
+// Só uma tela de destino por enquanto (Quadro/Pedidos); tipo novo que
+// precisar de destino próprio entra aqui.
 function abrirNotificacaoItem(tipo) {
   if (tipo === 'pedidos_parados') window.location.href = '/crm/quadro.html';
+  else if (tipo === 'pedido_criado' || tipo === 'pedido_pronto') window.location.href = '/crm/pedidos.html';
 }
+
+async function marcarNotificacaoLida(id) {
+  const res = await apiFetch(`/crm/api/notificacoes/${id}/lida`, { method: 'PATCH' });
+  if (res.ok) carregarNotificacoes();
+}
+
 document.addEventListener('click', (e) => {
+  // Botão "marcar como lida" fica DENTRO do <a> do item — precisa vir antes
+  // do closest('.ds-notificacoes-item') abaixo e nunca deixar o clique
+  // também navegar.
+  const btnLida = e.target.closest('.ds-notificacoes-item-marcar-lida');
+  if (btnLida) {
+    e.preventDefault();
+    e.stopPropagation();
+    marcarNotificacaoLida(btnLida.dataset.id);
+    return;
+  }
   const item = e.target.closest('.ds-notificacoes-item');
   if (item) { e.preventDefault(); abrirNotificacaoItem(item.dataset.tipo); }
 });
@@ -318,6 +336,7 @@ async function carregarNotificacoes() {
           <a class="ds-notificacoes-item" href="#" data-tipo="${g.tipo}" data-id="${item.id}">
             <div class="ds-notificacoes-item-titulo">${escapeHtml(item.titulo)}</div>
             <div class="ds-notificacoes-item-meta">${escapeHtml(item.detalhe)}</div>
+            ${g.eventoUnico ? `<button type="button" class="ds-notificacoes-item-marcar-lida" data-id="${item.id}" aria-label="Marcar como lida" title="Marcar como lida">✓</button>` : ''}
           </a>
         `).join('')}
       `).join('');
