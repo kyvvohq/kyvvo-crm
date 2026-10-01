@@ -230,10 +230,16 @@
     });
 
     // --- Importar NF-e (movida de Pedidos) -----------------------------------
+    // Processa em fila no servidor (index.js: POST responde 202 na hora,
+    // processamento continua em segundo plano) — sem limite de quantos
+    // arquivos por vez. A tela faz polling em GET /crm/api/importacoes/:id
+    // pra mostrar progresso real ("7 de 14 processados") e uma notificação
+    // aparece no sininho quando terminar, mesmo se a modal for fechada antes.
     document.getElementById('btn-importar-nfe').addEventListener('click', () => {
       abrirModal('<h3>Importar NF-e (XML)</h3>', `
-        <p class="modal-texto">Selecione um ou mais arquivos XML de NF-e. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada.</p>
+        <p class="modal-texto">Selecione quantos arquivos XML de NF-e quiser. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada. Pode fechar esta janela a qualquer momento — avisamos no sininho quando terminar.</p>
         <input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple>
+        <div id="nfe-progresso" style="margin-top:12px"></div>
         <div id="nfe-resultado" style="margin-top:12px"></div>
         <div class="modal-erro" id="nfe-erro"></div>
         <div class="modal-acoes">
@@ -241,24 +247,38 @@
         </div>
       `, 'modal-card-larga');
 
-      // Limite real do servidor (index.js: fastifyMultipart `files: 20`) — sem
-      // avisar aqui, selecionar mais do que isso só falhava sem explicação
-      // nenhuma lá na hora de importar.
-      const NFE_MAX_ARQUIVOS = 20;
       document.getElementById('nfe-arquivos').addEventListener('change', (e) => {
-        const erroEl = document.getElementById('nfe-erro');
-        const excedeu = e.target.files.length > NFE_MAX_ARQUIVOS;
-        erroEl.textContent = excedeu ? `Selecione no máximo ${NFE_MAX_ARQUIVOS} arquivos por vez (você selecionou ${e.target.files.length}).` : '';
-        document.getElementById('nfe-importar').disabled = !e.target.files.length || excedeu;
+        document.getElementById('nfe-importar').disabled = !e.target.files.length;
       });
+
+      let pollTimer = null;
+      async function acompanharProgresso(id) {
+        const progressoEl = document.getElementById('nfe-progresso');
+        const resultadoEl = document.getElementById('nfe-resultado');
+        if (!progressoEl) { clearInterval(pollTimer); return; } // modal fechada
+        const res = await apiFetch(`/crm/api/importacoes/${id}`);
+        if (!res.ok) { clearInterval(pollTimer); return; }
+        const dados = await res.json();
+        const processados = dados.criados + dados.atualizados + dados.com_erro;
+        if (dados.status === 'processando') {
+          progressoEl.innerHTML = `<p class="modal-texto">Processando… ${processados} de ${dados.total_arquivos || '?'} arquivo(s).</p>`;
+          return;
+        }
+        clearInterval(pollTimer);
+        progressoEl.innerHTML = '';
+        resultadoEl.innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
+        `;
+      }
 
       document.getElementById('nfe-importar').addEventListener('click', async () => {
         const arquivos = document.getElementById('nfe-arquivos').files;
-        if (!arquivos.length || arquivos.length > NFE_MAX_ARQUIVOS) return;
+        if (!arquivos.length) return;
         const btn = document.getElementById('nfe-importar');
         const erroEl = document.getElementById('nfe-erro');
         btn.disabled = true;
-        btn.textContent = 'Importando…';
+        btn.textContent = 'Enviando…';
         erroEl.textContent = '';
         try {
           const formData = new FormData();
@@ -267,20 +287,20 @@
           const dados = await res.json().catch(() => ({}));
           if (!res.ok) {
             erroEl.textContent = dados.error || 'Falha ao importar';
+            btn.disabled = false;
+            btn.textContent = 'Importar';
             return;
           }
-          document.getElementById('nfe-resultado').innerHTML = `
-            <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
-            ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
-          `;
           btn.hidden = true;
+          document.getElementById('nfe-arquivos').hidden = true;
+          acompanharProgresso(dados.id);
+          pollTimer = setInterval(() => acompanharProgresso(dados.id), 2000);
           return;
         } catch (erro) {
-          // Sem isso, qualquer falha de rede/timeout numa importação de várias
-          // notas (demora mais, mais chance de cair) deixava o botão travado
-          // em "Importando…" pra sempre, sem nenhuma mensagem — exatamente o
-          // sintoma "não evolui e não apresenta erro".
-          erroEl.textContent = 'Falha de conexão ao importar — tente novamente com menos arquivos por vez.';
+          // Sem isso, qualquer falha de rede ao ENVIAR os arquivos (não mais
+          // ao processar — isso já é em fila) deixava o botão travado em
+          // "Enviando…" pra sempre, sem nenhuma mensagem.
+          erroEl.textContent = 'Falha de conexão ao enviar os arquivos — tente de novo.';
         }
         btn.disabled = false;
         btn.textContent = 'Importar';
