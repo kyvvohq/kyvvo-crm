@@ -1590,13 +1590,18 @@ async function build() {
     if (!notificacoes_ativas || typeof notificacoes_ativas !== 'object') {
       return reply.code(400).send({ error: 'notificacoes_ativas é obrigatório' });
     }
+    // Normaliza pro mesmo formato E.164 (+55DDNNNNNNNNN) usado em
+    // crm_clientes.telefone — a tela manda o valor já mascarado
+    // ((34) 99999-9888), e enviarWhatsappNotificacao manda esse valor direto
+    // pro `to` da Cloud API sem conversão nenhuma, então precisa estar
+    // normalizado aqui, não só bonito na tela.
     const { rows } = await pool.query(
       `insert into crm_configuracoes (tenant_id, notificacoes_ativas, notificacao_email, notificacao_whatsapp, atualizado_em)
        values ($1, $2, $3, $4, now())
        on conflict (tenant_id) do update set
          notificacoes_ativas = $2, notificacao_email = $3, notificacao_whatsapp = $4, atualizado_em = now()
        returning notificacoes_ativas, notificacao_email, notificacao_whatsapp`,
-      [tenantId, JSON.stringify(notificacoes_ativas), notificacao_email || null, notificacao_whatsapp || null]
+      [tenantId, JSON.stringify(notificacoes_ativas), notificacao_email ? notificacao_email.trim().toLowerCase() : null, notificacao_whatsapp ? paraE164(notificacao_whatsapp) : null]
     );
     return rows[0];
   });
