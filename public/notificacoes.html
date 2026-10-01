@@ -13,11 +13,20 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .notificacao-linha { padding:14px 0; border-top:1px solid var(--border); }
-  .notificacao-linha:first-child { border-top:none; padding-top:0; }
-  .campo-check { display:flex; align-items:center; gap:8px; }
-  .campo-check input { width:auto; }
-  .campo-check label { margin:0; font-size:14px; font-weight:600; color:var(--text); }
+  /* Toggle de canal (E-mail/WhatsApp/CRM por tipo) — mesmo mecanismo do
+     Studio (checkbox + trilho via :checked irmão), só copiado aqui porque
+     ainda não migrou pro shell.css compartilhado. */
+  .toggle-switch { position:relative; display:inline-block; width:34px; height:18px; flex-shrink:0; }
+  .toggle-switch input { position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+  .toggle-switch-trilho { position:absolute; inset:0; background:#3a3f5c; border-radius:100px; transition:background .15s; pointer-events:none; }
+  .toggle-switch-trilho::after { content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:left .15s; }
+  .toggle-switch input:checked + .toggle-switch-trilho { background:var(--success); }
+  .toggle-switch input:checked + .toggle-switch-trilho::after { left:18px; }
+
+  .notificacoes-destino { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+  .notificacoes-destino .campo { flex:1; min-width:220px; }
+  .notificacoes-destino label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
+  .notificacao-historico-detalhe { margin-top:2px; font-size:12.5px; color:var(--muted-strong); }
 </style>
 </head>
 <body>
@@ -97,11 +106,48 @@
       <div class="cabecalho-pagina">
         <div class="textos">
           <div class="linha-titulo"><h1>Notificações</h1></div>
-          <p class="descricao">Escolha quais avisos aparecem no sino do topo.</p>
         </div>
       </div>
 
-      <div class="card" id="lista-notificacoes"><div class="vazio">Carregando…</div></div>
+      <div class="ds-abas" data-ds-abas>
+        <div class="ds-abas-lista">
+          <button type="button" class="ds-aba" id="aba-notificacoes-regras" aria-controls="painel-notificacoes-regras" aria-selected="true">Regras</button>
+          <button type="button" class="ds-aba" id="aba-notificacoes-historico" aria-controls="painel-notificacoes-historico" aria-selected="false">Histórico</button>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-notificacoes-regras" aria-labelledby="aba-notificacoes-regras">
+          <div class="notificacoes-destino">
+            <div class="campo">
+              <label for="notificacao-email">E-mail pra receber notificações</label>
+              <input type="email" id="notificacao-email" placeholder="seuemail@exemplo.com">
+            </div>
+            <div class="campo">
+              <label for="notificacao-whatsapp">WhatsApp pra receber notificações</label>
+              <input type="text" id="notificacao-whatsapp" placeholder="(34) 99999-9999">
+            </div>
+            <div class="campo" style="flex:none; align-self:flex-end">
+              <button type="button" id="btn-salvar-destino">Salvar</button>
+            </div>
+          </div>
+          <div class="msg" id="msg-destino"></div>
+          <p class="vazio" style="padding:0 0 8px; text-align:left">Precisa estar preenchido pros canais E-mail/WhatsApp abaixo funcionarem.</p>
+          <div class="tabela-wrapper">
+            <table>
+              <thead><tr><th>Descrição</th><th>E-mail</th><th>WhatsApp</th><th>CRM</th></tr></thead>
+              <tbody id="lista-regras"><tr><td colspan="4">Carregando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-notificacoes-historico" aria-labelledby="aba-notificacoes-historico" hidden>
+          <div class="tabela-wrapper">
+            <table>
+              <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Status</th></tr></thead>
+              <tbody id="lista-historico"><tr><td colspan="4">Carregando…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -111,62 +157,144 @@
   <script src="/crm/shell.js"></script>
   <script>
     // Mesma lista de lib/notificacoes.js (backend), só com o que o frontend
-    // precisa pra desenhar a tela — chave+título pra cada toggle. Evita um
-    // endpoint só pra listar os tipos existentes.
+    // precisa pra desenhar a tela — chave+título+eventoUnico pra cada linha.
+    // Evita um endpoint só pra listar os tipos existentes.
     const TIPOS_NOTIFICACAO = [
-      { chave: 'pedidos_parados', titulo: 'Pedidos parados além do prazo da etapa' },
+      { chave: 'pedidos_parados', titulo: 'Pedidos parados além do prazo da etapa', eventoUnico: false },
+      { chave: 'pedido_criado', titulo: 'Novo pedido criado', eventoUnico: true },
+      { chave: 'pedido_pronto', titulo: 'Pedido pronto pra envio/retirada', eventoUnico: true },
     ];
 
     let notificacoesAtivas = {};
+    let abaAtiva = 'regras';
 
     function configAtual(chave) {
       const cfg = notificacoesAtivas[chave];
       return cfg && typeof cfg === 'object' ? cfg : {};
     }
+    // Espelha lib/notificacoes.js#canaisAtivos — formato novo
+    // ({canais:{crm,email,whatsapp}}) e formato antigo ({ativo: bool}, de
+    // antes desta tela existir, tratado como "só CRM").
+    function canaisAtivosNotificacao(cfg) {
+      if (cfg && cfg.canais && typeof cfg.canais === 'object') {
+        return { crm: cfg.canais.crm !== false, email: !!cfg.canais.email, whatsapp: !!cfg.canais.whatsapp };
+      }
+      return { crm: cfg ? cfg.ativo !== false : true, email: false, whatsapp: false };
+    }
 
-    async function carregar() {
+    async function carregarConfig() {
       const res = await apiFetch('/crm/api/notificacoes/config');
       const dados = await res.json();
       notificacoesAtivas = dados.notificacoes_ativas || {};
-      renderizar();
+      document.getElementById('notificacao-email').value = dados.notificacao_email || '';
+      document.getElementById('notificacao-whatsapp').value = dados.notificacao_whatsapp || '';
+      renderizarRegras();
     }
 
-    function renderizar() {
-      const el = document.getElementById('lista-notificacoes');
-      el.innerHTML = TIPOS_NOTIFICACAO.map((tipo) => {
-        const cfg = configAtual(tipo.chave);
-        const ativo = cfg.ativo !== false;
+    function renderizarRegras() {
+      const tbody = document.getElementById('lista-regras');
+      const toggleCanal = (chave, canal, canais) => `
+        <span class="toggle-switch">
+          <input type="checkbox" class="notificacao-canal" data-chave="${chave}" data-canal="${canal}" ${canais[canal] ? 'checked' : ''}>
+          <span class="toggle-switch-trilho"></span>
+        </span>
+      `;
+      tbody.innerHTML = TIPOS_NOTIFICACAO.map((tipo) => {
+        const canais = canaisAtivosNotificacao(configAtual(tipo.chave));
         return `
-          <div class="notificacao-linha" data-chave="${tipo.chave}">
-            <div class="campo-check">
-              <input type="checkbox" id="chk-${tipo.chave}" class="notificacao-ativa" data-chave="${tipo.chave}" ${ativo ? 'checked' : ''}>
-              <label for="chk-${tipo.chave}">${escapeHtml(tipo.titulo)}</label>
-            </div>
-          </div>
+          <tr data-chave="${tipo.chave}">
+            <td>${escapeHtml(tipo.titulo)}</td>
+            <td>${toggleCanal(tipo.chave, 'email', canais)}</td>
+            <td>${toggleCanal(tipo.chave, 'whatsapp', canais)}</td>
+            <td>${toggleCanal(tipo.chave, 'crm', canais)}</td>
+          </tr>
         `;
       }).join('');
 
-      // Manda o objeto INTEIRO daquela chave já mesclado — o PATCH substitui
-      // o objeto completo, não mescla parcial no backend.
-      async function salvar(chave, patchParcial) {
+      async function salvarCanal(chave, novoCanais) {
         const cfgAtual = configAtual(chave);
-        const novo = { ...notificacoesAtivas, [chave]: { ...cfgAtual, ...patchParcial } };
-        const res = await apiFetch('/crm/api/notificacoes/config', { method: 'PATCH', body: JSON.stringify({ notificacoes_ativas: novo }) });
+        const { ativo, ...resto } = cfgAtual;
+        const novo = { ...notificacoesAtivas, [chave]: { ...resto, canais: novoCanais } };
+        const res = await apiFetch('/crm/api/notificacoes/config', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            notificacoes_ativas: novo,
+            notificacao_email: document.getElementById('notificacao-email').value.trim(),
+            notificacao_whatsapp: document.getElementById('notificacao-whatsapp').value.trim(),
+          }),
+        });
         if (!res.ok) return false;
         notificacoesAtivas = (await res.json()).notificacoes_ativas || novo;
         carregarNotificacoes();
         return true;
       }
 
-      el.querySelectorAll('.notificacao-ativa').forEach((chk) => {
+      tbody.querySelectorAll('.notificacao-canal').forEach((chk) => {
         chk.addEventListener('change', async () => {
-          const ok = await salvar(chk.dataset.chave, { ativo: chk.checked });
+          const chave = chk.dataset.chave;
+          const canaisAtuais = canaisAtivosNotificacao(configAtual(chave));
+          const ok = await salvarCanal(chave, { ...canaisAtuais, [chk.dataset.canal]: chk.checked });
           if (!ok) chk.checked = !chk.checked;
         });
       });
     }
 
-    carregar();
+    document.getElementById('btn-salvar-destino').addEventListener('click', async () => {
+      const msg = document.getElementById('msg-destino');
+      const res = await apiFetch('/crm/api/notificacoes/config', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          notificacoes_ativas: notificacoesAtivas,
+          notificacao_email: document.getElementById('notificacao-email').value.trim(),
+          notificacao_whatsapp: document.getElementById('notificacao-whatsapp').value.trim(),
+        }),
+      });
+      msg.className = res.ok ? 'msg ok' : 'msg erro';
+      msg.textContent = res.ok ? 'Salvo!' : 'Não foi possível salvar.';
+    });
+
+    function renderHistoricoLinha(item) {
+      const dataLabel = new Date(item.criadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return `
+        <tr>
+          <td>${dataLabel}</td>
+          <td>${escapeHtml(item.tipoTitulo)}</td>
+          <td>
+            <div>${escapeHtml(item.titulo)}</div>
+            ${item.detalhe ? `<div class="notificacao-historico-detalhe">${escapeHtml(item.detalhe)}</div>` : ''}
+          </td>
+          <td>
+            ${item.lida
+              ? '<span class="badge neutro">Lida</span>'
+              : `<button type="button" class="btn-secundario" data-marcar-lida-historico="${item.id}">Marcar como lida</button>`}
+          </td>
+        </tr>
+      `;
+    }
+
+    async function carregarHistorico() {
+      const res = await apiFetch('/crm/api/notificacoes/historico');
+      const dados = await res.json();
+      const historico = dados.historico || [];
+      const tbody = document.getElementById('lista-historico');
+      tbody.innerHTML = historico.length
+        ? historico.map(renderHistoricoLinha).join('')
+        : '<tr><td colspan="4">Nenhuma notificação registrada ainda.</td></tr>';
+
+      tbody.querySelectorAll('[data-marcar-lida-historico]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const res2 = await apiFetch(`/crm/api/notificacoes/${btn.dataset.marcarLidaHistorico}/lida`, { method: 'PATCH' });
+          if (res2.ok) { carregarHistorico(); carregarNotificacoes(); }
+        });
+      });
+    }
+
+    document.querySelector('.ds-abas').addEventListener('ds-abas-alterar', (e) => {
+      abaAtiva = e.detail.id === 'painel-notificacoes-historico' ? 'historico' : 'regras';
+      if (abaAtiva === 'historico') carregarHistorico();
+    });
+
+    carregarConfig();
   </script>
 </body>
 </html>

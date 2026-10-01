@@ -21,7 +21,10 @@ const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio } = r
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
-const { listarNotificacoesPendentes } = require('./lib/notificacoes');
+const {
+  listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
+  dispararNotificacaoEvento,
+} = require('./lib/notificacoes');
 
 const PORT = process.env.PORT || 3005;
 
@@ -984,6 +987,13 @@ async function build() {
       await client.query('COMMIT');
       dispararPedidoCriado(pool, { tenantId, pedidoId: pedido.id, cliente, valorTotal: pedido.valor_total })
         .catch((err) => fastify.log.error(`[automacoes] pedido_criado: ${err.message}`));
+      // Configurações > Notificações ("Novo pedido criado") — diferente do
+      // disparo acima (mensagem de WhatsApp pro CLIENTE, lib/automacoes.js):
+      // esta é a notificação ADMIN (sino/e-mail/WhatsApp do dono do negócio).
+      dispararNotificacaoEvento(pool, tenantId, 'pedido_criado', {
+        titulo: `Novo pedido: ${cliente.nome || cliente.telefone}`,
+        detalhe: `Pedido #${numero} — R$ ${Number(pedido.valor_total || 0).toFixed(2).replace('.', ',')}`,
+      }).catch((err) => fastify.log.error(`[notificacoes] pedido_criado: ${err.message}`));
       return reply.code(201).send({ ...pedido, cliente });
     } catch (erro) {
       await client.query('ROLLBACK');
@@ -1053,6 +1063,20 @@ async function build() {
       [tenantId, rows[0].cliente_id, rows[0].id, JSON.stringify({ etapa_id, motivo_perda: motivo_perda || null }), userId || null]
     );
     disparaAutomacaoDeEtapa(rows[0], etapaRows[0]);
+    // Configurações > Notificações ("Pedido pronto pra envio/retirada") —
+    // só quando REALMENTE entrou numa etapa marcada eh_pronto (não repete se
+    // já estava lá — pedidoAtual[0].etapa_id é a etapa de ANTES do UPDATE).
+    if (etapaRows[0].eh_pronto && pedidoAtual[0].etapa_id !== etapa_id) {
+      pool.query('select nome, telefone from crm_clientes where id = $1', [rows[0].cliente_id])
+        .then(({ rows: clienteRows }) => {
+          const cliente = clienteRows[0];
+          return dispararNotificacaoEvento(pool, tenantId, 'pedido_pronto', {
+            titulo: `Pedido pronto: ${(cliente && cliente.nome) || (cliente && cliente.telefone) || 'Sem nome'}`,
+            detalhe: `Etapa "${etapaRows[0].nome}"`,
+          });
+        })
+        .catch((err) => fastify.log.error(`[notificacoes] pedido_pronto: ${err.message}`));
+    }
     return rows[0];
   });
 
@@ -1548,23 +1572,49 @@ async function build() {
   });
 
   fastify.get('/crm/api/notificacoes/config', { preHandler: fastify.authenticate }, async (request) => {
-    const { rows } = await pool.query('select notificacoes_ativas from crm_configuracoes where tenant_id = $1', [request.user.tenantId]);
-    return { notificacoes_ativas: (rows[0] && rows[0].notificacoes_ativas) || {} };
+    const { rows } = await pool.query(
+      'select notificacoes_ativas, notificacao_email, notificacao_whatsapp from crm_configuracoes where tenant_id = $1',
+      [request.user.tenantId]
+    );
+    const config = rows[0] || {};
+    return {
+      notificacoes_ativas: config.notificacoes_ativas || {},
+      notificacao_email: config.notificacao_email || '',
+      notificacao_whatsapp: config.notificacao_whatsapp || '',
+    };
   });
 
   fastify.patch('/crm/api/notificacoes/config', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { notificacoes_ativas } = request.body || {};
+    const { notificacoes_ativas, notificacao_email, notificacao_whatsapp } = request.body || {};
     if (!notificacoes_ativas || typeof notificacoes_ativas !== 'object') {
       return reply.code(400).send({ error: 'notificacoes_ativas é obrigatório' });
     }
     const { rows } = await pool.query(
-      `insert into crm_configuracoes (tenant_id, notificacoes_ativas, atualizado_em) values ($1, $2, now())
-       on conflict (tenant_id) do update set notificacoes_ativas = $2, atualizado_em = now()
-       returning notificacoes_ativas`,
-      [tenantId, JSON.stringify(notificacoes_ativas)]
+      `insert into crm_configuracoes (tenant_id, notificacoes_ativas, notificacao_email, notificacao_whatsapp, atualizado_em)
+       values ($1, $2, $3, $4, now())
+       on conflict (tenant_id) do update set
+         notificacoes_ativas = $2, notificacao_email = $3, notificacao_whatsapp = $4, atualizado_em = now()
+       returning notificacoes_ativas, notificacao_email, notificacao_whatsapp`,
+      [tenantId, JSON.stringify(notificacoes_ativas), notificacao_email || null, notificacao_whatsapp || null]
     );
     return rows[0];
+  });
+
+  fastify.patch('/crm/api/notificacoes/:id/lida', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const ok = await marcarNotificacaoLida(pool, request.user.tenantId, request.params.id);
+    if (!ok) return reply.code(404).send({ error: 'Notificação não encontrada' });
+    return { ok: true };
+  });
+
+  fastify.post('/crm/api/notificacoes/marcar-todas-lidas', { preHandler: fastify.authenticate }, async (request) => {
+    const marcadas = await marcarTodasNotificacoesLidas(pool, request.user.tenantId);
+    return { ok: true, marcadas };
+  });
+
+  fastify.get('/crm/api/notificacoes/historico', { preHandler: fastify.authenticate }, async (request) => {
+    const historico = await listarHistoricoNotificacoes(pool, request.user.tenantId);
+    return { historico };
   });
 
   return fastify;
