@@ -23,10 +23,26 @@
   .toggle-switch input:checked + .toggle-switch-trilho { background:var(--success); }
   .toggle-switch input:checked + .toggle-switch-trilho::after { left:18px; }
 
-  .notificacoes-destino { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
-  .notificacoes-destino .campo { flex:1; min-width:220px; }
+  .notificacoes-destino { display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+  .notificacoes-destino .campo { flex:0 1 260px; min-width:200px; }
   .notificacoes-destino label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
   .notificacao-historico-detalhe { margin-top:2px; font-size:12.5px; color:var(--muted-strong); }
+
+  /* Kebab padrão (mesmo bloco de opcoes-cadastro.html/estoque.html) — local
+     porque ainda não migrou pra shell.css compartilhado. */
+  .menu-acoes-wrap { position:relative; display:inline-block; }
+  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
+  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
+    box-shadow:var(--shadow-md); min-width:150px; z-index:20; padding:6px; }
+  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
+  .menu-acoes button:hover { background:var(--surface-muted); }
+  .menu-acoes button.perigo { color:var(--danger); }
+
+  .destino-card { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px;
+    padding:14px 16px; background:var(--surface-muted); border:1px solid var(--border); border-radius:var(--radius-md); }
+  .destino-card-info { display:flex; flex-direction:column; gap:4px; font-size:13.5px; color:var(--text); }
+  .destino-card-info .rotulo { color:var(--muted-strong); font-size:12px; margin-right:4px; }
 </style>
 </head>
 <body>
@@ -116,17 +132,32 @@
         </div>
 
         <div class="ds-abas-painel" id="painel-notificacoes-regras" aria-labelledby="aba-notificacoes-regras">
-          <div class="notificacoes-destino">
+          <div class="destino-card" id="destino-card" hidden>
+            <div class="destino-card-info">
+              <div><span class="rotulo">E-mail:</span><span id="destino-card-email">—</span></div>
+              <div><span class="rotulo">WhatsApp:</span><span id="destino-card-whatsapp">—</span></div>
+            </div>
+            <div class="menu-acoes-wrap">
+              <button type="button" class="btn-acoes" id="btn-abrir-menu-destino" aria-haspopup="true" aria-expanded="false">⋯</button>
+              <div class="menu-acoes" id="menu-destino" hidden>
+                <button type="button" id="btn-editar-destino">Editar</button>
+                <button type="button" class="perigo" id="btn-excluir-destino">Excluir</button>
+              </div>
+            </div>
+          </div>
+          <div class="notificacoes-destino" id="form-destino">
             <div class="campo">
               <label for="notificacao-email">E-mail pra receber notificações</label>
-              <input type="email" id="notificacao-email" placeholder="seuemail@exemplo.com">
+              <input type="email" id="notificacao-email" data-ds-mascara="email" placeholder="seuemail@exemplo.com">
             </div>
             <div class="campo">
               <label for="notificacao-whatsapp">WhatsApp pra receber notificações</label>
-              <input type="text" id="notificacao-whatsapp" placeholder="(34) 99999-9999">
+              <input type="text" id="notificacao-whatsapp" data-ds-mascara="telefone" placeholder="(34) 99999-9999">
             </div>
-            <div class="campo" style="flex:none; align-self:flex-end">
-              <button type="button" id="btn-salvar-destino">Salvar</button>
+            <div class="campo" style="flex:none">
+              <label aria-hidden="true">&nbsp;</label>
+              <button type="button" id="btn-salvar-destino" disabled>Salvar</button>
+              <button type="button" class="btn-secundario" id="btn-cancelar-destino" hidden>Cancelar</button>
             </div>
           </div>
           <div class="msg" id="msg-destino"></div>
@@ -182,14 +213,108 @@
       return { crm: cfg ? cfg.ativo !== false : true, email: false, whatsapp: false };
     }
 
+    // Guarda o que já está salvo de verdade no servidor — usado pra: (1)
+    // decidir card (tem destino) vs formulário (não tem), (2) o botão Salvar
+    // só habilitar quando o valor digitado MUDOU em relação a isso, e (3)
+    // "Cancelar" na edição reverter sem precisar recarregar da API.
+    let destinoSalvo = { email: '', whatsapp: '' };
+
+    // notificacao_whatsapp vem do servidor em E.164 (+5534999998888, mesmo
+    // padrão de crm_clientes.telefone) — a máscara "telefone" do DS espera
+    // só o número local (sem o 55 do país), senão formata errado.
+    function whatsappParaExibicao(valorE164) {
+      if (!valorE164) return '';
+      let digitos = valorE164.replace(/\D/g, '');
+      if (digitos.length > 11 && digitos.startsWith('55')) digitos = digitos.slice(2);
+      return (window.KyvvoDS && KyvvoDS.mascara) ? KyvvoDS.mascara.formatar('telefone', digitos) : digitos;
+    }
+
     async function carregarConfig() {
       const res = await apiFetch('/crm/api/notificacoes/config');
       const dados = await res.json();
       notificacoesAtivas = dados.notificacoes_ativas || {};
-      document.getElementById('notificacao-email').value = dados.notificacao_email || '';
-      document.getElementById('notificacao-whatsapp').value = dados.notificacao_whatsapp || '';
+      destinoSalvo = { email: dados.notificacao_email || '', whatsapp: dados.notificacao_whatsapp || '' };
+      preencherFormDestino(destinoSalvo);
+      renderizarDestinoCard();
       renderizarRegras();
     }
+
+    function preencherFormDestino(valores) {
+      const campoEmail = document.getElementById('notificacao-email');
+      const campoWhatsapp = document.getElementById('notificacao-whatsapp');
+      // Formata o que já veio salvo — hidratarMascaras só roda sozinho no
+      // load da página, não depois de um fetch assíncrono preencher o valor.
+      campoEmail.value = valores.email;
+      campoWhatsapp.value = valores.whatsapp ? whatsappParaExibicao(valores.whatsapp) : '';
+      atualizarEstadoBotaoSalvar();
+    }
+
+    // Habilita Salvar só quando algo mudou E os campos preenchidos são
+    // válidos (campo vazio continua sendo uma opção válida — os dois canais
+    // são independentes, não é obrigatório ter os dois).
+    function atualizarEstadoBotaoSalvar() {
+      const email = document.getElementById('notificacao-email').value.trim();
+      const whatsapp = document.getElementById('notificacao-whatsapp').value.trim();
+      const mudou = email !== destinoSalvo.email || whatsapp !== whatsappParaExibicao(destinoSalvo.whatsapp);
+      const emailValido = !email || (window.KyvvoDS && KyvvoDS.mascara.validar('email', email));
+      const whatsappValido = !whatsapp || (window.KyvvoDS && KyvvoDS.mascara.validar('telefone', whatsapp));
+      document.getElementById('btn-salvar-destino').disabled = !mudou || !emailValido || !whatsappValido;
+    }
+    ['notificacao-email', 'notificacao-whatsapp'].forEach((id) => {
+      document.getElementById(id).addEventListener('input', atualizarEstadoBotaoSalvar);
+    });
+
+    function renderizarDestinoCard() {
+      const temDestino = !!(destinoSalvo.email || destinoSalvo.whatsapp);
+      document.getElementById('destino-card').hidden = !temDestino;
+      document.getElementById('form-destino').hidden = temDestino;
+      document.getElementById('btn-cancelar-destino').hidden = true;
+      if (temDestino) {
+        document.getElementById('destino-card-email').textContent = destinoSalvo.email || '—';
+        document.getElementById('destino-card-whatsapp').textContent = whatsappParaExibicao(destinoSalvo.whatsapp) || '—';
+      }
+    }
+
+    document.getElementById('btn-abrir-menu-destino').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('menu-destino').hidden = !document.getElementById('menu-destino').hidden;
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.menu-acoes-wrap')) document.getElementById('menu-destino').hidden = true;
+    });
+
+    document.getElementById('btn-editar-destino').addEventListener('click', () => {
+      document.getElementById('menu-destino').hidden = true;
+      preencherFormDestino(destinoSalvo);
+      document.getElementById('destino-card').hidden = true;
+      document.getElementById('form-destino').hidden = false;
+      document.getElementById('btn-cancelar-destino').hidden = false;
+    });
+
+    document.getElementById('btn-cancelar-destino').addEventListener('click', () => {
+      preencherFormDestino(destinoSalvo);
+      renderizarDestinoCard();
+    });
+
+    document.getElementById('btn-excluir-destino').addEventListener('click', () => {
+      document.getElementById('menu-destino').hidden = true;
+      confirmarAcao(
+        'Remover destino de notificações',
+        'Isso desliga o envio por e-mail e WhatsApp pra todos os tipos de notificação (o canal CRM continua funcionando). Confirmar?',
+        async () => {
+          const res = await apiFetch('/crm/api/notificacoes/config', {
+            method: 'PATCH',
+            body: JSON.stringify({ notificacoes_ativas: notificacoesAtivas, notificacao_email: '', notificacao_whatsapp: '' }),
+          });
+          if (res.ok) {
+            destinoSalvo = { email: '', whatsapp: '' };
+            preencherFormDestino(destinoSalvo);
+            renderizarDestinoCard();
+          }
+        },
+        { textoConfirmar: 'Remover', textoCancelar: 'Cancelar' }
+      );
+    });
 
     function renderizarRegras() {
       const tbody = document.getElementById('lista-regras');
@@ -241,16 +366,23 @@
 
     document.getElementById('btn-salvar-destino').addEventListener('click', async () => {
       const msg = document.getElementById('msg-destino');
+      const emailDigitado = document.getElementById('notificacao-email').value.trim();
+      const whatsappDigitado = document.getElementById('notificacao-whatsapp').value.trim();
       const res = await apiFetch('/crm/api/notificacoes/config', {
         method: 'PATCH',
         body: JSON.stringify({
           notificacoes_ativas: notificacoesAtivas,
-          notificacao_email: document.getElementById('notificacao-email').value.trim(),
-          notificacao_whatsapp: document.getElementById('notificacao-whatsapp').value.trim(),
+          notificacao_email: emailDigitado,
+          notificacao_whatsapp: whatsappDigitado,
         }),
       });
+      const dados = await res.json().catch(() => ({}));
       msg.className = res.ok ? 'msg ok' : 'msg erro';
-      msg.textContent = res.ok ? 'Salvo!' : 'Não foi possível salvar.';
+      msg.textContent = res.ok ? 'Salvo!' : (dados.error || 'Não foi possível salvar.');
+      if (res.ok) {
+        destinoSalvo = { email: dados.notificacao_email || '', whatsapp: dados.notificacao_whatsapp || '' };
+        renderizarDestinoCard();
+      }
     });
 
     function renderHistoricoLinha(item) {
