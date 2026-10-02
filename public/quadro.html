@@ -97,13 +97,32 @@
   .celula.arrastando-sobre { border-color:var(--accent); background:var(--accent-tint); }
   .celula-vazia { color:var(--muted); font-size:11px; padding:10px 4px; text-align:center; }
 
-  .cartao-pedido { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:grab; font-size:12.5px; }
+  .cartao-pedido { position:relative; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 32px 10px 12px; cursor:grab; font-size:12.5px; }
   .cartao-pedido:active { cursor:grabbing; }
-  .cartao-pedido .nome { font-weight:700; color:var(--text); margin-bottom:2px; }
+  .cartao-pedido .nome { font-weight:700; color:var(--text); }
   .cartao-pedido .linha { display:flex; justify-content:space-between; align-items:center; margin-top:6px; }
   .cartao-pedido .valor { font-weight:600; color:var(--text-secondary); }
   .cartao-pedido .dias-parado { color:var(--danger); font-weight:600; }
   .badge-prioridade-altissima { background:color-mix(in srgb, var(--danger) 25%, transparent); color:var(--danger); }
+
+  /* Menu ⋯ do cartão — mesmo padrão de pedidos.html/opcoes-cadastro.html,
+     ainda não migrou pra shell.css compartilhado. Posicionado no canto do
+     card (position:relative acima) em vez de ao lado do texto, já que o
+     card ficou só com o nome depois de tirar os "subtítulos" (prioridade/
+     pagamento/origem/dias) pra reduzir a quantidade de informação na cara
+     do quadro — tudo isso continua acessível no menu/modal de detalhe. */
+  .cartao-pedido .menu-acoes-wrap { position:absolute; top:4px; right:4px; }
+  .cartao-pedido .btn-acoes { width:24px; height:24px; background:transparent; color:var(--muted); padding:0; border-radius:6px; }
+  .cartao-pedido .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes { position:absolute; right:0; top:28px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
+    box-shadow:var(--shadow-md); min-width:180px; z-index:20; padding:6px; }
+  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
+  .menu-acoes button:hover { background:var(--surface-muted); }
+  .menu-acoes button.perigo { color:var(--danger); }
+  .linha-cliente-vincular { padding:8px 6px; border-top:1px solid var(--border); cursor:pointer; border-radius:6px; }
+  .linha-cliente-vincular:first-child { border-top:none; }
+  .linha-cliente-vincular:hover { background:var(--surface-muted); }
+  .linha-cliente-vincular .telefone { font-size:12px; color:var(--muted); }
 
   /* Raia especial "Prioridade Altíssima" — só aparece quando existe pelo
      menos 1 pedido nessa prioridade (ver raias() no script). */
@@ -267,24 +286,24 @@
     const ROTULO_PRIORIDADE = { altissima: 'Altíssima', alta: 'Alta', media: 'Média', baixa: 'Baixa' };
 
     function cartaoHtml(p) {
-      // Usa o prazo real configurado na etapa (US19) — não um limiar fixo.
-      // Etapa sem prazo configurado nunca alerta.
-      const etapaDoCartao = etapas.find((et) => et.id === p.etapa_id);
-      const prazo = etapaDoCartao ? etapaDoCartao.prazo_alerta_dias : null;
-      const alerta = prazo != null && p.dias_na_etapa >= prazo;
       const numQtd = Number(p.quantidade_itens);
       const qtd = numQtd > 1 ? `${Number.isInteger(numQtd) ? numQtd : numQtd.toLocaleString('pt-BR')}× ` : '';
+      // Card reduzido ao essencial (nome) — prioridade/pagamento/origem/dias
+      // parado saíram daqui (pedido do Bruno, 2026-10-02) e ficam só no menu
+      // ⋯/modal de detalhe. Quem precisa saber de pedido parado já é avisado
+      // pela notificação "Pedidos parados" (Configurações > Notificações).
       return `
         <div class="cartao-pedido" draggable="true" data-pedido="${p.id}">
           <div class="nome">${qtd}${escapeHtml(p.cliente_nome)}</div>
-          ${p.prioridade ? `<div class="linha"><span class="badge${p.prioridade === 'altissima' ? ' badge-prioridade-altissima' : ''}">${ROTULO_PRIORIDADE[p.prioridade]}</span></div>` : ''}
-          <div class="linha">
-            <span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span>
-            <span class="valor">${formatarMoeda(p.valor_total)}</span>
-          </div>
-          <div class="linha">
-            <span style="color:var(--muted)">${escapeHtml(p.origem)}</span>
-            <span class="${alerta ? 'dias-parado' : ''}" style="font-size:11px">${p.dias_na_etapa}d</span>
+          <div class="menu-acoes-wrap">
+            <button type="button" class="btn-acoes" data-abrir-menu-pedido="${p.id}" aria-haspopup="true" aria-expanded="false" title="Ações">⋯</button>
+            <div class="menu-acoes" data-menu-pedido="${p.id}" hidden>
+              <button type="button" data-vincular-cliente="${p.id}">Vincular a um cliente</button>
+              <button type="button" data-editar-pedido-quadro="${p.id}">Editar</button>
+              <button type="button" data-confirmar-pagamento-quadro="${p.id}">Confirmar pagamento</button>
+              <button type="button" data-confirmar-frete-quadro="${p.id}">Confirmar frete</button>
+              <button type="button" class="perigo" data-remover-pedido-quadro="${p.id}">Remover</button>
+            </div>
           </div>
         </div>
       `;
@@ -346,12 +365,55 @@
       ligarEventosGrid();
     }
 
+    function fecharMenusPedidoAbertos() {
+      document.querySelectorAll('.cartao-pedido .menu-acoes').forEach((m) => { m.hidden = true; });
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.cartao-pedido .menu-acoes-wrap')) fecharMenusPedidoAbertos();
+    });
+
     function ligarEventosGrid() {
       document.querySelectorAll('.cartao-pedido').forEach((cartao) => {
         cartao.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', cartao.dataset.pedido);
         });
-        cartao.addEventListener('click', () => abrirDetalhe(cartao.dataset.pedido));
+        cartao.addEventListener('click', (e) => {
+          if (e.target.closest('.menu-acoes-wrap')) return;
+          abrirDetalhe(cartao.dataset.pedido);
+        });
+      });
+
+      document.querySelectorAll('[data-abrir-menu-pedido]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = document.querySelector(`[data-menu-pedido="${btn.dataset.abrirMenuPedido}"]`);
+          const jaAberto = !menu.hidden;
+          fecharMenusPedidoAbertos();
+          menu.hidden = jaAberto;
+        });
+      });
+      document.querySelectorAll('[data-editar-pedido-quadro]').forEach((btn) => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); fecharMenusPedidoAbertos(); abrirDetalhe(btn.dataset.editarPedidoQuadro); });
+      });
+      document.querySelectorAll('[data-vincular-cliente]').forEach((btn) => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); fecharMenusPedidoAbertos(); abrirModalVincularCliente(btn.dataset.vincularCliente); });
+      });
+      document.querySelectorAll('[data-confirmar-pagamento-quadro]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          fecharMenusPedidoAbertos();
+          await apiFetch(`/crm/api/pedidos/${btn.dataset.confirmarPagamentoQuadro}/pagamento`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status_pagamento: 'pago' }),
+          });
+          carregar();
+        });
+      });
+      document.querySelectorAll('[data-confirmar-frete-quadro]').forEach((btn) => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); fecharMenusPedidoAbertos(); abrirModalConfirmarFrete(btn.dataset.confirmarFreteQuadro); });
+      });
+      document.querySelectorAll('[data-remover-pedido-quadro]').forEach((btn) => {
+        btn.addEventListener('click', (e) => { e.stopPropagation(); fecharMenusPedidoAbertos(); confirmarRemoverPedido(btn.dataset.removerPedidoQuadro); });
       });
 
       document.querySelectorAll('.celula').forEach((celula) => {
@@ -677,12 +739,17 @@
       if (!p) return;
       const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
       const overlay = abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
+        <p class="modal-texto">${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
 
         ${ehOrigemPropria(p.origem) ? `
         <div class="banner-assinatura" style="margin-top:12px">
           <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
         </div>` : ''}
+
+        <div class="grid2">
+          <div><label for="d-cliente-nome">Nome do cliente</label><input id="d-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
+          <div><label for="d-cliente-telefone">Telefone</label><input id="d-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
+        </div>
 
         <div class="grid2">
           <div><label for="d-etapa">Etapa</label>
@@ -731,11 +798,23 @@
       aplicarMascaraMoeda(campoRecebido);
 
       document.getElementById('btn-salvar-detalhe').addEventListener('click', async () => {
+        const novoNome = document.getElementById('d-cliente-nome').value.trim();
+        const novoTelefone = document.getElementById('d-cliente-telefone').value.trim();
         const novaEtapaId = document.getElementById('d-etapa').value;
         const novoRecursoId = document.getElementById('d-recurso').value || null;
         const novaPrioridade = document.getElementById('d-prioridade').value || null;
         const novoStatus = document.getElementById('d-status').value;
         const novoRecebido = valorMoedaParaNumero(campoRecebido);
+
+        // Edita o CLIENTE vinculado, não o pedido — nome/telefone não são
+        // campos de crm_pedidos. Só manda o PATCH se algo mudou de verdade.
+        if (novoNome !== (p.cliente_nome || '') || novoTelefone !== (p.cliente_telefone || '')) {
+          const resCliente = await apiFetch(`/crm/api/clientes/${p.cliente_id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ nome: novoNome, telefone: novoTelefone }),
+          });
+          if (!resCliente.ok) { document.getElementById('d-erro').textContent = 'Falha ao salvar nome/telefone do cliente'; return; }
+        }
 
         if (novaEtapaId !== p.etapa_id) {
           const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
@@ -780,6 +859,114 @@
         });
         if (!resPagamento.ok) { document.getElementById('d-erro').textContent = 'Falha ao salvar pagamento'; return; }
 
+        fecharModal();
+        carregar();
+      });
+    }
+
+    // "Vincular a um cliente" — busca entre clientes JÁ cadastrados (reaproveita
+    // GET /crm/api/clientes?busca=, mesmo endpoint da tela de Clientes) e troca
+    // o cliente_id do pedido. Não cria cliente novo — é pra corrigir um
+    // vínculo errado/automático (bot, importação), não cadastrar do zero.
+    function abrirModalVincularCliente(pedidoId) {
+      abrirModal('<h3>Vincular a um cliente</h3>', `
+        <label for="busca-cliente-vincular">Buscar cliente</label>
+        <input type="text" id="busca-cliente-vincular" placeholder="Nome, telefone ou CPF...">
+        <div id="lista-clientes-vincular" style="margin-top:8px; max-height:280px; overflow-y:auto"></div>
+        <div class="modal-erro" id="vincular-erro"></div>
+      `, 'modal-card-larga');
+
+      const campo = document.getElementById('busca-cliente-vincular');
+      const lista = document.getElementById('lista-clientes-vincular');
+      let temporizador = null;
+
+      async function buscar() {
+        const busca = campo.value.trim();
+        if (!busca) { lista.innerHTML = '<p class="vazio">Digite pra buscar.</p>'; return; }
+        const res = await apiFetch(`/crm/api/clientes?busca=${encodeURIComponent(busca)}`);
+        const clientes = await res.json();
+        lista.innerHTML = clientes.length
+          ? clientes.map((c) => `
+              <div class="linha-cliente-vincular" data-cliente-id="${c.id}">
+                <div>${escapeHtml(c.nome)}</div>
+                <div class="telefone">${escapeHtml(c.telefone || 'sem telefone')}</div>
+              </div>
+            `).join('')
+          : '<p class="vazio">Nenhum cliente encontrado.</p>';
+        lista.querySelectorAll('[data-cliente-id]').forEach((linha) => {
+          linha.addEventListener('click', async () => {
+            const res2 = await apiFetch(`/crm/api/pedidos/${pedidoId}/cliente`, {
+              method: 'PATCH',
+              body: JSON.stringify({ cliente_id: linha.dataset.clienteId }),
+            });
+            if (!res2.ok) { document.getElementById('vincular-erro').textContent = 'Falha ao vincular cliente'; return; }
+            fecharModal();
+            carregar();
+          });
+        });
+      }
+      campo.addEventListener('input', () => { clearTimeout(temporizador); temporizador = setTimeout(buscar, 300); });
+      campo.focus();
+    }
+
+    // "Confirmar frete" — valor separado do total do pedido, de propósito
+    // (pedido do Bruno): entrega por Uber/similar tem custo variável, só
+    // sabido perto da entrega e às vezes pago direto ao entregador, não
+    // junto com o pagamento do produto. frete_pago é um controle à parte de
+    // status_pagamento (migration 023).
+    function abrirModalConfirmarFrete(pedidoId) {
+      const p = pedidos.find((x) => x.id === pedidoId);
+      if (!p) return;
+      abrirModal('<h3>Confirmar frete</h3>', `
+        <p class="modal-texto">${p.frete_pago ? 'Frete já confirmado como pago. Pode ajustar o valor se mudou.' : 'Informe o valor do frete pra marcar como pago.'}</p>
+        <label for="frete-valor-confirmar">Valor do frete</label>
+        <input id="frete-valor-confirmar" inputmode="decimal" placeholder="0,00">
+        <div class="modal-erro" id="frete-confirmar-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="frete-confirmar-cancelar">Cancelar</button>
+          <button type="button" id="frete-confirmar-salvar">Confirmar</button>
+        </div>
+      `);
+      const campo = document.getElementById('frete-valor-confirmar');
+      campo.value = p.frete ? Number(p.frete).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      aplicarMascaraMoeda(campo);
+      document.getElementById('frete-confirmar-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('frete-confirmar-salvar').addEventListener('click', async () => {
+        const valor = valorMoedaParaNumero(campo);
+        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/entrega`, {
+          method: 'PATCH',
+          body: JSON.stringify({ frete: valor, frete_pago: true }),
+        });
+        if (!res.ok) { document.getElementById('frete-confirmar-erro').textContent = 'Falha ao confirmar frete'; return; }
+        fecharModal();
+        carregar();
+      });
+    }
+
+    // "Remover" — mesmo endpoint/semântica do kebab da tela de Pedidos
+    // (POST .../cancelar): move pra etapa tipo "perdida", nunca apaga de
+    // verdade (histórico/eventos continuam intactos).
+    function confirmarRemoverPedido(pedidoId) {
+      abrirModal('<h3>Remover pedido?</h3>', `
+        <p class="modal-texto">Essa ação não pode ser desfeita. O pedido vai pra etapa de "perdido".</p>
+        <label for="remover-motivo">Motivo</label>
+        <textarea id="remover-motivo" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
+        <div class="modal-erro" id="remover-erro"></div>
+        <div class="modal-acoes">
+          <button type="button" class="btn-secundario" id="remover-voltar">Voltar</button>
+          <button type="button" class="btn-perigo" id="remover-confirmar">Remover pedido</button>
+        </div>
+      `);
+      document.getElementById('remover-voltar').addEventListener('click', fecharModal);
+      document.getElementById('remover-confirmar').addEventListener('click', async () => {
+        const motivo = document.getElementById('remover-motivo').value.trim();
+        if (!motivo) { document.getElementById('remover-erro').textContent = 'Motivo é obrigatório'; return; }
+        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}/cancelar`, { method: 'POST', body: JSON.stringify({ motivo }) });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('remover-erro').textContent = dados.error || 'Falha ao remover pedido';
+          return;
+        }
         fecharModal();
         carregar();
       });

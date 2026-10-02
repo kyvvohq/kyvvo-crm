@@ -377,8 +377,12 @@
       const p = pedidos.find((x) => x.id === pedidoId);
       if (!p) return;
       abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <p class="modal-texto">${escapeHtml(p.cliente_telefone || 'sem telefone')} · ${escapeHtml(p.origem)}</p>
+        <p class="modal-texto">${escapeHtml(p.origem)}</p>
         ${ehOrigemPropria(p.origem) ? `<div class="banner-assinatura" style="margin-top:12px"><span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span></div>` : ''}
+        <div class="grid2">
+          <div><label for="e-cliente-nome">Nome do cliente</label><input id="e-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
+          <div><label for="e-cliente-telefone">Telefone</label><input id="e-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
+        </div>
         <div class="grid2">
           <div><label for="e-etapa">Etapa</label>
             <select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>
@@ -432,10 +436,22 @@
       aplicarMascaraMoeda(campoFreteEdicao);
 
       document.getElementById('btn-salvar-edicao').addEventListener('click', async () => {
+        const novoNome = document.getElementById('e-cliente-nome').value.trim();
+        const novoTelefone = document.getElementById('e-cliente-telefone').value.trim();
         const novaEtapaId = document.getElementById('e-etapa').value;
         const novaPrioridade = document.getElementById('e-prioridade').value || null;
         const novoStatus = document.getElementById('e-status').value;
         const novoRecebido = valorMoedaParaNumero(campoRecebido);
+
+        // Edita o CLIENTE vinculado, não o pedido — nome/telefone não são
+        // campos de crm_pedidos. Só manda o PATCH se algo mudou de verdade.
+        if (novoNome !== (p.cliente_nome || '') || novoTelefone !== (p.cliente_telefone || '')) {
+          const resCliente = await apiFetch(`/crm/api/clientes/${p.cliente_id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ nome: novoNome, telefone: novoTelefone }),
+          });
+          if (!resCliente.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar nome/telefone do cliente'; return; }
+        }
 
         if (novaEtapaId !== p.etapa_id) {
           const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
