@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Relatórios</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .relatorio-filtros { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; margin-bottom:20px; }
+  .relatorio-filtros .campo { flex:0 1 180px; min-width:150px; }
+  .relatorio-filtros label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
+  .relatorio-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:24px; }
+  .relatorio-kpi { background:var(--surface-muted); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px; }
+  .relatorio-kpi .rotulo { font-size:11px; font-weight:600; letter-spacing:.4px; color:var(--muted); text-transform:uppercase; }
+  .relatorio-kpi .valor { font-size:20px; font-weight:700; color:var(--text); margin-top:4px; }
+</style>
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="ds-topbar-acoes">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link ds-menu-link-ativo active" href="/crm/relatorios.html"><span class="ds-menu-icone" data-icon="chart-column"></span><span class="ds-menu-rotulo">Relatórios</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Relatórios</h1></div>
+          <p class="descricao">Valor total e quantidade de pedidos — geral ou detalhado por dia, cliente, tipo de frete, segmento ou origem.</p>
+        </div>
+        <div class="acoes">
+          <button type="button" class="btn-secundario" id="btn-exportar-pdf">Exportar PDF</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="relatorio-filtros">
+          <div class="campo">
+            <label for="f-data-inicio">De</label>
+            <input type="date" id="f-data-inicio">
+          </div>
+          <div class="campo">
+            <label for="f-data-fim">Até</label>
+            <input type="date" id="f-data-fim">
+          </div>
+          <div class="campo">
+            <label for="f-tipo-entrega">Tipo de frete</label>
+            <select id="f-tipo-entrega"><option value="">Todos</option></select>
+          </div>
+          <div class="campo">
+            <label for="f-segmento">Segmento</label>
+            <select id="f-segmento"><option value="">Todos</option></select>
+          </div>
+          <div class="campo">
+            <label for="f-origem">Origem</label>
+            <select id="f-origem"><option value="">Todas</option></select>
+          </div>
+          <div class="campo">
+            <label for="f-agrupar">Detalhar por</label>
+            <select id="f-agrupar">
+              <option value="">Não detalhar (só o geral)</option>
+              <option value="dia">Dia</option>
+              <option value="cliente">Cliente</option>
+              <option value="tipo_entrega">Tipo de frete</option>
+              <option value="segmento">Segmento</option>
+              <option value="origem">Origem</option>
+            </select>
+          </div>
+          <div class="campo" style="flex:none">
+            <label aria-hidden="true">&nbsp;</label>
+            <button type="button" id="btn-filtrar">Filtrar</button>
+          </div>
+        </div>
+
+        <div class="relatorio-kpis" id="relatorio-kpis"></div>
+
+        <div class="tabela-wrapper" id="relatorio-detalhado-wrap" hidden>
+          <table>
+            <thead><tr><th id="relatorio-coluna-detalhe">Detalhe</th><th>Pedidos</th><th>Valor total</th></tr></thead>
+            <tbody id="relatorio-detalhado-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="CRM"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    const TITULOS_AGRUPAMENTO = { dia: 'Dia', cliente: 'Cliente', tipo_entrega: 'Tipo de frete', segmento: 'Segmento', origem: 'Origem' };
+
+    async function carregarOpcoes(tipo, selectId) {
+      const res = await apiFetch(`/crm/api/opcoes-cadastro?tipo=${tipo}`);
+      const opcoes = await res.json();
+      const select = document.getElementById(selectId);
+      opcoes.filter((o) => o.ativo).forEach((o) => {
+        const opt = document.createElement('option');
+        opt.value = o.valor;
+        opt.textContent = o.valor;
+        select.appendChild(opt);
+      });
+    }
+
+    function filtrosAtuais() {
+      const params = new URLSearchParams();
+      const dataInicio = document.getElementById('f-data-inicio').value;
+      const dataFim = document.getElementById('f-data-fim').value;
+      const tipoEntrega = document.getElementById('f-tipo-entrega').value;
+      const segmento = document.getElementById('f-segmento').value;
+      const origem = document.getElementById('f-origem').value;
+      const agrupar = document.getElementById('f-agrupar').value;
+      if (dataInicio) params.set('data_inicio', dataInicio);
+      if (dataFim) params.set('data_fim', dataFim);
+      if (tipoEntrega) params.set('tipo_entrega', tipoEntrega);
+      if (segmento) params.set('segmento', segmento);
+      if (origem) params.set('origem', origem);
+      if (agrupar) params.set('agrupar_por', agrupar);
+      return params;
+    }
+
+    function formatarData(iso) {
+      // chave de "dia" vem como "2026-10-02" (date, sem hora) — evita o
+      // bug clássico de fuso horário fazendo `new Date('2026-10-02')`
+      // exibir o dia anterior.
+      const [ano, mes, dia] = String(iso).slice(0, 10).split('-');
+      return `${dia}/${mes}/${ano}`;
+    }
+
+    async function carregarRelatorio() {
+      const params = filtrosAtuais();
+      const res = await apiFetch(`/crm/api/relatorios/pedidos?${params.toString()}`);
+      const dados = await res.json();
+
+      document.getElementById('relatorio-kpis').innerHTML = `
+        <div class="relatorio-kpi"><div class="rotulo">Pedidos</div><div class="valor">${dados.resumo.quantidade}</div></div>
+        <div class="relatorio-kpi"><div class="rotulo">Valor total</div><div class="valor">${formatarMoeda(dados.resumo.valor_total)}</div></div>
+        <div class="relatorio-kpi"><div class="rotulo">Ticket médio</div><div class="valor">${formatarMoeda(dados.resumo.ticket_medio)}</div></div>
+        <div class="relatorio-kpi"><div class="rotulo">Frete total</div><div class="valor">${formatarMoeda(dados.resumo.frete_total)}</div></div>
+      `;
+
+      const wrap = document.getElementById('relatorio-detalhado-wrap');
+      if (dados.agrupar_por && dados.detalhado.length) {
+        document.getElementById('relatorio-coluna-detalhe').textContent = TITULOS_AGRUPAMENTO[dados.agrupar_por] || 'Detalhe';
+        document.getElementById('relatorio-detalhado-tbody').innerHTML = dados.detalhado.map((d) => `
+          <tr>
+            <td>${escapeHtml(dados.agrupar_por === 'dia' ? formatarData(d.rotulo) : String(d.rotulo))}</td>
+            <td>${d.quantidade}</td>
+            <td>${formatarMoeda(d.valor_total)}</td>
+          </tr>
+        `).join('');
+        wrap.hidden = false;
+      } else {
+        wrap.hidden = true;
+      }
+    }
+
+    document.getElementById('btn-filtrar').addEventListener('click', carregarRelatorio);
+
+    // Baixa o PDF via blob (não dá pra navegar direto pra uma rota
+    // autenticada por Bearer token — mesmo padrão já usado na exportação de
+    // CSV em campanhas.html, só que buscando o arquivo do servidor em vez
+    // de montar no navegador).
+    document.getElementById('btn-exportar-pdf').addEventListener('click', async () => {
+      const params = filtrosAtuais();
+      const res = await apiFetch(`/crm/api/relatorios/pedidos/pdf?${params.toString()}`);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-pedidos-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    carregarOpcoes('tipo_entrega', 'f-tipo-entrega');
+    carregarOpcoes('segmento', 'f-segmento');
+    carregarOpcoes('origem', 'f-origem');
+    carregarRelatorio();
+  </script>
+</body>
+</html>
