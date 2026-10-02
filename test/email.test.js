@@ -45,3 +45,14 @@ describe('enviarEmail', () => {
     assert.equal(await enviarEmail(msg, { env: { PLATFORM_EMAIL_TOKEN: 't' }, fetchImpl: async () => { throw new Error('ECONNREFUSED'); } }), false);
   });
 });
+
+test('repassa modelo, variaveis e layout pra platform', async () => {
+  const chamadas = [];
+  const f = async (url, opts) => { chamadas.push(JSON.parse(opts.body)); return { ok: true, status: 200 }; };
+  await enviarEmail({ to: 'a@b.com', subject: 'S', html: '<p>h</p>', modelo: 'm', variaveis: { a: 1 }, layout: { tipo: 'aviso', titulo: 'T' } },
+    { env: { PLATFORM_EMAIL_TOKEN: 't' }, fetchImpl: f });
+  assert.equal(chamadas[0].modelo, 'm');
+  assert.deepEqual(chamadas[0].variaveis, { a: 1 });
+  assert.equal(chamadas[0].layout.titulo, 'T');
+  assert.equal(chamadas[0].html, '<p>h</p>');
+});
