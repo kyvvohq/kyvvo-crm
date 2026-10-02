@@ -1205,19 +1205,42 @@ async function build() {
   // informativo.
   fastify.patch('/crm/api/pedidos/:id/entrega', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['data_entrega', 'tipo_entrega', 'frete', 'observacoes'];
+    const campos = ['data_entrega', 'tipo_entrega', 'frete', 'frete_pago', 'observacoes'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
     for (const campo of campos) {
       if (body[campo] === undefined) continue;
-      params.push(body[campo] || null);
+      // frete_pago é boolean not null — `false || null` virava null e
+      // quebrava a constraint; os outros campos continuam podendo "limpar"
+      // mandando string vazia.
+      params.push(typeof body[campo] === 'boolean' ? body[campo] : (body[campo] || null));
       sets.push(`${campo} = $${params.length}`);
     }
     if (!sets.length) return reply.code(400).send({ error: 'Nenhum campo pra atualizar' });
     const { rows } = await pool.query(
       `update crm_pedidos set ${sets.join(', ')}, atualizado_em = now() where id = $1 and tenant_id = $2 returning *`,
       params
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+    return rows[0];
+  });
+
+  // "Vincular a um cliente" (menu ⋯ do Quadro) — troca o cliente_id do
+  // pedido por um cliente JÁ EXISTENTE (busca em GET /crm/api/clientes),
+  // pro caso de pedido criado automaticamente (bot/importação) com cliente
+  // errado/sem nome e precisar apontar pro cadastro certo.
+  fastify.patch('/crm/api/pedidos/:id/cliente', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { cliente_id: clienteId } = request.body || {};
+    if (!clienteId) return reply.code(400).send({ error: 'cliente_id é obrigatório' });
+
+    const { rows: clienteRows } = await pool.query('select id from crm_clientes where id = $1 and tenant_id = $2', [clienteId, tenantId]);
+    if (!clienteRows[0]) return reply.code(400).send({ error: 'Cliente inválido' });
+
+    const { rows } = await pool.query(
+      `update crm_pedidos set cliente_id = $1, atualizado_em = now() where id = $2 and tenant_id = $3 returning *`,
+      [clienteId, request.params.id, tenantId]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
     return rows[0];
