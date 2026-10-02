@@ -97,6 +97,7 @@
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
         <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/relatorios.html"><span class="ds-menu-icone" data-icon="chart-column"></span><span class="ds-menu-rotulo">Relatórios</span></a></li>
         <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
         <li class="ds-menu-grupo">
           <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
@@ -147,6 +148,9 @@
             <option value="baixa">Baixa</option>
           </select>
         </div>
+        <div><label for="f-tipo-entrega">Tipo de frete</label><select id="f-tipo-entrega"><option value="">Qualquer</option></select></div>
+        <div><label for="f-data-inicio">De</label><input type="date" id="f-data-inicio"></div>
+        <div><label for="f-data-fim">Até</label><input type="date" id="f-data-fim"></div>
       </div>
 
       <div class="card" style="padding:0">
@@ -185,6 +189,9 @@
       if (document.getElementById('f-recurso').value) params.set('recurso_id', document.getElementById('f-recurso').value);
       if (document.getElementById('f-pagamento').value) params.set('status_pagamento', document.getElementById('f-pagamento').value);
       if (document.getElementById('f-prioridade').value) params.set('prioridade', document.getElementById('f-prioridade').value);
+      if (document.getElementById('f-tipo-entrega').value) params.set('tipo_entrega', document.getElementById('f-tipo-entrega').value);
+      if (document.getElementById('f-data-inicio').value) params.set('data_inicio', document.getElementById('f-data-inicio').value);
+      if (document.getElementById('f-data-fim').value) params.set('data_fim', document.getElementById('f-data-fim').value);
       const qs = params.toString();
 
       const [resPedidos, resEtapas, resRecursos, resProdutos, resTiposEntrega] = await Promise.all([
@@ -202,11 +209,15 @@
 
       document.getElementById('f-etapa').innerHTML = '<option value="">Qualquer</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
       document.getElementById('f-recurso').innerHTML = '<option value="">Qualquer</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
+      if (!document.getElementById('f-tipo-entrega').dataset.preenchido) {
+        document.getElementById('f-tipo-entrega').innerHTML = '<option value="">Qualquer</option>' + tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
+        document.getElementById('f-tipo-entrega').dataset.preenchido = '1';
+      }
 
       renderizar();
     }
 
-    ['f-etapa', 'f-recurso', 'f-pagamento', 'f-prioridade'].forEach((id) => {
+    ['f-etapa', 'f-recurso', 'f-pagamento', 'f-prioridade', 'f-tipo-entrega', 'f-data-inicio', 'f-data-fim'].forEach((id) => {
       document.getElementById(id).addEventListener('change', carregar);
     });
 

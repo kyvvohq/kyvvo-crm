@@ -22,6 +22,8 @@ const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
 const metaWhatsappService = require('./lib/meta-whatsapp-service');
+const { relatorioPedidos } = require('./lib/relatorios');
+const { novoDocumentoRelatorio, desenharResumo, desenharTabela, formatarMoedaPdf } = require('./lib/pdf-relatorios');
 const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
@@ -1007,7 +1009,7 @@ async function build() {
   // de uma vez, sem filtro, pra desenhar o kanban inteiro).
   fastify.get('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
-    const { etapa_id, recurso_id, status_pagamento, prioridade, cliente_id } = request.query || {};
+    const { etapa_id, recurso_id, status_pagamento, prioridade, cliente_id, tipo_entrega: tipoEntrega, data_inicio: dataInicio, data_fim: dataFim } = request.query || {};
     const condicoes = ['p.tenant_id = $1'];
     const params = [tenantId];
     if (etapa_id) { params.push(etapa_id); condicoes.push(`p.etapa_id = $${params.length}`); }
@@ -1015,6 +1017,9 @@ async function build() {
     if (status_pagamento) { params.push(status_pagamento); condicoes.push(`p.status_pagamento = $${params.length}`); }
     if (prioridade) { params.push(prioridade); condicoes.push(`p.prioridade = $${params.length}`); }
     if (cliente_id) { params.push(cliente_id); condicoes.push(`p.cliente_id = $${params.length}`); }
+    if (tipoEntrega) { params.push(tipoEntrega); condicoes.push(`p.tipo_entrega = $${params.length}`); }
+    if (dataInicio) { params.push(dataInicio); condicoes.push(`p.criado_em >= $${params.length}::date`); }
+    if (dataFim) { params.push(dataFim); condicoes.push(`p.criado_em < $${params.length}::date + interval '1 day'`); }
 
     const { rows } = await pool.query(
       `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
@@ -1311,6 +1316,62 @@ async function build() {
     );
     disparaAutomacaoDeEtapa(rows[0], etapaRows[0]);
     return rows[0];
+  });
+
+  // --- Relatórios (pedido do Bruno, 2026-10-02) -----------------------------
+  // Mesmo filtro pra tela (JSON) e pra exportação em PDF — só muda o que faz
+  // com o resultado. Ver lib/relatorios.js pro porquê de ser um motor único
+  // parametrizado por `agrupar_por` em vez de 6 relatórios hardcoded.
+  function filtrosRelatorioDaQuery(query) {
+    return {
+      dataInicio: query.data_inicio || null,
+      dataFim: query.data_fim || null,
+      tipoEntrega: query.tipo_entrega || null,
+      segmento: query.segmento || null,
+      origem: query.origem || null,
+      agruparPor: query.agrupar_por || null,
+    };
+  }
+
+  fastify.get('/crm/api/relatorios/pedidos', { preHandler: fastify.authenticate }, async (request) => {
+    return relatorioPedidos(pool, request.user.tenantId, filtrosRelatorioDaQuery(request.query || {}));
+  });
+
+  fastify.get('/crm/api/relatorios/pedidos/pdf', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const filtros = filtrosRelatorioDaQuery(request.query || {});
+    const { resumo, detalhado, agrupar_por: agruparPor } = await relatorioPedidos(pool, request.user.tenantId, filtros);
+    const titulosAgrupamento = {
+      dia: 'Dia', cliente: 'Cliente', tipo_entrega: 'Tipo de frete', segmento: 'Segmento', origem: 'Origem',
+    };
+
+    reply.header('Content-Type', 'application/pdf');
+    reply.header('Content-Disposition', 'attachment; filename="relatorio-pedidos.pdf"');
+
+    const doc = novoDocumentoRelatorio('Relatório de Pedidos');
+    desenharResumo(doc, [
+      { rotulo: 'Pedidos', valor: String(resumo.quantidade) },
+      { rotulo: 'Valor total', valor: formatarMoedaPdf(resumo.valor_total) },
+      { rotulo: 'Ticket médio', valor: formatarMoedaPdf(resumo.ticket_medio) },
+      { rotulo: 'Frete total', valor: formatarMoedaPdf(resumo.frete_total) },
+    ]);
+    if (agruparPor && detalhado.length) {
+      // lineBreak:false — ver comentário em lib/pdf-relatorios.js sobre o
+      // bug real de recursão infinita quando um texto pode quebrar linha
+      // bem perto do fim da página.
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#0F111A').text(`Detalhado por ${titulosAgrupamento[agruparPor]}`, { lineBreak: false });
+      doc.moveDown(0.5);
+      desenharTabela(
+        doc,
+        [
+          { chave: 'rotulo', titulo: titulosAgrupamento[agruparPor] },
+          { chave: 'quantidade', titulo: 'Pedidos', align: 'right' },
+          { chave: 'valor_total', titulo: 'Valor total', align: 'right' },
+        ],
+        detalhado.map((d) => ({ ...d, valor_total: formatarMoedaPdf(d.valor_total) }))
+      );
+    }
+    doc.end();
+    return reply.send(doc);
   });
 
   // Download de um arquivo anexado a um pedido (STL/foto enviada pelo
