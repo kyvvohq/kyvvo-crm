@@ -27,6 +27,14 @@
   .notificacoes-destino .campo { flex:0 1 260px; min-width:200px; }
   .notificacoes-destino label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
   .notificacao-historico-detalhe { margin-top:2px; font-size:12.5px; color:var(--muted-strong); }
+  /* Mesmo padrão do design system (ver .ds-abas-painel[hidden] etc. em
+     components.css): qualquer classe com `display` próprio precisa da sua
+     própria regra [hidden] — o atributo sozinho perde pro `display:flex`
+     daqui por empate de especificidade + ordem no cascade. Bug real
+     encontrado em produção (2026-10-01): card e formulário apareciam juntos
+     o tempo todo, e o botão "Cancelar" nunca sumia. */
+  .notificacoes-destino[hidden] { display:none; }
+  #btn-cancelar-destino[hidden] { display:none; }
 
   /* Kebab padrão (mesmo bloco de opcoes-cadastro.html/estoque.html) — local
      porque ainda não migrou pra shell.css compartilhado. */
@@ -41,6 +49,7 @@
 
   .destino-card { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px;
     padding:14px 16px; background:var(--surface-muted); border:1px solid var(--border); border-radius:var(--radius-md); }
+  .destino-card[hidden] { display:none; }
   .destino-card-info { display:flex; flex-direction:column; gap:4px; font-size:13.5px; color:var(--text); }
   .destino-card-info .rotulo { color:var(--muted-strong); font-size:12px; margin-right:4px; }
 </style>
@@ -194,6 +203,12 @@
       { chave: 'pedidos_parados', titulo: 'Pedidos parados além do prazo da etapa', eventoUnico: false },
       { chave: 'pedido_criado', titulo: 'Novo pedido criado', eventoUnico: true },
       { chave: 'pedido_pronto', titulo: 'Pedido pronto pra envio/retirada', eventoUnico: true },
+      // 3 tipos adicionados em lib/notificacoes.js (backend) mas esquecidos
+      // aqui — bug real em produção (2026-10-01): a tabela de Regras não
+      // mostrava essas linhas, parecia que o pedido não tinha sido atendido.
+      { chave: 'importacao_concluida', titulo: 'Importação de arquivo concluída', eventoUnico: true },
+      { chave: 'whatsapp_limite_proximo', titulo: 'Limite de disparos do WhatsApp quase atingido', eventoUnico: true },
+      { chave: 'atendimento_bot_travado', titulo: 'Cliente pode estar com dificuldade no atendimento automático', eventoUnico: true },
     ];
 
     let notificacoesAtivas = {};

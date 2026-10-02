@@ -136,7 +136,13 @@
     // clique na linha abre o histórico completo num modal — em vez do
     // painel de 2 colunas (lista + thread sempre visível) de antes.
     let conversas = [];
-    const telefoneAbrirDireto = new URLSearchParams(window.location.search).get('telefone');
+    const paramsUrl = new URLSearchParams(window.location.search);
+    const telefoneAbrirDireto = paramsUrl.get('telefone');
+    // ?aba=conversas (usado pelo clique na notificação "atendimento_bot_travado",
+    // ver shell.js) — ou telefone= direto, que já implica querer ver Conversas.
+    if (paramsUrl.get('aba') === 'conversas' || telefoneAbrirDireto) {
+      window.KyvvoDS && KyvvoDS.abasSelecionar(document.querySelector('.ds-abas'), 'painel-whatsapp-conversas', true);
+    }
 
     function formatarHoraConversa(iso) {
       const d = new Date(iso);
