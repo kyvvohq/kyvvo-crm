@@ -24,8 +24,14 @@
   .toggle-switch input:checked + .toggle-switch-trilho::after { left:18px; }
 
   .notificacoes-destino { display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
-  .notificacoes-destino .campo { flex:0 1 260px; min-width:200px; }
+  .notificacoes-destino .campo { flex:0 1 220px; min-width:180px; }
   .notificacoes-destino label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
+  /* Input um pouco menor que o padrão (44px) do resto do app — nesse card
+     compacto o padrão deixava o input bem mais alto que os botões ao lado,
+     o que parecia "desalinhado" mesmo com os dois no mesmo flex-row. Deixa
+     os botões na mesma altura, pra tudo bater certinho na mesma linha. */
+  .notificacoes-destino input { height:38px; }
+  .notificacoes-destino .campo button { height:38px; }
   .notificacao-historico-detalhe { margin-top:2px; font-size:12.5px; color:var(--muted-strong); }
   /* Mesmo padrão do design system (ver .ds-abas-painel[hidden] etc. em
      components.css): qualquer classe com `display` próprio precisa da sua
