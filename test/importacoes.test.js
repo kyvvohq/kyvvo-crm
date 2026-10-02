@@ -121,3 +121,64 @@ test('importarNfe: concilia com pedido existente pelo número do pedido, não cr
   assert.ok(chamadas.some((c) => /update crm_pedidos set chave_nfe/.test(c.sql) && c.params[1] === 'pedido-existente-1'));
   assert.ok(!chamadas.some((c) => /insert into crm_pedidos /.test(c.sql)), 'não deveria criar pedido novo quando concilia');
 });
+
+test('parseNfeXml: data do pedido = <dhEmi> da nota (com fuso), não a da importação', () => {
+  const xml = `<nfeProc><NFe><infNFe Id="NFe35240112345678901234550010000012341123456789">
+    <ide><nNF>1</nNF><dhEmi>2026-09-24T22:19:37-03:00</dhEmi><tpNF>1</tpNF></ide>
+    <dest><xNome>X</xNome></dest>
+  </infNFe></NFe></nfeProc>`;
+  // 22:19 em -03:00 = 01:19 do dia 25 em UTC — o instante exato é preservado.
+  assert.equal(parseNfeXml(xml).data_emissao.toISOString(), '2026-09-25T01:19:37.000Z');
+});
+
+test('parseNfeXml: layout antigo <dEmi> (só data) e nota sem data', () => {
+  const comDEmi = `<infNFe Id="NFe35240112345678901234550010000012341123456789"><ide><dEmi>2014-03-10</dEmi></ide></infNFe>`;
+  assert.equal(parseNfeXml(comDEmi).data_emissao.toISOString(), '2014-03-10T15:00:00.000Z');
+  const semData = `<infNFe Id="NFe35240112345678901234550010000012341123456789"><ide></ide></infNFe>`;
+  assert.equal(parseNfeXml(semData).data_emissao, null);
+});
+
+test('importarNfe: pedido novo nasce com criado_em/entrou_na_etapa_em = emissão', async () => {
+  const chamadas = [];
+  const client = {
+    query: async (sql, params) => {
+      chamadas.push({ sql, params });
+      if (/from crm_etapas/.test(sql)) return { rows: [{ id: 'etapa-ganha' }] };
+      if (/insert into crm_clientes/.test(sql)) return { rows: [{ id: 'cliente-1' }] };
+      if (/insert into crm_pedidos /.test(sql)) return { rows: [{ id: 'pedido-novo' }] };
+      if (/numero/.test(sql) && /select/.test(sql)) return { rows: [{ numero: 1, proximo: 1 }] };
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  const emissao = new Date('2026-09-24T22:19:37-03:00');
+  const r = await importarNfe({ connect: async () => client }, 'tenant-1', {
+    chave_nfe: '2'.repeat(44), numero_nota: '9', data_emissao: emissao,
+    cliente: { nome: 'Y', cpf: null, cnpj: null, telefone: null, cidade: null, uf: null },
+    valor_total: 10, identificador_externo_ref: null, itens: [],
+  }, 'nota.xml');
+  assert.equal(r.status, 'criado');
+  const insert = chamadas.find((c) => /insert into crm_pedidos /.test(c.sql));
+  assert.match(insert.sql, /criado_em, entrou_na_etapa_em/);
+  assert.equal(insert.params[7], emissao);
+});
+
+test('importarNfe: reimportar nota já importada corrige a data do pedido', async () => {
+  const chamadas = [];
+  const client = {
+    query: async (sql, params) => {
+      chamadas.push({ sql, params });
+      if (/select id from crm_pedidos where tenant_id = \$1 and chave_nfe = \$2/.test(sql)) return { rows: [{ id: 'pedido-antigo' }] };
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  const emissao = new Date('2026-09-24T22:19:37-03:00');
+  const r = await importarNfe({ connect: async () => client }, 'tenant-1', { chave_nfe: '3'.repeat(44), data_emissao: emissao }, 'nota.xml');
+  assert.deepEqual(r, { status: 'ja_importado', pedido_id: 'pedido-antigo' });
+  const upd = chamadas.find((c) => /update crm_pedidos set criado_em/.test(c.sql));
+  assert.ok(upd, 'deveria corrigir criado_em');
+  assert.deepEqual(upd.params, [emissao, 'pedido-antigo']);
+  assert.match(upd.sql, /origem = 'nfe'/);
+  assert.ok(chamadas.some((c) => c.sql === 'COMMIT'));
+});
