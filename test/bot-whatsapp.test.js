@@ -1,6 +1,23 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio } = require('../lib/bot-whatsapp');
+const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio, estaDentroDoHorarioComercial } = require('../lib/bot-whatsapp');
+
+describe('estaDentroDoHorarioComercial (Seg-Sex 8h-18h, horário de Brasília)', () => {
+  // Datas em UTC escolhidas pra cair em horários conhecidos em
+  // America/Sao_Paulo (UTC-3, sem horário de verão no Brasil desde 2019).
+  test('quarta 10h (Brasília) está dentro', () => {
+    assert.equal(estaDentroDoHorarioComercial(new Date('2026-09-30T13:00:00Z')), true);
+  });
+  test('quarta 7h59 (Brasília) está fora (antes de abrir)', () => {
+    assert.equal(estaDentroDoHorarioComercial(new Date('2026-09-30T10:59:00Z')), false);
+  });
+  test('quarta 18h (Brasília) está fora (já fechou)', () => {
+    assert.equal(estaDentroDoHorarioComercial(new Date('2026-09-30T21:00:00Z')), false);
+  });
+  test('sábado 10h (Brasília) está fora (fim de semana)', () => {
+    assert.equal(estaDentroDoHorarioComercial(new Date('2026-10-03T13:00:00Z')), false);
+  });
+});
 
 describe('textoDaEntrada (histórico de mensagens — o que o cliente mandou)', () => {
   test('texto: devolve o texto puro', () => {
@@ -291,6 +308,37 @@ test('falha ao baixar mídia: avisa o cliente e não avança de estado', async (
   const [envio] = await processarMensagem(pool, { tenantId: TENANT, telefoneE164: TELEFONE, entrada: arquivo('peca.stl'), baixarMidia: baixarMidiaComErro });
   assert.ok(envio.texto.includes('não consegui baixar'));
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'recebendo_arquivos');
+});
+
+describe('falar_atendente (transferência pra humano, pedido do Bruno 2026-10-02)', () => {
+  const DENTRO_DO_HORARIO = () => new Date('2026-09-30T13:00:00Z'); // quarta 10h Brasília
+  const FORA_DO_HORARIO = () => new Date('2026-09-30T21:00:00Z'); // quarta 18h Brasília
+
+  test('dentro do horário: avisa que chamou a equipe e NÃO sai do menu', async () => {
+    const { pool, conversas } = poolFalso();
+    await enviar(pool, TENANT, TELEFONE, texto('oi'));
+    const [envio] = await enviar(pool, TENANT, TELEFONE, botao('falar_atendente'), { agora: DENTRO_DO_HORARIO });
+    assert.equal(envio.tipo, 'texto');
+    assert.ok(envio.texto.includes('Já avisei nossa equipe'));
+    assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
+  });
+
+  test('fora do horário: informa horário comercial em vez de chamar a equipe', async () => {
+    const { pool } = poolFalso();
+    await enviar(pool, TENANT, TELEFONE, texto('oi'));
+    const [envio] = await enviar(pool, TENANT, TELEFONE, botao('falar_atendente'), { agora: FORA_DO_HORARIO });
+    assert.equal(envio.tipo, 'texto');
+    assert.ok(envio.texto.includes('Seg. a Sex., das 8h às 18h'));
+  });
+
+  test('também funciona a partir do menu pós-lojas', async () => {
+    const { pool, conversas } = poolFalso();
+    await enviar(pool, TENANT, TELEFONE, texto('oi'));
+    await enviar(pool, TENANT, TELEFONE, botao('ver_lojas'));
+    const [envio] = await enviar(pool, TENANT, TELEFONE, botao('falar_atendente'), { agora: DENTRO_DO_HORARIO });
+    assert.ok(envio.texto.includes('Já avisei nossa equipe'));
+    assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'pos_lojas');
+  });
 });
 
 test('estado desconhecido/corrompido: reinicia a conversa E manda a saudação (bug real, 2026-09-28)', async () => {
