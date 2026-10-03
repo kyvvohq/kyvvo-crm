@@ -163,6 +163,35 @@ test('importarNfe: pedido novo nasce com criado_em/entrou_na_etapa_em = emissão
   assert.equal(insert.params[7], emissao);
 });
 
+// Bug real (2026-10-03): NF-e importada ficava com valor_recebido=0 e
+// status_pagamento='pendente' (default da coluna) — "total gasto"/"ticket
+// médio" do cliente (soma valor_recebido) e o card "Pagamentos pendentes"
+// do Painel Hoje ficavam errados pra toda venda importada, mesmo já sendo
+// uma venda concluída e faturada no passado.
+test('importarNfe: pedido novo nasce com valor_recebido = valor_total e status_pagamento = pago', async () => {
+  const chamadas = [];
+  const client = {
+    query: async (sql, params) => {
+      chamadas.push({ sql, params });
+      if (/from crm_etapas/.test(sql)) return { rows: [{ id: 'etapa-ganha' }] };
+      if (/insert into crm_clientes/.test(sql)) return { rows: [{ id: 'cliente-1' }] };
+      if (/insert into crm_pedidos /.test(sql)) return { rows: [{ id: 'pedido-novo' }] };
+      if (/numero/.test(sql) && /select/.test(sql)) return { rows: [{ numero: 1, proximo: 1 }] };
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  await importarNfe({ connect: async () => client }, 'tenant-1', {
+    chave_nfe: '4'.repeat(44), numero_nota: '9', data_emissao: new Date(),
+    cliente: { nome: 'Y', cpf: null, cnpj: null, telefone: null, cidade: null, uf: null },
+    valor_total: 250, identificador_externo_ref: null, itens: [],
+  }, 'nota.xml');
+  const insert = chamadas.find((c) => /insert into crm_pedidos /.test(c.sql));
+  assert.match(insert.sql, /valor_total, valor_recebido, status_pagamento/);
+  assert.match(insert.sql, /\$4, \$4, 'pago'/);
+  assert.equal(insert.params[3], 250);
+});
+
 test('importarNfe: reimportar nota já importada corrige a data do pedido', async () => {
   const chamadas = [];
   const client = {

@@ -7,37 +7,45 @@
 <link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
 <style>
-  :root { color-scheme: light; }
+  /* Página sem sidebar/topbar (fluxo de autenticação) — mesmo
+     tokens.css/components.css/shell.css do resto do CRM (2026-10-03: antes
+     era tudo hex fixo, sem suporte a tema escuro). */
   body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:#F8F9FC; color:#0F111A; font-family:'Inter',Arial,Helvetica,sans-serif; }
-  .card { width:100%; max-width:360px; background:#FFFFFF; border:1px solid #E7EAF2; border-radius:16px; padding:32px; }
-  .logo { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
-  .logo img { height:22px; width:auto; }
-  .logo .nome { font-size:16px; font-weight:700; }
-  label { display:block; font-size:13px; font-weight:600; color:#2B3040; margin:16px 0 7px; }
-  input { width:100%; box-sizing:border-box; background:#fff; border:1px solid #D7DCE8; border-radius:12px;
-    height:44px; padding:0 14px; color:#0F111A; font-size:14px; font-family:inherit; }
-  button { width:100%; margin-top:24px; background:#7C5CFC; color:#fff; font-weight:600; border:none;
-    border-radius:12px; height:44px; font-size:14px; cursor:pointer; }
-  button:hover { background:#6344E8; }
-  button:disabled { opacity:.6; cursor:default; }
-  .erro { color:#F04438; font-size:13px; margin-top:12px; min-height:16px; }
+    background:var(--bg); color:var(--text); font-family:var(--font-ui); }
+  .login-card { width:100%; max-width:360px; }
+  .login-logo { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
+  .login-logo img { height:22px; width:auto; }
+  .login-logo .nome { font-size:16px; font-weight:700; font-family:var(--font-titulo); }
+  .login-rodape { text-align:center; font-size:13px; color:var(--muted); margin-top:18px; }
+  .login-rodape a { color:var(--accent); font-weight:600; text-decoration:none; }
+  .erro { color:var(--danger); font-size:13px; margin-top:12px; min-height:16px; }
 </style>
 </head>
 <body>
-  <form class="card" id="form">
-    <div class="logo"><img src="/ds/logo.svg" alt="Kyvvo"><div class="nome">Kyvvo CRM</div></div>
+  <form class="card login-card" id="form">
+    <div class="login-logo"><img src="/ds/logo.svg" class="js-logo-kyvvo" alt="Kyvvo"><div class="nome">Kyvvo CRM</div></div>
     <label for="email">E-mail</label>
     <input id="email" type="email" required autocomplete="username">
     <label for="senha">Senha</label>
     <input id="senha" type="password" required autocomplete="current-password">
     <div class="erro" id="erro"></div>
-    <button type="submit" id="btn">Entrar</button>
+    <button type="submit" id="btn" style="width:100%;margin-top:24px">Entrar</button>
   </form>
-  <p style="text-align:center;font-size:13px;color:#6B7086;margin-top:18px">Ainda não tem conta? <a href="/crm/cadastro.html" style="color:#7C5CFC;font-weight:600;text-decoration:none">Criar conta</a></p>
+  <p class="login-rodape">Ainda não tem conta? <a href="/crm/cadastro.html">Criar conta</a></p>
   <script>
+    // Logo clara/escura conforme o tema — mesma lógica de aplicarLogos()
+    // em shell.js, só que inline aqui porque esta página não carrega
+    // shell.js (não tem topbar/sidebar autenticados).
+    document.querySelectorAll('.js-logo-kyvvo').forEach((img) => {
+      img.src = document.documentElement.getAttribute('data-theme') === 'dark' ? '/ds/logo-dark.svg' : '/ds/logo.svg';
+    });
+
     const form = document.getElementById('form');
     const erro = document.getElementById('erro');
     const btn = document.getElementById('btn');
