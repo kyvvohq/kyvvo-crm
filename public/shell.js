@@ -349,3 +349,134 @@ if (document.getElementById('notificacoes-sino')) {
   carregarNotificacoes();
   setInterval(carregarNotificacoes, 60000);
 }
+
+// Modal genérico de "peça um texto antes de confirmar uma ação destrutiva"
+// (motivo de perda no Quadro, motivo de cancelamento no kebab do Painel
+// Hoje) — movida de quadro.html pra cá em 2026-10-03 pra ser reusável.
+// Resolve com o texto digitado, ou null se cancelado/fechado.
+function pedirTexto(titulo, label, placeholder, textoBotaoConfirmar) {
+  return new Promise((resolve) => {
+    const overlay = abrirModal(`<h3>${titulo}</h3>`, `
+      <label for="pedir-texto-campo">${label}</label>
+      <textarea id="pedir-texto-campo" placeholder="${escapeHtml(placeholder || '')}"></textarea>
+      <div class="modal-erro" id="pedir-texto-erro"></div>
+      <div class="modal-acoes">
+        <button type="button" class="btn-secundario" id="pedir-texto-cancelar">Cancelar</button>
+        <button type="button" class="btn-perigo" id="pedir-texto-confirmar">${textoBotaoConfirmar}</button>
+      </div>
+    `);
+    let resolvido = false;
+    const finalizar = (valor) => {
+      if (resolvido) return;
+      resolvido = true;
+      resolve(valor);
+    };
+    document.getElementById('pedir-texto-cancelar').addEventListener('click', () => { finalizar(null); fecharModal(); });
+    document.getElementById('pedir-texto-confirmar').addEventListener('click', () => {
+      const texto = document.getElementById('pedir-texto-campo').value.trim();
+      if (!texto) { document.getElementById('pedir-texto-erro').textContent = 'Motivo é obrigatório'; return; }
+      finalizar(texto);
+      fecharModal();
+    });
+    // Fechar pelo X, clique fora ou Esc conta como cancelar.
+    overlay.querySelector('#modal-close').addEventListener('click', () => finalizar(null));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) finalizar(null); });
+    document.addEventListener('keydown', function escHandler(e) {
+      if (e.key !== 'Escape') return;
+      finalizar(null);
+      document.removeEventListener('keydown', escHandler);
+    });
+  });
+}
+function pedirMotivoPerda() {
+  return pedirTexto('Motivo da perda', 'Por que este pedido foi perdido?', 'ex.: cliente desistiu, não respondeu, preço...', 'Marcar como perdido');
+}
+function pedirMotivoCancelamento() {
+  return pedirTexto('Cancelar pedido', 'Por que este pedido está sendo cancelado?', 'ex.: cliente desistiu, duplicado...', 'Cancelar pedido');
+}
+
+// --- Ações rápidas por cliente (Painel Hoje: Aniversariantes do mês e
+// Pagamentos pendentes, pedido do Bruno 2026-10-03) — 3 ícones: WhatsApp
+// direto (wa.me), conversa pelo próprio CRM (abrirModalConversa, movida de
+// whatsapp.html pra cá pra ser reusável) e disparo individual (mensagem
+// avulsa agora, usando o modelo já cadastrado da situação).
+function acoesClienteHtml(telefone, nomeCliente, mensagemPadrao) {
+  if (!telefone) return '';
+  const tel = escapeHtml(telefone);
+  const nome = escapeHtml(nomeCliente || '');
+  const msg = escapeHtml(mensagemPadrao || '');
+  return `
+    <div class="acoes-cliente">
+      <a class="acao-whatsapp" href="${linkWhatsapp(telefone, mensagemPadrao)}" target="_blank" rel="noopener" title="Chamar no WhatsApp" aria-label="Chamar no WhatsApp">${icon('message-circle', 16)}</a>
+      <button type="button" class="acao-conversa-crm" data-telefone="${tel}" data-nome="${nome}" title="Conversa pelo CRM" aria-label="Conversa pelo CRM"><img src="/ds/favicon.svg" width="16" height="16" alt=""></button>
+      <button type="button" class="acao-disparo-individual" data-telefone="${tel}" data-nome="${nome}" data-mensagem="${msg}" title="Disparo individual" aria-label="Disparo individual">${icon('zap', 16)}</button>
+    </div>
+  `;
+}
+document.addEventListener('click', (e) => {
+  const btnConversa = e.target.closest('.acao-conversa-crm');
+  if (btnConversa) { abrirModalConversa(btnConversa.dataset.telefone, btnConversa.dataset.nome); return; }
+  const btnDisparo = e.target.closest('.acao-disparo-individual');
+  if (btnDisparo) abrirModalDisparoIndividual(btnDisparo.dataset.telefone, btnDisparo.dataset.nome, btnDisparo.dataset.mensagem);
+});
+
+// Popup com o histórico completo da conversa (igual whatsapp.html > aba
+// Conversas, só que acessível de qualquer tela com shell.js carregado).
+async function abrirModalConversa(telefone, nomeCliente) {
+  abrirModal(
+    `<h3>${escapeHtml(nomeCliente || telefone)}</h3>
+     <p class="modal-texto">${escapeHtml(telefone)}</p>`,
+    '<div class="chat-conversa"><div class="vazio">Carregando…</div></div>'
+  );
+  const res = await apiFetch(`/crm/api/conversas/${encodeURIComponent(telefone)}/mensagens`);
+  const mensagens = await res.json();
+  const chat = document.querySelector('.chat-conversa');
+  if (!chat) return; // modal fechado antes da resposta chegar
+  chat.innerHTML = mensagens.length ? mensagens.map((m) => `
+    <div class="bolha bolha-${m.direcao}">
+      ${escapeHtml(m.conteudo)}
+      <div class="bolha-hora">${formatarDataHora(m.criado_em)}</div>
+    </div>
+  `).join('') : '<div class="vazio">Nenhuma mensagem registrada ainda — essa pessoa nunca escreveu pro bot.</div>';
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// Mensagem avulsa pra 1 cliente agora (fora do fluxo do bot/automações) —
+// pré-preenchida com o modelo da situação (aniversário/pagamento pendente
+// etc.), editável antes de enviar. Precisa de um número de WhatsApp
+// conectado (crm_whatsapp_numeros) — a rota devolve erro claro se não tiver.
+function abrirModalDisparoIndividual(telefone, nomeCliente, mensagemPadrao) {
+  abrirModal(
+    `<h3>Disparo individual</h3><p class="modal-texto">${escapeHtml(nomeCliente || telefone)} · ${escapeHtml(telefone)}</p>`,
+    `
+      <label for="disparo-mensagem">Mensagem</label>
+      <textarea id="disparo-mensagem">${escapeHtml(mensagemPadrao || '')}</textarea>
+      <div class="modal-erro" id="disparo-erro"></div>
+      <div class="modal-acoes">
+        <button type="button" class="btn-secundario" id="disparo-cancelar">Cancelar</button>
+        <button type="button" id="disparo-enviar">Enviar</button>
+      </div>
+    `
+  );
+  document.getElementById('disparo-cancelar').addEventListener('click', fecharModal);
+  document.getElementById('disparo-enviar').addEventListener('click', async () => {
+    const mensagem = document.getElementById('disparo-mensagem').value.trim();
+    const erroEl = document.getElementById('disparo-erro');
+    if (!mensagem) { erroEl.textContent = 'Escreva uma mensagem antes de enviar.'; return; }
+    const btn = document.getElementById('disparo-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+    const res = await apiFetch('/crm/api/disparo-individual', {
+      method: 'POST',
+      body: JSON.stringify({ telefone, mensagem }),
+    });
+    if (!res.ok) {
+      const dados = await res.json().catch(() => ({}));
+      erroEl.textContent = dados.error || 'Erro ao enviar.';
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+      return;
+    }
+    fecharModal();
+  });
+}

@@ -182,6 +182,10 @@
     // selects (não tem um pra "voltar" no meio dos outros filtros).
     const clienteIdFiltroFixo = new URLSearchParams(window.location.search).get('cliente_id');
     document.getElementById('aviso-filtro-cliente').hidden = !clienteIdFiltroFixo;
+    // ?abrir_pedido=<id> (vindo do Painel Hoje — clique na data do pedido em
+    // Orçamentos parados/Pagamentos pendentes, ou o "Editar" do kebab) abre
+    // o modal de edição direto, sem precisar achar a linha na lista.
+    const pedidoAbrirDireto = new URLSearchParams(window.location.search).get('abrir_pedido');
 
     async function carregar() {
       const params = new URLSearchParams();
@@ -216,7 +220,13 @@
       }
 
       renderizar();
+
+      if (pedidoAbrirDireto && !pedidoAbrirDiretoJaProcessado) {
+        pedidoAbrirDiretoJaProcessado = true;
+        if (pedidos.some((p) => p.id === pedidoAbrirDireto)) abrirEdicaoPedido(pedidoAbrirDireto);
+      }
     }
+    let pedidoAbrirDiretoJaProcessado = false;
 
     ['f-etapa', 'f-recurso', 'f-pagamento', 'f-prioridade', 'f-tipo-entrega', 'f-data-inicio', 'f-data-fim'].forEach((id) => {
       document.getElementById(id).addEventListener('change', carregar);
