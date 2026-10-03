@@ -411,7 +411,20 @@ function pedirMotivoCancelamento() {
 // whatsapp.html pra cá pra ser reusável) e disparo individual (mensagem
 // avulsa agora, usando o modelo já cadastrado da situação).
 function acoesClienteHtml(telefone, nomeCliente, mensagemPadrao) {
-  if (!telefone) return '';
+  // Sem telefone, os 3 ícones aparecem desabilitados (cinza, sem clique) em
+  // vez de sumirem — uma pessoa sem telefone cadastrado (ex.: aniversariante
+  // sem WhatsApp na ficha) ainda devia aparecer na lista, só sem como agir
+  // em cima dela. Sumir a linha inteira (tentativa anterior) ficava pior:
+  // parecia que a pessoa tinha desaparecido, não que faltava um dado.
+  if (!telefone) {
+    return `
+      <div class="acoes-cliente acoes-cliente-desabilitado" title="Sem telefone cadastrado">
+        <span>${icon('message-circle', 16)}</span>
+        <span><img src="/ds/favicon.svg" width="16" height="16" alt=""></span>
+        <span>${icon('zap', 16)}</span>
+      </div>
+    `;
+  }
   const tel = escapeHtml(telefone);
   const nome = escapeHtml(nomeCliente || '');
   const msg = escapeHtml(mensagemPadrao || '');

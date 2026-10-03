@@ -222,3 +222,9 @@ a.acao:hover { color:var(--accent-dark); }
   display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
 .acoes-cliente button:hover, .acoes-cliente a:hover { background:var(--accent-tint); color:var(--accent-strong); }
 .acoes-cliente .acao-whatsapp:hover { background:#25D36622; color:#1DA851; }
+
+/* Sem telefone — ícones aparecem desabilitados (cinza, sem clique) em vez
+   de sumirem (ver acoesClienteHtml, shell.js). */
+.acoes-cliente-desabilitado span { width:32px; height:32px; border-radius:50%; background:var(--surface-muted);
+  color:var(--border-strong); flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; opacity:.6; }
+.acoes-cliente-desabilitado img { opacity:.5; filter:grayscale(1); }

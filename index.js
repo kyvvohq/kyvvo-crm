@@ -1764,15 +1764,16 @@ async function build() {
       // ordenado a partir do dia de hoje e dando a volta no mês (dia 31 antes
       // do dia 1, se hoje for dia 20, por exemplo) — "% 31" como teto seguro
       // de dias num mês, só pra ordenar (não representa uma data real).
-      // `telefone is not null` (2026-10-03): sem telefone não dá pra mostrar
-      // os ícones de ação rápida (acoesClienteHtml some sozinha sem
-      // telefone) — ficava parecendo que os ícones "não tinham sido
-      // habilitados" pra aniversariantes, quando na real a linha não tinha
-      // como ação nenhuma.
+      // Mostra todo mundo com aniversário no mês, mesmo sem telefone — um
+      // filtro `telefone is not null` aqui (tentativa anterior de "sempre
+      // ter os ícones") sumia com a pessoa inteira da lista quando ela não
+      // tinha telefone, o que é pior do que ela aparecer sem os ícones de
+      // ação (ver acoesClienteHtml, shell.js, que agora mostra os ícones
+      // desabilitados em vez de sumir).
       pool.query(
         `select id, nome, telefone, extract(day from data_nascimento)::int as dia_nascimento
          from crm_clientes
-         where tenant_id = $1 and data_nascimento is not null and telefone is not null
+         where tenant_id = $1 and data_nascimento is not null
            and extract(month from data_nascimento) = extract(month from current_date)
          order by (extract(day from data_nascimento)::int - extract(day from current_date)::int + 31) % 31`,
         [tenantId]
