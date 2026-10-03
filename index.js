@@ -566,7 +566,7 @@ async function build() {
       filtro = `and (lower(nome) like $2 or telefone like $2 or cpf like $2)`;
     }
     const { rows } = await pool.query(
-      `select id, nome, telefone, email, cidade, uf, origem, segmento, bloqueado, criado_em
+      `select id, nome, telefone, email, cidade, uf, origem, segmento, bloqueado, criado_em, data_nascimento
        from crm_clientes where tenant_id = $1 ${filtro}
        order by nome limit 200`,
       params

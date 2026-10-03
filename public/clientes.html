@@ -128,7 +128,7 @@
       <div class="card" style="padding:0">
         <table>
           <thead>
-            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Segmento</th><th>Origem</th><th>Desde</th><th></th></tr>
+            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Segmento</th><th>Origem</th><th>Nascimento</th><th>Desde</th><th></th></tr>
           </thead>
           <tbody id="tbody-clientes"></tbody>
         </table>
@@ -173,7 +173,7 @@
     function renderizar() {
       const tbody = document.getElementById('tbody-clientes');
       if (!clientes.length) {
-        tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
         return;
       }
       tbody.innerHTML = clientes.map((c) => `
@@ -183,6 +183,7 @@
           <td>${escapeHtml([c.cidade, c.uf].filter(Boolean).join('/') || '—')}</td>
           <td>${escapeHtml(c.segmento || '—')}</td>
           <td>${escapeHtml(c.origem || '—')}</td>
+          <td>${formatarDataSemFuso(c.data_nascimento)}</td>
           <td>${formatarData(c.criado_em)}</td>
           <td>
             <div class="menu-acoes-wrap">
