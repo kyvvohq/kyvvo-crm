@@ -38,6 +38,21 @@
   .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
   .menu-acoes button:hover { background:var(--surface-muted); }
   .menu-acoes button.perigo { color:var(--danger); }
+
+  /* Card "Resumo" — tiles clicáveis (abrem o relatório detalhado) +
+     sublista de "pedidos por etapa" dentro do próprio tile. */
+  .resumo-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:4px; }
+  .resumo-tile { background:var(--surface-muted); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px;
+    text-align:left; height:auto; display:block; color:inherit; font-family:var(--font-ui); }
+  .resumo-tile:hover { background:var(--accent-tint); border-color:var(--accent); }
+  .resumo-tile .rotulo { font-size:11px; font-weight:600; letter-spacing:.4px; color:var(--muted); text-transform:uppercase; }
+  .resumo-tile .valor { font-size:20px; font-weight:700; color:var(--text); margin-top:4px; }
+  .resumo-tile .valor-secundario { font-size:12.5px; color:var(--muted-strong); margin-top:2px; }
+  .resumo-etapas { display:flex; flex-direction:column; gap:6px; }
+  .resumo-etapas .resumo-etapa-linha { display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:transparent; color:var(--text-secondary); border:none; padding:4px 0; height:auto; font-size:13px; text-align:left; width:100%; }
+  .resumo-etapas .resumo-etapa-linha:hover { color:var(--accent-strong); }
+  .resumo-etapas .resumo-etapa-linha .contagem { font-weight:700; color:var(--text); }
 </style>
 </head>
 <body>
@@ -120,6 +135,14 @@
         <div class="textos">
           <div class="linha-titulo"><h1 id="saudacao">Painel Hoje</h1></div>
         </div>
+      </div>
+
+      <!-- Módulo "Resumo" (pedido do Bruno, 2026-10-03) — só aparece se
+           liberado pelo admin pra este tenant (GET /crm/api/resumo-ativo).
+           Cada métrica abre o relatório detalhado já filtrado. -->
+      <div class="card" id="card-resumo" hidden>
+        <h2 class="secao-titulo"><span data-icon="chart-column" data-size="17"></span>Resumo</h2>
+        <div class="resumo-grid" id="resumo-grid"><p class="vazio">Carregando…</p></div>
       </div>
 
       <div class="painel-hoje-grid">
@@ -265,6 +288,51 @@
       ligarEventosOrcamentos();
     }
 
+    // Card "Resumo" — módulo liberado por tenant via kyvvo-admin (pedido do
+    // Bruno, 2026-10-03). Checa o flag antes de gastar a segunda chamada; se
+    // desativado, o card nem aparece (fica hidden desde o HTML).
+    async function carregarResumo() {
+      const resAtivo = await apiFetch('/crm/api/resumo-ativo');
+      const { ativo } = await resAtivo.json();
+      if (!ativo) return;
+
+      document.getElementById('card-resumo').hidden = false;
+      const res = await apiFetch('/crm/api/painel-hoje/resumo');
+      const dados = await res.json();
+
+      const linkLista = (filtros) => `/crm/relatorios.html?lista=1&${new URLSearchParams(filtros).toString()}`;
+
+      document.getElementById('resumo-grid').innerHTML = `
+        <div class="resumo-tile">
+          <div class="rotulo">Pedidos por etapa</div>
+          <div class="resumo-etapas">
+            ${dados.pedidos_por_etapa.map((e) => `
+              <button type="button" class="resumo-etapa-linha" data-ir-lista='${JSON.stringify({ etapa_id: e.etapa_id })}'>
+                <span>${escapeHtml(e.etapa_nome)}</span><span class="contagem">${e.quantidade}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        <button type="button" class="resumo-tile" data-ir-lista='${JSON.stringify({ apenas_hoje: '1' })}'>
+          <div class="rotulo">Pedidos hoje</div>
+          <div class="valor">${dados.novos_pedidos_dia}</div>
+          <div class="valor-secundario">${formatarMoeda(dados.valor_total_dia)}</div>
+        </button>
+        <a class="resumo-tile" href="/crm/whatsapp.html?aba=conversas">
+          <div class="rotulo">Atendimentos do bot hoje</div>
+          <div class="valor">${dados.atendimentos_bot_dia}</div>
+        </a>
+        <button type="button" class="resumo-tile" data-ir-lista='${JSON.stringify({ proximos_entrega_dias: '7' })}'>
+          <div class="rotulo">Pedidos próximos da entrega</div>
+          <div class="valor">${dados.pedidos_proximos_entrega}</div>
+          <div class="valor-secundario">Próximos 7 dias</div>
+        </button>
+      `;
+      document.querySelectorAll('[data-ir-lista]').forEach((el) => {
+        el.addEventListener('click', () => { window.location.href = linkLista(JSON.parse(el.dataset.irLista)); });
+      });
+    }
+
     function fecharMenusOrcamentoAbertos() {
       document.querySelectorAll('[data-menu-orcamento]').forEach((m) => { m.hidden = true; });
     }
@@ -315,6 +383,7 @@
     }
 
     carregar();
+    carregarResumo();
   </script>
 </body>
 </html>

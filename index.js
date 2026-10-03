@@ -22,7 +22,7 @@ const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
 const metaWhatsappService = require('./lib/meta-whatsapp-service');
-const { relatorioPedidos } = require('./lib/relatorios');
+const { relatorioPedidos, listarPedidosDetalhado } = require('./lib/relatorios');
 const { novoDocumentoRelatorio, desenharResumo, desenharTabela, formatarMoedaPdf } = require('./lib/pdf-relatorios');
 const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
@@ -205,6 +205,24 @@ async function build() {
   fastify.delete('/crm/admin-interno/whatsapp-numeros/:phoneNumberId', async (request, reply) => {
     if (!autenticarAdminInterno(request, reply)) return;
     await pool.query('delete from crm_whatsapp_numeros where phone_number_id = $1', [request.params.phoneNumberId]);
+    return { ok: true };
+  });
+
+  // --- Módulo "Resumo" do Painel Hoje — liberado por tenant pelo kyvvo-admin
+  // (catálogo 'crm_resumo' em tenant_modulos, banco do Studio/admin) e
+  // sincronizado aqui porque o CRM não enxerga aquela tabela (banco próprio,
+  // sem tenants). Mesmo padrão de auth dos outros admin-interno.
+  fastify.patch('/crm/admin-interno/resumo-ativo', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { tenant_id: tenantId, ativo } = request.body || {};
+    if (!tenantId || typeof ativo !== 'boolean') {
+      return reply.code(400).send({ error: 'tenant_id e ativo (booleano) são obrigatórios' });
+    }
+    await pool.query(
+      `insert into crm_configuracoes (tenant_id, resumo_ativo, atualizado_em) values ($1, $2, now())
+       on conflict (tenant_id) do update set resumo_ativo = $2, atualizado_em = now()`,
+      [tenantId, ativo]
+    );
     return { ok: true };
   });
 
@@ -1365,11 +1383,22 @@ async function build() {
       segmento: query.segmento || null,
       origem: query.origem || null,
       agruparPor: query.agrupar_por || null,
+      // Drill-down do card "Resumo" (Painel Hoje) — ver lib/relatorios.js.
+      etapaId: query.etapa_id || null,
+      apenasHoje: query.apenas_hoje === '1',
+      proximosEntregaDias: query.proximos_entrega_dias ? Number(query.proximos_entrega_dias) : null,
     };
   }
 
   fastify.get('/crm/api/relatorios/pedidos', { preHandler: fastify.authenticate }, async (request) => {
     return relatorioPedidos(pool, request.user.tenantId, filtrosRelatorioDaQuery(request.query || {}));
+  });
+
+  // Listagem individual (não agrupada) — usada pelo drill-down do card
+  // "Resumo" do Painel Hoje: cada métrica/etapa clicada abre essa lista
+  // filtrada em vez do relatório agregado.
+  fastify.get('/crm/api/relatorios/pedidos/lista', { preHandler: fastify.authenticate }, async (request) => {
+    return listarPedidosDetalhado(pool, request.user.tenantId, filtrosRelatorioDaQuery(request.query || {}));
   });
 
   fastify.get('/crm/api/relatorios/pedidos/pdf', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -1783,6 +1812,50 @@ async function build() {
     };
   });
 
+  // --- Resumo (card do Painel Hoje, pedido do Bruno 2026-10-03) ---------------
+  // Módulo liberado por tenant via kyvvo-admin (ver resumo-ativo acima) —
+  // esta rota não checa o flag, só devolve os números; quem decide mostrar
+  // ou não o card é o frontend, consultando /crm/api/resumo-ativo primeiro.
+  // "Pedidos próximos da entrega" usa uma janela fixa de 7 dias — mesmo
+  // princípio de default simples e documentado já usado em
+  // lib/bot-whatsapp.js (horário comercial) antes de virar configurável, só
+  // que aqui não foi pedido pra ser configurável.
+  fastify.get('/crm/api/painel-hoje/resumo', { preHandler: fastify.authenticate }, async (request) => {
+    const { tenantId } = request.user;
+    const [porEtapa, hoje, atendimentosBot, proximosEntrega] = await Promise.all([
+      pool.query(
+        `select e.id as etapa_id, e.nome as etapa_nome, count(p.id)::int as quantidade
+         from crm_etapas e left join crm_pedidos p on p.etapa_id = e.id
+         where e.tenant_id = $1 group by e.id, e.nome, e.ordem order by e.ordem`,
+        [tenantId]
+      ),
+      pool.query(
+        `select count(*)::int as quantidade, coalesce(sum(p.valor_total), 0) as valor_total
+         from crm_pedidos p join crm_etapas e on e.id = p.etapa_id
+         where p.tenant_id = $1 and p.criado_em::date = current_date and e.tipo != 'perdida'`,
+        [tenantId]
+      ),
+      pool.query(
+        `select count(distinct telefone_e164)::int as quantidade from crm_mensagens_whatsapp
+         where tenant_id = $1 and direcao = 'recebida' and criado_em::date = current_date`,
+        [tenantId]
+      ),
+      pool.query(
+        `select count(*)::int as quantidade from crm_pedidos p join crm_etapas e on e.id = p.etapa_id
+         where p.tenant_id = $1 and e.tipo != 'perdida'
+           and p.data_entrega between current_date and current_date + interval '7 days'`,
+        [tenantId]
+      ),
+    ]);
+    return {
+      pedidos_por_etapa: porEtapa.rows,
+      novos_pedidos_dia: hoje.rows[0].quantidade,
+      valor_total_dia: hoje.rows[0].valor_total,
+      atendimentos_bot_dia: atendimentosBot.rows[0].quantidade,
+      pedidos_proximos_entrega: proximosEntrega.rows[0].quantidade,
+    };
+  });
+
   // --- Notificações (balão do topo + Configurações > Notificações) -------------
   // Cálculo dos pendentes por tipo vive em lib/notificacoes.js — aqui é só
   // leitura (GET) e o save de qual tipo está ativo/config extra (PATCH),
@@ -1835,6 +1908,13 @@ async function build() {
   // tempo de retomada de conversa parada e dias de visibilidade da última
   // coluna do Quadro — mesmo padrão de upsert em crm_configuracoes já usado
   // pelas Notificações, só tocando as colunas desta tela.
+  // Só leitura — liberado/desligado pelo kyvvo-admin (módulo 'crm_resumo'),
+  // não pela própria conta (ver PATCH /crm/admin-interno/resumo-ativo).
+  fastify.get('/crm/api/resumo-ativo', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select resumo_ativo from crm_configuracoes where tenant_id = $1', [request.user.tenantId]);
+    return { ativo: !!(rows[0] && rows[0].resumo_ativo) };
+  });
+
   fastify.get('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
       `select horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna

@@ -154,6 +154,16 @@
             <tbody id="relatorio-detalhado-tbody"></tbody>
           </table>
         </div>
+
+        <!-- Drill-down do card "Resumo" do Painel Hoje (?lista=1&...) —
+             listagem individual de pedidos, não agregada. Some o resto do
+             card (KPIs/agrupado) quando ativa. -->
+        <div class="tabela-wrapper" id="relatorio-lista-wrap" hidden>
+          <table>
+            <thead><tr><th>Cliente</th><th>WhatsApp</th><th>Data do pedido</th><th>Valor</th><th>Data de entrega</th><th>Tipo de frete</th><th>Valor de frete</th></tr></thead>
+            <tbody id="relatorio-lista-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -164,6 +174,19 @@
   <script src="/crm/shell.js"></script>
   <script>
     const TITULOS_AGRUPAMENTO = { dia: 'Dia', cliente: 'Cliente', tipo_entrega: 'Tipo de frete', segmento: 'Segmento', origem: 'Origem' };
+
+    // Drill-down do card "Resumo" (Painel Hoje) — chega como
+    // ?lista=1&etapa_id=...|apenas_hoje=1|proximos_entrega_dias=7, filtros
+    // que não têm controle próprio na tela (ficam fixos pra essa visita,
+    // só combinados com o que a pessoa ajustar em período/tipo de frete/
+    // segmento/origem, se quiser refinar mais).
+    const paramsUrl = new URLSearchParams(window.location.search);
+    const modoLista = paramsUrl.get('lista') === '1';
+    const filtrosFixosLista = {
+      etapa_id: paramsUrl.get('etapa_id') || null,
+      apenas_hoje: paramsUrl.get('apenas_hoje') || null,
+      proximos_entrega_dias: paramsUrl.get('proximos_entrega_dias') || null,
+    };
 
     async function carregarOpcoes(tipo, selectId) {
       const res = await apiFetch(`/crm/api/opcoes-cadastro?tipo=${tipo}`);
@@ -191,6 +214,7 @@
       if (segmento) params.set('segmento', segmento);
       if (origem) params.set('origem', origem);
       if (agrupar) params.set('agrupar_por', agrupar);
+      Object.entries(filtrosFixosLista).forEach(([chave, valor]) => { if (valor) params.set(chave, valor); });
       return params;
     }
 
@@ -200,6 +224,28 @@
       // exibir o dia anterior.
       const [ano, mes, dia] = String(iso).slice(0, 10).split('-');
       return `${dia}/${mes}/${ano}`;
+    }
+
+    async function carregarListaDetalhada() {
+      const params = filtrosAtuais();
+      const res = await apiFetch(`/crm/api/relatorios/pedidos/lista?${params.toString()}`);
+      const pedidos = await res.json();
+
+      document.getElementById('relatorio-kpis').innerHTML = `
+        <div class="relatorio-kpi"><div class="rotulo">Pedidos</div><div class="valor">${pedidos.length}</div></div>
+        <div class="relatorio-kpi"><div class="rotulo">Valor total</div><div class="valor">${formatarMoeda(pedidos.reduce((soma, p) => soma + Number(p.valor_total || 0), 0))}</div></div>
+      `;
+      document.getElementById('relatorio-lista-tbody').innerHTML = pedidos.length ? pedidos.map((p) => `
+        <tr>
+          <td>${escapeHtml(p.cliente_nome || '—')}</td>
+          <td>${escapeHtml(p.cliente_telefone || '—')}</td>
+          <td>${formatarData(p.criado_em)}</td>
+          <td>${formatarMoeda(p.valor_total)}</td>
+          <td>${p.data_entrega ? formatarData(p.data_entrega) : '—'}</td>
+          <td>${escapeHtml(p.tipo_entrega || '—')}</td>
+          <td>${p.frete != null ? formatarMoeda(p.frete) : '—'}</td>
+        </tr>
+      `).join('') : '<tr><td colspan="7">Nenhum pedido encontrado com esses filtros.</td></tr>';
     }
 
     async function carregarRelatorio() {
@@ -230,7 +276,18 @@
       }
     }
 
-    document.getElementById('btn-filtrar').addEventListener('click', carregarRelatorio);
+    if (modoLista) {
+      // Some com o "Detalhar por" (não se aplica à listagem individual) e
+      // com "Exportar PDF" (o PDF usa o relatório agregado, formato
+      // diferente do que esta tela mostra em modo lista) — troca a função de
+      // carregar/filtrar pela versão sem agregação.
+      document.getElementById('f-agrupar').closest('.campo').hidden = true;
+      document.getElementById('btn-exportar-pdf').hidden = true;
+      document.getElementById('relatorio-lista-wrap').hidden = false;
+      document.getElementById('btn-filtrar').addEventListener('click', carregarListaDetalhada);
+    } else {
+      document.getElementById('btn-filtrar').addEventListener('click', carregarRelatorio);
+    }
 
     // Baixa o PDF via blob (não dá pra navegar direto pra uma rota
     // autenticada por Bearer token — mesmo padrão já usado na exportação de
@@ -252,7 +309,7 @@
     carregarOpcoes('tipo_entrega', 'f-tipo-entrega');
     carregarOpcoes('segmento', 'f-segmento');
     carregarOpcoes('origem', 'f-origem');
-    carregarRelatorio();
+    if (modoLista) carregarListaDetalhada(); else carregarRelatorio();
   </script>
 </body>
 </html>
