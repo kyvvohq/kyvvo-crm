@@ -137,10 +137,10 @@
         </div>
       </div>
 
-      <!-- Módulo "Resumo" (pedido do Bruno, 2026-10-03) — só aparece se
-           liberado pelo admin pra este tenant (GET /crm/api/resumo-ativo).
-           Cada métrica abre o relatório detalhado já filtrado. -->
-      <div class="card" id="card-resumo" hidden>
+      <!-- "Resumo" (pedido do Bruno, 2026-10-03) — parte padrão do Painel
+           Hoje, sempre visível pra quem tem CRM. Cada métrica abre o
+           relatório detalhado já filtrado. -->
+      <div class="card" id="card-resumo">
         <h2 class="secao-titulo"><span data-icon="chart-column" data-size="17"></span>Resumo</h2>
         <div class="resumo-grid" id="resumo-grid"><p class="vazio">Carregando…</p></div>
       </div>
@@ -288,15 +288,10 @@
       ligarEventosOrcamentos();
     }
 
-    // Card "Resumo" — módulo liberado por tenant via kyvvo-admin (pedido do
-    // Bruno, 2026-10-03). Checa o flag antes de gastar a segunda chamada; se
-    // desativado, o card nem aparece (fica hidden desde o HTML).
+    // Card "Resumo" — parte padrão do Painel Hoje (pedido do Bruno,
+    // 2026-10-03: sempre ativo, sem toggle por tenant; o controle de acesso
+    // já existente pro produto CRM em si é suficiente).
     async function carregarResumo() {
-      const resAtivo = await apiFetch('/crm/api/resumo-ativo');
-      const { ativo } = await resAtivo.json();
-      if (!ativo) return;
-
-      document.getElementById('card-resumo').hidden = false;
       const res = await apiFetch('/crm/api/painel-hoje/resumo');
       const dados = await res.json();
 
