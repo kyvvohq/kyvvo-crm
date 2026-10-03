@@ -236,6 +236,29 @@ async function build() {
     return rows;
   });
 
+  // Disparo manual pra 1 cliente (Painel Hoje — ícone "Disparo individual",
+  // pedido do Bruno 2026-10-03): fora do fluxo automático do bot/automações,
+  // o operador escreve/edita a mensagem na hora e manda agora. Usa o mesmo
+  // número conectado do tenant (crm_whatsapp_numeros) e registra no
+  // histórico igual uma mensagem enviada pelo bot (aparece em Conversas).
+  fastify.post('/crm/api/disparo-individual', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { telefone, mensagem } = request.body || {};
+    const telefoneE164 = paraE164(telefone);
+    if (!telefoneE164 || !mensagem || !mensagem.trim()) {
+      return reply.code(400).send({ error: 'Telefone e mensagem são obrigatórios' });
+    }
+    const { rows } = await pool.query('select phone_number_id from crm_whatsapp_numeros where tenant_id = $1 limit 1', [tenantId]);
+    const phoneNumberId = rows[0] && rows[0].phone_number_id;
+    if (!phoneNumberId) return reply.code(409).send({ error: 'Nenhum WhatsApp conectado — conecte em Configurações > WhatsApp.' });
+
+    const enviado = await enviarTexto({ to: telefoneE164, texto: mensagem, phoneNumberId });
+    if (!enviado) return reply.code(502).send({ error: 'Falha ao enviar a mensagem pelo WhatsApp.' });
+
+    await registrarMensagem(pool, { tenantId, telefoneE164, direcao: 'enviada', tipo: 'texto', conteudo: mensagem });
+    return { ok: true };
+  });
+
   // --- Self-service de conexão do WhatsApp (Embedded Signup da Meta) -------
   // Mesmo fluxo do kyvvo-studio (server/panel/routes/whatsapp-config.js),
   // adaptado pro modelo multi-número do CRM (crm_whatsapp_numeros em vez de
@@ -1707,7 +1730,7 @@ async function build() {
 
     const [orcamentosParados, pagamentosPendentes, aniversariantes, etapaProntoId] = await Promise.all([
       pool.query(
-        `select p.id, p.cliente_id, c.nome as cliente_nome, c.telefone as cliente_telefone, e.nome as etapa_nome,
+        `select p.id, p.cliente_id, p.criado_em, p.etapa_id, c.nome as cliente_nome, c.telefone as cliente_telefone, e.nome as etapa_nome,
                 extract(day from now() - p.entrou_na_etapa_em)::int as dias_parado
          from crm_pedidos p
          join crm_etapas e on e.id = p.etapa_id
@@ -1718,7 +1741,7 @@ async function build() {
         [tenantId]
       ),
       pool.query(
-        `select p.id, p.cliente_id, c.nome as cliente_nome, c.telefone as cliente_telefone, p.valor_total, p.valor_recebido
+        `select p.id, p.cliente_id, p.criado_em, c.nome as cliente_nome, c.telefone as cliente_telefone, p.valor_total, p.valor_recebido
          from crm_pedidos p
          join crm_etapas e on e.id = p.etapa_id
          join crm_clientes c on c.id = p.cliente_id
@@ -1726,11 +1749,16 @@ async function build() {
          order by p.criado_em`,
         [tenantId]
       ),
+      // Aniversariantes DO MÊS (pedido do Bruno, 2026-10-03 — era só "hoje"),
+      // ordenado a partir do dia de hoje e dando a volta no mês (dia 31 antes
+      // do dia 1, se hoje for dia 20, por exemplo) — "% 31" como teto seguro
+      // de dias num mês, só pra ordenar (não representa uma data real).
       pool.query(
-        `select id, nome, telefone from crm_clientes
+        `select id, nome, telefone, extract(day from data_nascimento)::int as dia_nascimento
+         from crm_clientes
          where tenant_id = $1 and data_nascimento is not null
            and extract(month from data_nascimento) = extract(month from current_date)
-           and extract(day from data_nascimento) = extract(day from current_date)`,
+         order by (extract(day from data_nascimento)::int - extract(day from current_date)::int + 31) % 31`,
         [tenantId]
       ),
       buscarEtapaPronto(pool, tenantId),

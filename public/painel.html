@@ -25,6 +25,19 @@
   .item-hoje .meta { font-size:12px; color:var(--muted); margin-top:2px; }
   .item-hoje .btn-whats { flex-shrink:0; height:32px; padding:0 12px; font-size:12.5px; background:#25D366; }
   .item-hoje .btn-whats:hover { background:#1DA851; }
+  .item-hoje .data-pedido { flex-shrink:0; background:transparent; color:var(--accent); font-weight:600; font-size:12.5px;
+    padding:0 6px; height:auto; text-decoration:underline; }
+  .item-hoje .data-pedido:hover { color:var(--accent-dark); }
+
+  /* Kebab (Orçamentos parados) — mesmo padrão já usado em pedidos.html. */
+  .menu-acoes-wrap { position:relative; display:inline-block; flex-shrink:0; }
+  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
+  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
+  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
+    box-shadow:var(--shadow-md); min-width:200px; z-index:20; padding:6px; }
+  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
+  .menu-acoes button:hover { background:var(--surface-muted); }
+  .menu-acoes button.perigo { color:var(--danger); }
 </style>
 </head>
 <body>
@@ -123,7 +136,7 @@
           <div id="lista-prontos"><p class="vazio">Carregando…</p></div>
         </div>
         <div class="card">
-          <h2 class="secao-titulo"><span data-icon="cake" data-size="17"></span>Aniversariantes de hoje</h2>
+          <h2 class="secao-titulo"><span data-icon="cake" data-size="17"></span>Aniversariantes do mês</h2>
           <div id="lista-aniversariantes"><p class="vazio">Carregando…</p></div>
         </div>
       </div>
@@ -149,6 +162,62 @@
       `;
     }
 
+    // Orçamentos parados (pedido do Bruno, 2026-10-03): data do pedido vira
+    // link pra abrir a edição direto em Pedidos, + kebab com Editar/Mover
+    // pra próxima etapa/Cancelar — igual o padrão de kebab já usado em
+    // pedidos.html/quadro.html.
+    function itemOrcamentoHtml(o) {
+      return `
+        <div class="item-hoje">
+          <div class="info">
+            <div class="nome">${escapeHtml(o.cliente_nome)}</div>
+            <div class="meta">${escapeHtml(o.etapa_nome)} há ${o.dias_parado} dia${o.dias_parado === 1 ? '' : 's'}</div>
+          </div>
+          <button type="button" class="data-pedido" data-abrir-pedido="${o.id}">${formatarData(o.criado_em)}</button>
+          ${o.cliente_telefone ? `<a class="btn btn-whats" href="${linkWhatsapp(o.cliente_telefone, preencherModelo('orcamento_parado', o.cliente_nome))}" target="_blank" rel="noopener">${icon('message-circle', 14)} WhatsApp</a>` : ''}
+          <div class="menu-acoes-wrap">
+            <button type="button" class="btn-acoes" data-abrir-menu-orcamento="${o.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
+            <div class="menu-acoes" data-menu-orcamento="${o.id}" hidden>
+              <button type="button" data-editar-orcamento="${o.id}">Editar</button>
+              <button type="button" data-mover-proxima-etapa="${o.id}" data-etapa-atual="${o.etapa_id}">Mover pra próxima etapa</button>
+              <button type="button" class="perigo" data-cancelar-orcamento="${o.id}">Cancelar pedido</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Pagamentos pendentes: data do pedido (mesmo link) + os 3 ícones de
+    // ação rápida (WhatsApp/conversa pelo CRM/disparo individual) — mesmos
+    // usados nos Aniversariantes do mês (acoesClienteHtml, shell.js).
+    function itemPagamentoHtml(p) {
+      return `
+        <div class="item-hoje">
+          <div class="info">
+            <div class="nome">${escapeHtml(p.cliente_nome)}</div>
+            <div class="meta">${formatarMoeda(p.valor_total - p.valor_recebido)} pendente</div>
+          </div>
+          <button type="button" class="data-pedido" data-abrir-pedido="${p.id}">${formatarData(p.criado_em)}</button>
+          ${acoesClienteHtml(p.cliente_telefone, p.cliente_nome, preencherModelo('pagamento_pendente', p.cliente_nome))}
+        </div>
+      `;
+    }
+
+    // Aniversariantes do mês (pedido do Bruno, 2026-10-03 — era só "hoje"):
+    // dia_nascimento vem calculado do backend (extract(day from ...)) pra
+    // não depender de parsear a data no fuso errado no navegador.
+    function itemAniversarioHtml(a) {
+      return `
+        <div class="item-hoje">
+          <div class="info">
+            <div class="nome">${escapeHtml(a.nome)}</div>
+            <div class="meta">Dia ${a.dia_nascimento} 🎂</div>
+          </div>
+          ${acoesClienteHtml(a.telefone, a.nome, preencherModelo('aniversario', a.nome))}
+        </div>
+      `;
+    }
+
     function renderLista(elId, itens, vazioMsg) {
       const el = document.getElementById(elId);
       el.innerHTML = itens.length ? itens.join('') : `<p class="vazio">${vazioMsg}</p>`;
@@ -163,27 +232,26 @@
       return texto.replace(/\{\{nome\}\}/g, (nomeCompleto || '').split(' ')[0] || '');
     }
 
+    let etapas = [];
+    function proximaEtapa(etapaAtualId) {
+      const atual = etapas.find((e) => e.id === etapaAtualId);
+      if (!atual) return null;
+      const candidatas = etapas.filter((e) => e.ordem > atual.ordem && e.tipo !== 'perdida').sort((a, b) => a.ordem - b.ordem);
+      return candidatas[0] || null;
+    }
+
     async function carregar() {
-      const [resPainel, resModelos] = await Promise.all([
+      const [resPainel, resModelos, resEtapas] = await Promise.all([
         apiFetch('/crm/api/painel-hoje'),
         apiFetch('/crm/api/modelos-mensagem'),
+        apiFetch('/crm/api/etapas'),
       ]);
       const dados = await resPainel.json();
       modelosMensagem = Object.fromEntries((await resModelos.json()).map((m) => [m.chave, m]));
+      etapas = await resEtapas.json();
 
-      renderLista('lista-orcamentos', dados.orcamentos_parados.map((o) => itemHtml({
-        nome: o.cliente_nome,
-        telefone: o.cliente_telefone,
-        meta: `${o.etapa_nome} há ${o.dias_parado} dia${o.dias_parado === 1 ? '' : 's'}`,
-        mensagem: preencherModelo('orcamento_parado', o.cliente_nome),
-      })), 'Nenhum orçamento parado. 🎉');
-
-      renderLista('lista-pagamentos', dados.pagamentos_pendentes.map((p) => itemHtml({
-        nome: p.cliente_nome,
-        telefone: p.cliente_telefone,
-        meta: `${formatarMoeda(p.valor_total - p.valor_recebido)} pendente`,
-        mensagem: preencherModelo('pagamento_pendente', p.cliente_nome),
-      })), 'Nenhum pagamento pendente.');
+      renderLista('lista-orcamentos', dados.orcamentos_parados.map(itemOrcamentoHtml), 'Nenhum orçamento parado. 🎉');
+      renderLista('lista-pagamentos', dados.pagamentos_pendentes.map(itemPagamentoHtml), 'Nenhum pagamento pendente.');
 
       renderLista('lista-prontos', dados.prontos_para_envio.map((p) => itemHtml({
         nome: p.cliente_nome,
@@ -192,12 +260,58 @@
         mensagem: preencherModelo('pedido_pronto', p.cliente_nome),
       })), 'Nada pronto pra envio agora.');
 
-      renderLista('lista-aniversariantes', dados.aniversariantes.map((a) => itemHtml({
-        nome: a.nome,
-        telefone: a.telefone,
-        meta: 'Aniversário hoje 🎂',
-        mensagem: preencherModelo('aniversario', a.nome),
-      })), 'Nenhum aniversariante hoje.');
+      renderLista('lista-aniversariantes', dados.aniversariantes.map(itemAniversarioHtml), 'Nenhum aniversariante este mês.');
+
+      ligarEventosOrcamentos();
+    }
+
+    function fecharMenusOrcamentoAbertos() {
+      document.querySelectorAll('[data-menu-orcamento]').forEach((m) => { m.hidden = true; });
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#lista-orcamentos .menu-acoes-wrap')) fecharMenusOrcamentoAbertos();
+    });
+
+    function ligarEventosOrcamentos() {
+      document.querySelectorAll('#lista-orcamentos [data-abrir-pedido]').forEach((btn) => {
+        btn.addEventListener('click', () => { window.location.href = `/crm/pedidos.html?abrir_pedido=${btn.dataset.abrirPedido}`; });
+      });
+      document.querySelectorAll('#lista-orcamentos [data-abrir-menu-orcamento]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const menu = document.querySelector(`[data-menu-orcamento="${btn.dataset.abrirMenuOrcamento}"]`);
+          const jaAberto = !menu.hidden;
+          fecharMenusOrcamentoAbertos();
+          menu.hidden = jaAberto;
+        });
+      });
+      document.querySelectorAll('#lista-orcamentos [data-editar-orcamento]').forEach((btn) => {
+        btn.addEventListener('click', () => { window.location.href = `/crm/pedidos.html?abrir_pedido=${btn.dataset.editarOrcamento}`; });
+      });
+      document.querySelectorAll('#lista-orcamentos [data-mover-proxima-etapa]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          fecharMenusOrcamentoAbertos();
+          const proxima = proximaEtapa(btn.dataset.etapaAtual);
+          if (!proxima) { avisar('Sem próxima etapa', 'Esse pedido já está na última etapa aberta.'); return; }
+          await apiFetch(`/crm/api/pedidos/${btn.dataset.moverProximaEtapa}/etapa`, {
+            method: 'PATCH',
+            body: JSON.stringify({ etapa_id: proxima.id }),
+          });
+          carregar();
+        });
+      });
+      document.querySelectorAll('#lista-orcamentos [data-cancelar-orcamento]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          fecharMenusOrcamentoAbertos();
+          const motivo = await pedirMotivoCancelamento();
+          if (!motivo) return;
+          await apiFetch(`/crm/api/pedidos/${btn.dataset.cancelarOrcamento}/cancelar`, {
+            method: 'POST',
+            body: JSON.stringify({ motivo }),
+          });
+          carregar();
+        });
+      });
     }
 
     carregar();

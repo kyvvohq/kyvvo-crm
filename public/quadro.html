@@ -607,43 +607,8 @@
       });
     }
 
-    // Modal próprio no lugar do prompt() nativo (US27) — window.prompt trava
-    // automação de browser e destoa do resto da UI, que já usa abrirModal em
-    // todo canto. Resolve com o texto digitado, ou null se cancelado/fechado.
-    function pedirMotivoPerda() {
-      return new Promise((resolve) => {
-        const overlay = abrirModal('<h3>Motivo da perda</h3>', `
-          <label for="motivo-perda-texto">Por que este pedido foi perdido?</label>
-          <textarea id="motivo-perda-texto" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
-          <div class="modal-erro" id="motivo-perda-erro"></div>
-          <div class="modal-acoes">
-            <button type="button" class="btn-secundario" id="motivo-perda-cancelar">Cancelar</button>
-            <button type="button" class="btn-perigo" id="motivo-perda-confirmar">Marcar como perdido</button>
-          </div>
-        `);
-        let resolvido = false;
-        const finalizar = (valor) => {
-          if (resolvido) return;
-          resolvido = true;
-          resolve(valor);
-        };
-        document.getElementById('motivo-perda-cancelar').addEventListener('click', () => { finalizar(null); fecharModal(); });
-        document.getElementById('motivo-perda-confirmar').addEventListener('click', () => {
-          const texto = document.getElementById('motivo-perda-texto').value.trim();
-          if (!texto) { document.getElementById('motivo-perda-erro').textContent = 'Motivo é obrigatório'; return; }
-          finalizar(texto);
-          fecharModal();
-        });
-        // Fechar pelo X, clique fora ou Esc conta como cancelar.
-        overlay.querySelector('#modal-close').addEventListener('click', () => finalizar(null));
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) finalizar(null); });
-        document.addEventListener('keydown', function escHandler(e) {
-          if (e.key !== 'Escape') return;
-          finalizar(null);
-          document.removeEventListener('keydown', escHandler);
-        });
-      });
-    }
+    // pedirMotivoPerda virou compartilhada em shell.js (2026-10-03 — junto
+    // com pedirMotivoCancelamento, também usada pelo kebab do Painel Hoje).
 
     async function moverPedido(pedidoId, etapaId, raiaId, tipoEtapa) {
       const pedido = pedidos.find((p) => p.id === pedidoId);

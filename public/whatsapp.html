@@ -13,14 +13,8 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  /* Chat da conversa — igual ao modal do Studio (lib: mesma ideia de bolhas,
-     mais recente embaixo), aberto a partir da linha da tabela em vez de um
-     painel sempre visível (ver abrirModalConversa()). */
-  .chat-conversa { display:flex; flex-direction:column; gap:8px; max-height:60vh; overflow-y:auto; padding:4px 2px; }
-  .bolha { max-width:70%; padding:8px 12px; border-radius:12px; font-size:13.5px; white-space:pre-wrap; }
-  .bolha-recebida { align-self:flex-start; background:var(--surface-muted); color:var(--text); border-bottom-left-radius:2px; }
-  .bolha-enviada { align-self:flex-end; background:var(--accent-tint); color:var(--accent-strong); border-bottom-right-radius:2px; }
-  .bolha-hora { font-size:10px; color:var(--muted); margin-top:3px; }
+  /* .chat-conversa/.bolha-* viraram compartilhados em shell.css (2026-10-03
+     — abrirModalConversa também virou shell.js, reusada pelo Painel Hoje). */
   .linha-conversa { cursor:pointer; }
 </style>
 </head>
@@ -159,7 +153,7 @@
       const res = await apiFetch('/crm/api/conversas');
       conversas = await res.json();
       renderizarTabela();
-      if (telefoneAbrirDireto) abrirModalConversa(telefoneAbrirDireto);
+      if (telefoneAbrirDireto) abrirConversaDaLista(telefoneAbrirDireto);
     }
 
     function renderizarTabela() {
@@ -174,30 +168,16 @@
       `).join('') : '<tr><td colspan="4">Nenhuma conversa registrada ainda.</td></tr>';
 
       tbody.querySelectorAll('[data-telefone]').forEach((tr) => {
-        tr.addEventListener('click', () => abrirModalConversa(tr.dataset.telefone));
+        tr.addEventListener('click', () => abrirConversaDaLista(tr.dataset.telefone));
       });
     }
 
-    // Popup com o histórico completo (mesma ideia do Studio: bolhas de
-    // cliente/enviada, mais recente embaixo, abre já rolado pro fim).
-    async function abrirModalConversa(telefone) {
+    // abrirModalConversa (shell.js) é compartilhada com o Painel Hoje — aqui
+    // só resolve o nome do cliente a partir da lista já carregada antes de
+    // chamar.
+    function abrirConversaDaLista(telefone) {
       const conversa = conversas.find((c) => c.telefone_e164 === telefone);
-      abrirModal(
-        `<h3>${escapeHtml((conversa && conversa.cliente_nome) || telefone)}</h3>
-         <p class="modal-texto">${escapeHtml(telefone)}</p>`,
-        '<div class="chat-conversa"><div class="vazio">Carregando…</div></div>'
-      );
-      const res = await apiFetch(`/crm/api/conversas/${encodeURIComponent(telefone)}/mensagens`);
-      const mensagens = await res.json();
-      const chat = document.querySelector('.chat-conversa');
-      if (!chat) return; // modal fechado antes da resposta chegar
-      chat.innerHTML = mensagens.length ? mensagens.map((m) => `
-        <div class="bolha bolha-${m.direcao}">
-          ${escapeHtml(m.conteudo)}
-          <div class="bolha-hora">${new Date(m.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
-        </div>
-      `).join('') : '<div class="vazio">Nenhuma mensagem registrada.</div>';
-      chat.scrollTop = chat.scrollHeight;
+      abrirModalConversa(telefone, conversa && conversa.cliente_nome);
     }
 
     // --- Conectar (Embedded Signup da Meta) -----------------------------------
