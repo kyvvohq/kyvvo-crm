@@ -28,14 +28,21 @@
   .raia-label .btn-remover-recurso { opacity:0; }
   .raia-label:hover .btn-remover-recurso { opacity:1; }
 
-  /* Recolher a coluna de recursos — botão no canto superior esquerdo do
-     quadro (1ª célula da grade, antes um <div></div> vazio) e "avatar" com
-     iniciais no lugar do nome completo em cada raia (ver iniciaisRecurso() e
-     --largura-raia, setada em renderizar()). */
-  .btn-recolher-recursos { position:sticky; left:0; z-index:4; width:100%; height:100%; min-height:38px;
-    display:flex; align-items:center; justify-content:center; background:var(--sunken); border:1px solid var(--border);
-    border-radius:var(--radius-md); color:var(--muted-strong); padding:0; }
-  .btn-recolher-recursos:hover { background:var(--surface-muted); color:var(--text); }
+  /* Recolher a coluna de recursos — ícone igual ao de recolher o menu
+     lateral (mesmo chevron único que gira 180° via CSS, em vez de trocar de
+     ícone — pedido do Bruno, 2026-10-03) + botão "+ Recurso" agora juntos no
+     cabeçalho da própria coluna de recursos (1ª célula da grade, antes um
+     <div></div> vazio) — antes "+ Recurso" ficava dentro do cabeçalho de "A
+     fazer", a coluna vizinha. "Avatar" com iniciais no lugar do nome
+     completo em cada raia (ver iniciaisRecurso() e --largura-raia, setada em
+     renderizar()). */
+  .cabecalho-recursos { position:sticky; left:0; z-index:4; display:flex; align-items:center; gap:4px; height:100%; min-height:38px; }
+  .btn-recolher-recursos { flex-shrink:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    background:var(--card); border:1px solid var(--border); border-radius:50%; color:var(--muted-strong); padding:0; }
+  .btn-recolher-recursos:hover { background:var(--surface-hover); color:var(--text); }
+  .btn-recolher-recursos svg { transition:transform .18s ease; }
+  .quadro-grid.recursos-recolhido .btn-recolher-recursos svg { transform:rotate(180deg); }
+  .quadro-grid.recursos-recolhido .cabecalho-recursos { justify-content:center; }
   .quadro-grid.recursos-recolhido .raia-label { justify-content:center; padding:10px 4px; }
   .raia-avatar { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
     border-radius:50%; background:var(--accent-tint); color:var(--accent-strong); font-size:12px; font-weight:700; flex-shrink:0; }
@@ -79,13 +86,19 @@
   .coluna-header .btn-pronto:hover { color:var(--accent); }
   .coluna-header .btn-pronto.ativo { color:var(--accent-strong); }
 
-  /* "+ Recurso" — fica dentro do cabeçalho da coluna fixa "A fazer" (pedido
-     do Bruno), no lugar onde ficaria o "✕ apagar etapa" das outras colunas
-     (ela nunca ganha esse botão, ver renderizar()). Cor de destaque própria
-     — sem isso herdaria o hover vermelho genérico de .coluna-header button,
-     que é pensado pra ação de apagar. */
-  .coluna-header .btn-novo-recurso-coluna { display:flex; align-items:center; gap:4px; color:var(--accent-strong); font-weight:600; }
-  .coluna-header .btn-novo-recurso-coluna:hover { background:var(--accent-tint); color:var(--accent-strong); }
+  /* "+ Recurso" — fica no cabeçalho da coluna de recursos, junto do botão de
+     recolher (pedido do Bruno, 2026-10-03: antes ficava dentro do cabeçalho
+     da coluna fixa "A fazer", a coluna vizinha). Cor de destaque própria —
+     sem isso herdaria o estilo genérico dos botões de ação de coluna. Some o
+     rótulo (só ícone) com a coluna de recursos recolhida, mesmo princípio do
+     "avatar" de iniciais nas raias. */
+  .btn-novo-recurso-coluna { display:flex; align-items:center; gap:4px; height:28px; padding:0 8px; border-radius:var(--radius-md);
+    background:var(--card); border:1px solid var(--border); color:var(--accent-strong); font-weight:600; font-size:12px; }
+  .btn-novo-recurso-coluna:hover { background:var(--accent-tint); color:var(--accent-strong); }
+  /* Recolhido (56px de largura) não cabe os 2 botões lado a lado — some o
+     "+ Recurso" e deixa só o chevron de expandir, mesma lógica de esconder
+     ação secundária já usada no botão de apagar recurso (opacity:0 acima). */
+  .quadro-grid.recursos-recolhido .btn-novo-recurso-coluna { display:none; }
 
   .coluna-add { display:flex; align-items:center; justify-content:center; min-width:60px; }
   .coluna-add button { width:36px; height:36px; border-radius:50%; font-size:18px; line-height:1; padding:0;
@@ -201,6 +214,7 @@
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
           <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Geral</a></li>
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
@@ -254,7 +268,7 @@
       const [resEtapas, resRecursos, resPedidos, resProdutos] = await Promise.all([
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
-        apiFetch('/crm/api/pedidos'),
+        apiFetch('/crm/api/pedidos?ocultar_antigos_ultima_coluna=1'),
         apiFetch('/crm/api/produtos'),
       ]);
       etapas = await resEtapas.json();
@@ -319,11 +333,14 @@
       grid.classList.toggle('recursos-recolhido', recursosRecolhido);
 
       let html = `
-        <button type="button" id="btn-recolher-recursos" class="btn-recolher-recursos"
-          title="${recursosRecolhido ? 'Expandir coluna de recursos' : 'Recolher coluna de recursos'}"
-          aria-label="${recursosRecolhido ? 'Expandir' : 'Recolher'} coluna de recursos">
-          ${icon(recursosRecolhido ? 'chevrons-right' : 'chevrons-left', 16)}
-        </button>
+        <div class="cabecalho-recursos">
+          <button type="button" id="btn-recolher-recursos" class="btn-recolher-recursos"
+            title="${recursosRecolhido ? 'Expandir coluna de recursos' : 'Recolher coluna de recursos'}"
+            aria-label="${recursosRecolhido ? 'Expandir' : 'Recolher'} coluna de recursos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button type="button" id="btn-novo-recurso" class="btn-novo-recurso-coluna" title="Novo recurso">${icon('plus', 14)}<span class="rotulo-recurso">Recurso</span></button>
+        </div>
       `;
       etapas.forEach((et) => {
         html += `
@@ -331,9 +348,7 @@
             <span class="nome-etapa" data-editar-etapa="${et.id}">${escapeHtml(et.nome)}</span>
             <span class="contagem-coluna">${pedidos.filter((p) => p.etapa_id === et.id).length}</span>
             <button type="button" class="btn-pronto${et.eh_pronto ? ' ativo' : ''}" data-marcar-pronto="${et.id}" data-valor-pronto="${!et.eh_pronto}" title="${et.eh_pronto ? 'Esta é a etapa de pronto pra envio/retirada (clique pra desmarcar)' : 'Marcar como etapa de pronto pra envio/retirada'}">${icon('package-check', 14)}</button>
-            ${et.fixa
-              ? `<button type="button" id="btn-novo-recurso" class="btn-novo-recurso-coluna" title="Novo recurso">${icon('plus', 14)}Recurso</button>`
-              : `<button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>`}
+            ${et.fixa ? '' : `<button type="button" data-apagar-etapa="${et.id}" data-nome-etapa="${escapeHtml(et.nome)}" title="Apagar etapa">✕</button>`}
             <button type="button" class="btn-automacao-etapa" data-criar-automacao-etapa="${et.id}" title="Criar automação de WhatsApp pra quando um pedido entrar nessa etapa">${icon('zap', 14)}</button>
           </div>
         `;
