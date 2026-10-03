@@ -257,6 +257,16 @@ function formatarMoeda(valor) {
 function formatarData(iso) {
   return iso ? new Date(iso).toLocaleDateString('pt-BR') : '—';
 }
+// Pra colunas `date` (sem hora, ex.: data_nascimento, data_entrega) — não
+// usa `new Date(iso)` de propósito: o Postgres manda só "AAAA-MM-DD", o JS
+// interpreta isso como meia-noite UTC, e toLocaleDateString('pt-BR') exibe
+// no fuso local (UTC-3) — vira o dia anterior. Fatiar a string direto evita
+// o bug (mesmo cuidado já tomado no cálculo de aniversariantes do mês).
+function formatarDataSemFuso(data) {
+  if (!data) return '—';
+  const [ano, mes, dia] = String(data).slice(0, 10).split('-');
+  return `${dia}/${mes}/${ano}`;
+}
 function formatarDataHora(iso) {
   return iso ? new Date(iso).toLocaleString('pt-BR') : '—';
 }

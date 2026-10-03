@@ -218,6 +218,7 @@ a.acao:hover { color:var(--accent-dark); }
    uma mensagem avulsa agora, usando o modelo da situação). */
 .acoes-cliente { display:flex; gap:4px; flex-shrink:0; }
 .acoes-cliente button, .acoes-cliente a { width:32px; height:32px; padding:0; border-radius:50%;
-  background:var(--surface-muted); color:var(--muted-strong); flex-shrink:0; }
+  background:var(--surface-muted); color:var(--muted-strong); flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center; text-decoration:none; }
 .acoes-cliente button:hover, .acoes-cliente a:hover { background:var(--accent-tint); color:var(--accent-strong); }
 .acoes-cliente .acao-whatsapp:hover { background:#25D36622; color:#1DA851; }
