@@ -11,41 +11,37 @@
 <script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
-<link rel="stylesheet" href="/crm/shell.css">
 <style>
-  /* Página sem sidebar/topbar (fluxo de autenticação) — mesmo
-     tokens.css/components.css/shell.css do resto do CRM (2026-10-03: antes
-     era tudo hex fixo, sem suporte a tema escuro). */
-  body { margin:0; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:var(--bg); color:var(--text); font-family:var(--font-ui); }
-  .login-card { width:100%; max-width:360px; }
-  .login-logo { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
-  .login-logo img { height:22px; width:auto; }
-  .login-logo .nome { font-size:16px; font-weight:700; font-family:var(--font-titulo); }
-  .login-rodape { text-align:center; font-size:13px; color:var(--muted); margin-top:18px; }
-  .login-rodape a { color:var(--accent); font-weight:600; text-decoration:none; }
-  .erro { color:var(--danger); font-size:13px; margin-top:12px; min-height:16px; }
+  /* Reset mínimo que normalmente vem de shell.css — esta página não carrega
+     ele (sem sidebar/topbar), só o necessário pro .ds-login cobrir a tela
+     inteira sem a margem padrão do body. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100vh; }
 </style>
 </head>
 <body>
-  <form class="card login-card" id="form">
-    <div class="login-logo"><img src="/ds/logo.svg" class="js-logo-kyvvo" alt="Kyvvo"><div class="nome">Kyvvo CRM</div></div>
-    <label for="email">E-mail</label>
-    <input id="email" type="email" required autocomplete="username">
-    <label for="senha">Senha</label>
-    <input id="senha" type="password" required autocomplete="current-password">
-    <div class="erro" id="erro"></div>
-    <button type="submit" id="btn" style="width:100%;margin-top:24px">Entrar</button>
-  </form>
-  <p class="login-rodape">Ainda não tem conta? <a href="/crm/cadastro.html">Criar conta</a></p>
+  <div class="ds-login">
+    <div class="ds-login-cartao">
+      <div class="ds-topbar-marca ds-login-marca">
+        <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+        <span class="ds-topbar-kyvvo">kyvvo</span>
+      </div>
+      <form class="ds-login-form" id="form">
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="email">E-mail</label>
+          <input class="ds-input ds-login-input" type="email" id="email" required autocomplete="username">
+        </div>
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="senha">Senha</label>
+          <input class="ds-input ds-login-input" type="password" id="senha" required autocomplete="current-password">
+        </div>
+        <div class="ds-campo-erro" id="erro" hidden></div>
+        <button type="submit" class="ds-btn ds-btn-primario ds-btn-bloco ds-btn-lg ds-login-entrar" id="btn">Entrar</button>
+      </form>
+    </div>
+    <p class="ds-login-rodape">Ainda não tem conta? <a class="ds-login-link" href="/crm/cadastro.html">Criar conta</a></p>
+  </div>
   <script>
-    // Logo clara/escura conforme o tema — mesma lógica de aplicarLogos()
-    // em shell.js, só que inline aqui porque esta página não carrega
-    // shell.js (não tem topbar/sidebar autenticados).
-    document.querySelectorAll('.js-logo-kyvvo').forEach((img) => {
-      img.src = document.documentElement.getAttribute('data-theme') === 'dark' ? '/ds/logo-dark.svg' : '/ds/logo.svg';
-    });
-
     const form = document.getElementById('form');
     const erro = document.getElementById('erro');
     const btn = document.getElementById('btn');
@@ -56,7 +52,8 @@
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      erro.textContent = '';
+      erro.hidden = true;
+      btn.setAttribute('aria-busy', 'true');
       btn.disabled = true;
       try {
         const res = await fetch('/crm/api/login', {
@@ -74,7 +71,9 @@
         window.location.href = data.onboarding_pendente ? '/crm/onboarding.html' : '/crm/painel.html';
       } catch (err) {
         erro.textContent = err.message;
+        erro.hidden = false;
       } finally {
+        btn.removeAttribute('aria-busy');
         btn.disabled = false;
       }
     });

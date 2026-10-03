@@ -105,7 +105,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <ul class="ds-menu-lista">
-        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel Hoje</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
         <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
@@ -197,7 +197,6 @@
             <div class="meta">${escapeHtml(o.etapa_nome)} há ${o.dias_parado} dia${o.dias_parado === 1 ? '' : 's'}</div>
           </div>
           <button type="button" class="data-pedido" data-abrir-pedido="${o.id}">${formatarData(o.criado_em)}</button>
-          ${o.cliente_telefone ? `<a class="btn btn-whats" href="${linkWhatsapp(o.cliente_telefone, preencherModelo('orcamento_parado', o.cliente_nome))}" target="_blank" rel="noopener">${icon('message-circle', 14)} WhatsApp</a>` : ''}
           <div class="menu-acoes-wrap">
             <button type="button" class="btn-acoes" data-abrir-menu-orcamento="${o.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
             <div class="menu-acoes" data-menu-orcamento="${o.id}" hidden>
