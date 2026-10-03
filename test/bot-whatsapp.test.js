@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio, estaDentroDoHorarioComercial } = require('../lib/bot-whatsapp');
+const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio, estaDentroDoHorarioComercial, checarConversasParaRetomar } = require('../lib/bot-whatsapp');
 
 describe('estaDentroDoHorarioComercial (Seg-Sex 8h-18h, horário de Brasília)', () => {
   // Datas em UTC escolhidas pra cair em horários conhecidos em
@@ -16,6 +16,42 @@ describe('estaDentroDoHorarioComercial (Seg-Sex 8h-18h, horário de Brasília)',
   });
   test('sábado 10h (Brasília) está fora (fim de semana)', () => {
     assert.equal(estaDentroDoHorarioComercial(new Date('2026-10-03T13:00:00Z')), false);
+  });
+  test('horário customizado (Configurações > Geral): 7h está dentro se início = 7', () => {
+    assert.equal(estaDentroDoHorarioComercial(new Date('2026-09-30T10:00:00Z'), { inicio: 7, fim: 18 }), true);
+  });
+});
+
+describe('checarConversasParaRetomar (Configurações > Geral, pedido do Bruno 2026-10-03)', () => {
+  test('apaga conversa parada há mais tempo que bot_retomada_horas (default 24h sem config)', async () => {
+    const apagadas = [];
+    const pool = {
+      query: async (sql) => {
+        if (/^select c\.tenant_id, c\.telefone_e164/.test(sql)) {
+          return { rows: [{ tenant_id: 'tenant-1', telefone_e164: '+5534999998888' }] };
+        }
+        if (/^delete from crm_conversas_whatsapp/.test(sql)) {
+          apagadas.push(sql);
+          return { rows: [] };
+        }
+        throw new Error('query inesperada: ' + sql);
+      },
+    };
+    await checarConversasParaRetomar(pool);
+    assert.equal(apagadas.length, 1);
+  });
+
+  test('sem conversa parada: não apaga nada', async () => {
+    let apagou = false;
+    const pool = {
+      query: async (sql) => {
+        if (/^select c\.tenant_id, c\.telefone_e164/.test(sql)) return { rows: [] };
+        apagou = true;
+        return { rows: [] };
+      },
+    };
+    await checarConversasParaRetomar(pool);
+    assert.equal(apagou, false);
   });
 });
 

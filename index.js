@@ -17,7 +17,7 @@ const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano, importarRelatorioUpseller } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
-const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio } = require('./lib/bot-whatsapp');
+const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, checarConversasParaRetomar } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
@@ -1009,7 +1009,7 @@ async function build() {
   // de uma vez, sem filtro, pra desenhar o kanban inteiro).
   fastify.get('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
-    const { etapa_id, recurso_id, status_pagamento, prioridade, cliente_id, tipo_entrega: tipoEntrega, data_inicio: dataInicio, data_fim: dataFim } = request.query || {};
+    const { etapa_id, recurso_id, status_pagamento, prioridade, cliente_id, tipo_entrega: tipoEntrega, data_inicio: dataInicio, data_fim: dataFim, ocultar_antigos_ultima_coluna: ocultarAntigos } = request.query || {};
     const condicoes = ['p.tenant_id = $1'];
     const params = [tenantId];
     if (etapa_id) { params.push(etapa_id); condicoes.push(`p.etapa_id = $${params.length}`); }
@@ -1020,6 +1020,18 @@ async function build() {
     if (tipoEntrega) { params.push(tipoEntrega); condicoes.push(`p.tipo_entrega = $${params.length}`); }
     if (dataInicio) { params.push(dataInicio); condicoes.push(`p.criado_em >= $${params.length}::date`); }
     if (dataFim) { params.push(dataFim); condicoes.push(`p.criado_em < $${params.length}::date + interval '1 day'`); }
+    // Usado só pelo Quadro (pedido do Bruno, 2026-10-03) — some da visão do
+    // board um pedido parado há tempo demais na última coluna (maior
+    // `ordem` de crm_etapas), configurável em Configurações > Geral. A lista
+    // de Pedidos não manda esse parâmetro, então continua mostrando tudo.
+    if (ocultarAntigos) {
+      condicoes.push(`(
+        p.etapa_id != (select id from crm_etapas where tenant_id = $1 order by ordem desc limit 1)
+        or p.entrou_na_etapa_em >= now() - (
+          (select coalesce(quadro_dias_ultima_coluna, 30) from crm_configuracoes where tenant_id = $1) || ' days'
+        )::interval
+      )`);
+    }
 
     const { rows } = await pool.query(
       `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
@@ -1790,6 +1802,49 @@ async function build() {
     return rows[0];
   });
 
+  // --- Configurações > Geral (pedido do Bruno, 2026-10-03) -------------------
+  // Horário de atendimento humano do bot (antes fixo em lib/bot-whatsapp.js),
+  // tempo de retomada de conversa parada e dias de visibilidade da última
+  // coluna do Quadro — mesmo padrão de upsert em crm_configuracoes já usado
+  // pelas Notificações, só tocando as colunas desta tela.
+  fastify.get('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query(
+      `select horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna
+       from crm_configuracoes where tenant_id = $1`,
+      [request.user.tenantId]
+    );
+    const config = rows[0] || {};
+    return {
+      horario_atendimento_inicio: config.horario_atendimento_inicio ?? 8,
+      horario_atendimento_fim: config.horario_atendimento_fim ?? 18,
+      bot_retomada_horas: config.bot_retomada_horas ?? 24,
+      quadro_dias_ultima_coluna: config.quadro_dias_ultima_coluna ?? 30,
+    };
+  });
+
+  fastify.patch('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { horario_atendimento_inicio: inicio, horario_atendimento_fim: fim, bot_retomada_horas: retomadaHoras, quadro_dias_ultima_coluna: diasUltimaColuna } = request.body || {};
+    if (![inicio, fim, retomadaHoras, diasUltimaColuna].every((v) => Number.isInteger(v))) {
+      return reply.code(400).send({ error: 'Todos os campos são obrigatórios e precisam ser números inteiros' });
+    }
+    if (inicio < 0 || inicio > 23 || fim < 0 || fim > 23 || fim <= inicio) {
+      return reply.code(400).send({ error: 'Horário inválido — início e fim precisam estar entre 0 e 23, com fim depois do início' });
+    }
+    if (retomadaHoras < 1 || diasUltimaColuna < 1) {
+      return reply.code(400).send({ error: 'Tempo de retomada e dias da última coluna precisam ser pelo menos 1' });
+    }
+    const { rows } = await pool.query(
+      `insert into crm_configuracoes (tenant_id, horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna, atualizado_em)
+       values ($1, $2, $3, $4, $5, now())
+       on conflict (tenant_id) do update set
+         horario_atendimento_inicio = $2, horario_atendimento_fim = $3, bot_retomada_horas = $4, quadro_dias_ultima_coluna = $5, atualizado_em = now()
+       returning horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna`,
+      [tenantId, inicio, fim, retomadaHoras, diasUltimaColuna]
+    );
+    return rows[0];
+  });
+
   fastify.patch('/crm/api/notificacoes/:id/lida', { preHandler: fastify.authenticate }, async (request, reply) => {
     const ok = await marcarNotificacaoLida(pool, request.user.tenantId, request.params.id);
     if (!ok) return reply.code(404).send({ error: 'Notificação não encontrada' });
@@ -1819,6 +1874,7 @@ async function start() {
     // não deixar um interval pendurado no processo de teste.
     setInterval(() => {
       checarGatilhosPeriodicos(pool).catch((err) => fastify.log.error(`[automacoes] checador periódico: ${err.message}`));
+      checarConversasParaRetomar(pool).catch((err) => fastify.log.error(`[bot-whatsapp] checador de retomada: ${err.message}`));
     }, 60 * 60 * 1000);
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
   } catch (err) {
