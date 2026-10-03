@@ -195,8 +195,10 @@
             <div><label for="ed-telefone">Telefone</label><input id="ed-telefone" value="${escapeHtml(c.telefone || '')}"></div>
             <div><label for="ed-email">E-mail</label><input id="ed-email" type="email" value="${escapeHtml(c.email || '')}"></div>
           </div>
-          <label for="ed-documento">CPF ou CNPJ</label>
-          <input id="ed-documento" value="${escapeHtml(c.cpf || c.cnpj || '')}">
+          <div class="grid2">
+            <div><label for="ed-documento">CPF ou CNPJ</label><input id="ed-documento" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
+            <div><label for="ed-nascimento">Data de nascimento</label><input id="ed-nascimento" type="date" value="${c.data_nascimento ? String(c.data_nascimento).slice(0, 10) : ''}"></div>
+          </div>
           <div class="grid3">
             <div><label for="ed-endereco">Endereço completo</label><input id="ed-endereco" placeholder="Rua, número, complemento, bairro, cidade - UF, CEP" value="${escapeHtml(c.endereco_completo || '')}"></div>
             <div><label for="ed-cidade">Cidade</label><input id="ed-cidade" value="${escapeHtml(c.cidade || '')}"></div>
@@ -323,7 +325,7 @@
       // Botão "Salvar alterações" só aparece depois de uma mudança de
       // verdade num campo — pedido do Bruno, 2026-09-25.
       const btnSalvar = document.getElementById('btn-salvar-cliente');
-      const camposEditaveis = ['ed-nome', 'ed-telefone', 'ed-email', 'ed-documento', 'ed-endereco', 'ed-cidade', 'ed-uf', 'ed-segmento', 'ed-origem', 'ed-observacoes'];
+      const camposEditaveis = ['ed-nome', 'ed-telefone', 'ed-email', 'ed-documento', 'ed-nascimento', 'ed-endereco', 'ed-cidade', 'ed-uf', 'ed-segmento', 'ed-origem', 'ed-observacoes'];
       camposEditaveis.forEach((id) => {
         document.getElementById(id).addEventListener('input', () => { btnSalvar.style.display = ''; });
         document.getElementById(id).addEventListener('change', () => { btnSalvar.style.display = ''; });
@@ -346,6 +348,7 @@
             email: document.getElementById('ed-email').value.trim() || null,
             cpf: documento && !ehCnpj ? documento : null,
             cnpj: documento && ehCnpj ? documento : null,
+            data_nascimento: document.getElementById('ed-nascimento').value || null,
             cidade: document.getElementById('ed-cidade').value.trim() || null,
             uf: document.getElementById('ed-uf').value.trim() || null,
             endereco_completo: document.getElementById('ed-endereco').value.trim() || null,
