@@ -214,8 +214,15 @@ async function build() {
   // uma conversa específica (rota de baixo), não precisa vir tudo de uma vez.
   fastify.get('/crm/api/conversas', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
+    // em_atendimento: existe uma linha ativa em crm_conversas_whatsapp pra
+    // esse telefone (bot ainda em algum passo do fluxo) — usado pra status
+    // "Em atendimento"/"Concluído" do componente .ds-conversas. O bot do
+    // CRM é 100% automático (sem handoff pra humano, ver
+    // lib/notificacoes.js#atendimento_bot_travado), então "quem atende"
+    // aqui é sempre o bot Kyvvo.
     const { rows } = await pool.query(
-      `select distinct on (m.telefone_e164) m.telefone_e164, m.conteudo as ultima_mensagem, m.criado_em as ultima_em, c.nome as cliente_nome
+      `select distinct on (m.telefone_e164) m.telefone_e164, m.conteudo as ultima_mensagem, m.criado_em as ultima_em, c.nome as cliente_nome,
+              exists(select 1 from crm_conversas_whatsapp cw where cw.tenant_id = m.tenant_id and cw.telefone_e164 = m.telefone_e164) as em_atendimento
        from crm_mensagens_whatsapp m
        left join crm_clientes c on c.tenant_id = m.tenant_id and c.telefone = m.telefone_e164
        where m.tenant_id = $1

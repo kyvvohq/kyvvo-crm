@@ -12,11 +12,6 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
-<style>
-  /* .chat-conversa/.bolha-* viraram compartilhados em shell.css (2026-10-03
-     — abrirModalConversa também virou shell.js, reusada pelo Painel Hoje). */
-  .linha-conversa { cursor:pointer; }
-</style>
 </head>
 <body>
   <header class="ds-topbar">
@@ -112,11 +107,15 @@
           <div class="msg" id="whatsapp-conectar-msg"></div>
         </div>
         <div class="ds-abas-painel" id="painel-whatsapp-conversas" aria-labelledby="aba-whatsapp-conversas" hidden>
-          <div class="tabela-wrapper">
-            <table class="tabela-tenants">
-              <thead><tr><th>Conversa</th><th>WhatsApp</th><th>Última mensagem</th><th>Quando</th></tr></thead>
-              <tbody id="conversas-tbody"><tr><td colspan="4">Carregando…</td></tr></tbody>
-            </table>
+          <div class="ds-conversas" role="table" aria-label="Conversas">
+            <div class="ds-conversas-cabecalho" role="row">
+              <span role="columnheader">Conversa</span>
+              <span role="columnheader">Whatsapp</span>
+              <span role="columnheader">Status</span>
+              <span role="columnheader">Atendimento</span>
+              <span role="columnheader">Última conversa</span>
+            </div>
+            <div id="conversas-linhas"><p class="vazio">Carregando…</p></div>
           </div>
         </div>
       </div>
@@ -140,35 +139,49 @@
       window.KyvvoDS && KyvvoDS.abasSelecionar(document.querySelector('.ds-abas'), 'painel-whatsapp-conversas', true);
     }
 
-    function formatarHoraConversa(iso) {
-      const d = new Date(iso);
-      const hoje = new Date();
-      const mesmoData = d.toDateString() === hoje.toDateString();
-      return mesmoData
-        ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-        : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    }
-
     async function carregarConversas() {
       const res = await apiFetch('/crm/api/conversas');
       conversas = await res.json();
-      renderizarTabela();
+      renderizarLista();
       if (telefoneAbrirDireto) abrirConversaDaLista(telefoneAbrirDireto);
     }
 
-    function renderizarTabela() {
-      const tbody = document.getElementById('conversas-tbody');
-      tbody.innerHTML = conversas.length ? conversas.map((c) => `
-        <tr class="linha-conversa" data-telefone="${c.telefone_e164}">
-          <td>${escapeHtml(c.cliente_nome || '—')}</td>
-          <td>${escapeHtml(c.telefone_e164)}</td>
-          <td>${escapeHtml(c.ultima_mensagem || '—')}</td>
-          <td>${formatarHoraConversa(c.ultima_em)}</td>
-        </tr>
-      `).join('') : '<tr><td colspan="4">Nenhuma conversa registrada ainda.</td></tr>';
+    // Componente .ds-conversas do design-system (v2.17.0) — divs com
+    // role="row"/"cell" em vez de <table>, pra virar cartão no mobile sem
+    // regra de layout de tabela atrapalhando (ver README do
+    // kyvvo-design-system). "Atendimento" é sempre o bot Kyvvo — o CRM não
+    // tem handoff pra humano (diferente do Studio), então não tem
+    // "Concluído": enquanto existir registro em crm_conversas_whatsapp
+    // (em_atendimento), a conversa tá em andamento; senão, o fluxo do bot já
+    // terminou.
+    function renderizarLista() {
+      const container = document.getElementById('conversas-linhas');
+      container.innerHTML = conversas.length ? conversas.map((c) => `
+        <div class="ds-conversas-linha" role="row" tabindex="0" data-telefone="${escapeHtml(c.telefone_e164)}">
+          <span role="cell" class="ds-conversas-nome">${escapeHtml(c.cliente_nome || '—')}</span>
+          <span role="cell" class="ds-conversas-whatsapp">${telefoneComBandeiraHtml(c.telefone_e164)}</span>
+          <span role="cell">
+            <span class="ds-conversas-status ${c.em_atendimento ? 'ds-conversas-status-atendimento' : 'ds-conversas-status-concluido'}">${c.em_atendimento ? 'Em atendimento' : 'Concluído'}</span>
+          </span>
+          <span role="cell">
+            <span class="ds-conversas-atendimento">
+              <span class="ds-conversas-atendimento-icone">${icon('bot', 12)}</span>
+              Kyvvo
+            </span>
+          </span>
+          <span role="cell" class="ds-conversas-data">${formatarDataHoraConversa(c.ultima_em)}</span>
+        </div>
+      `).join('') : '<p class="vazio">Nenhuma conversa registrada ainda.</p>';
 
-      tbody.querySelectorAll('[data-telefone]').forEach((tr) => {
-        tr.addEventListener('click', () => abrirConversaDaLista(tr.dataset.telefone));
+      container.querySelectorAll('[data-telefone]').forEach((linha) => {
+        linha.addEventListener('click', () => abrirConversaDaLista(linha.dataset.telefone));
+        // A linha não é um <button>, então Enter/Espaço não ativam sozinhos
+        // (mesma ressalva do README do design-system).
+        linha.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          abrirConversaDaLista(linha.dataset.telefone);
+        });
       });
     }
 

@@ -56,6 +56,7 @@ const ICON_PATHS = {
   'chevrons-left': '<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>',
   'chevrons-right': '<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>',
   'chart-column': '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  bot: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
 };
 
 function icon(name, size = 18) {
@@ -445,23 +446,50 @@ document.addEventListener('click', (e) => {
 
 // Popup com o histórico completo da conversa (igual whatsapp.html > aba
 // Conversas, só que acessível de qualquer tela com shell.js carregado).
+// "DD/MM/AAAA às HH:MM" — exatamente o formato do componente .ds-conversas
+// (README do design-system), não o formatarDataHora genérico (vírgula em
+// vez de "às").
+function formatarDataHoraConversa(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const dia = String(d.getDate()).padStart(2, '0');
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const hora = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dia}/${mes}/${d.getFullYear()} às ${hora}:${min}`;
+}
+function telefoneComBandeiraHtml(telefone) {
+  return `<span class="ds-conversas-bandeira" aria-hidden="true">BR</span>${escapeHtml(telefone)}`;
+}
+
+// Modal de conversa — componente .ds-conversa-modal do design-system
+// (v2.17.0), aberto via KyvvoDS.modalAbrir (não o abrirModal genérico do
+// CRM, que é pro resto das telas). Sem o botão "Assumir atendimento" do
+// componente original: o bot do CRM é 100% automático, sem handoff pra
+// humano (ver lib/notificacoes.js#atendimento_bot_travado) — um botão que
+// não faz nada seria pior que não ter botão.
 async function abrirModalConversa(telefone, nomeCliente) {
-  abrirModal(
-    `<h3>${escapeHtml(nomeCliente || telefone)}</h3>
-     <p class="modal-texto">${escapeHtml(telefone)}</p>`,
-    '<div class="chat-conversa"><div class="vazio">Carregando…</div></div>'
+  KyvvoDS.modalAbrir(
+    `<div class="ds-conversa-modal">
+      <div class="ds-conversa-modal-cabecalho">
+        <p class="ds-conversa-modal-nome">${escapeHtml(nomeCliente || telefone)}</p>
+        <p class="ds-conversa-modal-whatsapp">${telefoneComBandeiraHtml(telefone)}</p>
+      </div>
+      <div class="ds-conversa-modal-mensagens" id="conversa-modal-mensagens"><p class="vazio">Carregando…</p></div>
+    </div>`,
+    { classeExtra: 'ds-modal-card-conversa' }
   );
   const res = await apiFetch(`/crm/api/conversas/${encodeURIComponent(telefone)}/mensagens`);
   const mensagens = await res.json();
-  const chat = document.querySelector('.chat-conversa');
-  if (!chat) return; // modal fechado antes da resposta chegar
-  chat.innerHTML = mensagens.length ? mensagens.map((m) => `
-    <div class="bolha bolha-${m.direcao}">
-      ${escapeHtml(m.conteudo)}
-      <div class="bolha-hora">${formatarDataHora(m.criado_em)}</div>
+  const lista = document.getElementById('conversa-modal-mensagens');
+  if (!lista) return; // modal fechado antes da resposta chegar
+  lista.innerHTML = mensagens.length ? mensagens.map((m) => `
+    <div class="ds-conversa-modal-msg ds-conversa-modal-msg-${m.direcao === 'recebida' ? 'recebida' : 'enviada'}">
+      <p class="ds-conversa-modal-msg-texto">${escapeHtml(m.conteudo)}</p>
+      <p class="ds-conversa-modal-msg-hora">${formatarDataHoraConversa(m.criado_em)}</p>
     </div>
-  `).join('') : '<div class="vazio">Nenhuma mensagem registrada ainda — essa pessoa nunca escreveu pro bot.</div>';
-  chat.scrollTop = chat.scrollHeight;
+  `).join('') : '<p class="vazio">Nenhuma mensagem registrada ainda — essa pessoa nunca escreveu pro bot.</p>';
+  lista.scrollTop = lista.scrollHeight;
 }
 
 // Mensagem avulsa pra 1 cliente agora (fora do fluxo do bot/automações) —
