@@ -109,6 +109,13 @@
     min-width:220px; min-height:60px; display:flex; flex-direction:column; gap:6px; }
   .celula.arrastando-sobre { border-color:var(--accent); background:var(--accent-tint); }
   .celula-vazia { color:var(--muted); font-size:11px; padding:10px 4px; text-align:center; }
+  /* "+N pedidos"/"Mostrar menos" — cada célula (raia × etapa) só renderiza
+     os 10 primeiros cartões por padrão (pedido do Bruno, 2026-10-04); o
+     contador no topo da coluna continua somando todo mundo, truncado ou
+     não. */
+  .btn-expandir-celula { width:100%; height:30px; background:transparent; border:1px dashed var(--border-strong);
+    color:var(--muted-strong); font-size:11.5px; font-weight:600; border-radius:var(--radius-md); }
+  .btn-expandir-celula:hover { background:var(--surface-muted); color:var(--text); }
 
   .cartao-pedido { position:relative; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 32px 10px 12px; cursor:grab; font-size:12.5px; }
   .cartao-pedido:active { cursor:grabbing; }
@@ -258,6 +265,15 @@
     const LARGURA_RAIA_EXPANDIDA = 170;
     const LARGURA_RAIA_RECOLHIDA = 56;
 
+    // Mostra só os 10 primeiros pedidos de cada célula (raia × etapa) — uma
+    // coluna/recurso com dezenas de pedidos travava a rolagem — com um
+    // botão "+N pedidos" pra expandir aquela célula específica. O contador
+    // no topo da coluna (contagem-coluna) NUNCA usa esse recorte — sempre
+    // conta todo mundo da etapa, truncado ou não (pedido do Bruno,
+    // 2026-10-04). Estado só em memória (reseta ao recarregar a página).
+    const LIMITE_CARTOES_CELULA = 10;
+    let celulasExpandidas = new Set();
+
     function iniciaisRecurso(nome) {
       const partes = (nome || '').trim().split(/\s+/).filter(Boolean);
       if (!partes.length) return '?';
@@ -324,6 +340,21 @@
       `;
     }
 
+    function cartoesCelulaHtml(cartoes, raiaId, etapaId) {
+      if (!cartoes.length) return '<div class="celula-vazia">—</div>';
+      const chave = `${raiaId || ''}|${etapaId}`;
+      const expandida = celulasExpandidas.has(chave);
+      const visiveis = expandida ? cartoes : cartoes.slice(0, LIMITE_CARTOES_CELULA);
+      const escondidos = cartoes.length - visiveis.length;
+      let html = visiveis.map(cartaoHtml).join('');
+      if (escondidos > 0) {
+        html += `<button type="button" class="btn-expandir-celula" data-expandir-celula="${chave}">+${escondidos} pedido${escondidos === 1 ? '' : 's'}</button>`;
+      } else if (expandida && cartoes.length > LIMITE_CARTOES_CELULA) {
+        html += `<button type="button" class="btn-expandir-celula" data-expandir-celula="${chave}">Mostrar menos</button>`;
+      }
+      return html;
+    }
+
     function renderizar() {
       const linhas = raias();
       const grid = document.getElementById('quadro-grid');
@@ -370,7 +401,7 @@
           const cartoes = pedidosDe(raia.id, et.id);
           html += `
             <div class="celula${raia.altissima ? ' celula-altissima' : ''}${et.fixa ? ' coluna-fixa' : ''}" data-raia="${raia.id || ''}" data-etapa="${et.id}" data-tipo-etapa="${et.tipo}">
-              ${cartoes.map(cartaoHtml).join('') || '<div class="celula-vazia">—</div>'}
+              ${cartoesCelulaHtml(cartoes, raia.id, et.id)}
             </div>
           `;
         });
@@ -389,6 +420,14 @@
     });
 
     function ligarEventosGrid() {
+      document.querySelectorAll('[data-expandir-celula]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const chave = btn.dataset.expandirCelula;
+          if (celulasExpandidas.has(chave)) celulasExpandidas.delete(chave); else celulasExpandidas.add(chave);
+          renderizar();
+        });
+      });
       document.querySelectorAll('.cartao-pedido').forEach((cartao) => {
         cartao.addEventListener('dragstart', (e) => {
           e.dataTransfer.setData('text/plain', cartao.dataset.pedido);

@@ -12,6 +12,9 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .secao-titulo-whatsapp { font-size:15px; font-weight:700; color:var(--text); margin:0 0 14px; }
+</style>
 </head>
 <body>
   <header class="ds-topbar">
@@ -95,28 +98,27 @@
         </div>
       </div>
 
-      <div class="ds-abas" data-ds-abas>
-        <div class="ds-abas-lista">
-          <button type="button" class="ds-aba" id="aba-whatsapp-conectar" aria-controls="painel-whatsapp-conectar" aria-selected="true">Conectar</button>
-          <button type="button" class="ds-aba" id="aba-whatsapp-conversas" aria-controls="painel-whatsapp-conversas" aria-selected="false">Conversas</button>
+      <!-- Conectar e Conversas viraram blocos da mesma página, sem abas
+           (pedido do Bruno, 2026-10-04) — antes eram .ds-abas. -->
+      <div class="card">
+        <h2 class="secao-titulo-whatsapp">Conectar</h2>
+        <div id="whatsapp-status-card">
+          <p class="vazio">Carregando status da conexão…</p>
         </div>
-        <div class="ds-abas-painel" id="painel-whatsapp-conectar" aria-labelledby="aba-whatsapp-conectar">
-          <div class="card" id="whatsapp-status-card">
-            <p class="vazio">Carregando status da conexão…</p>
+        <div class="msg" id="whatsapp-conectar-msg"></div>
+      </div>
+
+      <div class="card" id="bloco-conversas" style="margin-top:20px">
+        <h2 class="secao-titulo-whatsapp">Conversas</h2>
+        <div class="ds-conversas" role="table" aria-label="Conversas">
+          <div class="ds-conversas-cabecalho" role="row">
+            <span role="columnheader">Conversa</span>
+            <span role="columnheader">Whatsapp</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader">Atendimento</span>
+            <span role="columnheader">Última conversa</span>
           </div>
-          <div class="msg" id="whatsapp-conectar-msg"></div>
-        </div>
-        <div class="ds-abas-painel" id="painel-whatsapp-conversas" aria-labelledby="aba-whatsapp-conversas" hidden>
-          <div class="ds-conversas" role="table" aria-label="Conversas">
-            <div class="ds-conversas-cabecalho" role="row">
-              <span role="columnheader">Conversa</span>
-              <span role="columnheader">Whatsapp</span>
-              <span role="columnheader">Status</span>
-              <span role="columnheader">Atendimento</span>
-              <span role="columnheader">Última conversa</span>
-            </div>
-            <div id="conversas-linhas"><p class="vazio">Carregando…</p></div>
-          </div>
+          <div id="conversas-linhas"><p class="vazio">Carregando…</p></div>
         </div>
       </div>
     </div>
@@ -134,9 +136,12 @@
     const paramsUrl = new URLSearchParams(window.location.search);
     const telefoneAbrirDireto = paramsUrl.get('telefone');
     // ?aba=conversas (usado pelo clique na notificação "atendimento_bot_travado",
-    // ver shell.js) — ou telefone= direto, que já implica querer ver Conversas.
+    // ver shell.js) — ou telefone= direto, que já implica querer ver
+    // Conversas. Antes selecionava a aba; sem abas (pedido do Bruno,
+    // 2026-10-04: Conectar/Conversas viraram blocos da mesma página), só
+    // rola a tela até o bloco.
     if (paramsUrl.get('aba') === 'conversas' || telefoneAbrirDireto) {
-      window.KyvvoDS && KyvvoDS.abasSelecionar(document.querySelector('.ds-abas'), 'painel-whatsapp-conversas', true);
+      document.getElementById('bloco-conversas').scrollIntoView({ block: 'start' });
     }
 
     async function carregarConversas() {
@@ -303,10 +308,6 @@
       msg.textContent = res.ok ? 'WhatsApp conectado com sucesso!' : (dados.error || 'Erro ao conectar o WhatsApp.');
       renderConectar();
     }
-
-    document.querySelector('.ds-abas').addEventListener('ds-abas-alterar', (e) => {
-      if (e.detail.id === 'painel-whatsapp-conversas') carregarConversas();
-    });
 
     renderConectar();
     carregarConversas();
