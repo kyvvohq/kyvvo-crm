@@ -12,15 +12,6 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
-<style>
-  .lista-automacoes-item { padding:14px 20px; border-top:1px solid var(--border); }
-  .lista-automacoes-item:first-child { border-top:none; }
-  .lista-automacoes-item .topo { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-  .lista-automacoes-item .nome { font-weight:600; color:var(--text); }
-  .lista-automacoes-item .acoes-linha { display:flex; gap:8px; }
-  .lista-automacoes-item .acoes-linha button { height:30px; padding:0 12px; font-size:12px; }
-  .lista-automacoes-item .detalhe { margin-top:4px; font-size:13px; color:var(--muted-strong); }
-</style>
 </head>
 <body>
   <header class="ds-topbar">
@@ -98,17 +89,22 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>Automações</h1></div>
-        </div>
-        <div class="acoes">
-          <button type="button" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
+      <div class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">Automações</h1></div>
+        <div class="ds-pagina-cab-acoes">
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
         </div>
       </div>
 
-      <div class="card" style="padding:0">
-        <div id="lista-automacoes"><div class="vazio">Carregando…</div></div>
+      <div class="ds-tabela" role="table" aria-label="Automações" style="--ds-colunas: minmax(0,1.3fr) minmax(0,1.7fr) minmax(0,1.2fr) 90px 48px">
+        <div class="ds-tabela-cabecalho" role="row">
+          <span role="columnheader">Nome</span>
+          <span role="columnheader">Gatilho</span>
+          <span role="columnheader">Modelo</span>
+          <span role="columnheader">Ativa</span>
+          <span role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ações</span></span>
+        </div>
+        <div id="lista-automacoes"><div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div></div>
       </div>
     </div>
   </div>
@@ -144,35 +140,44 @@
     function renderizar() {
       const el = document.getElementById('lista-automacoes');
       if (!automacoes.length) {
-        el.innerHTML = '<div class="vazio">Nenhuma automação configurada ainda.</div>';
+        el.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhuma automação configurada ainda</p><p class="ds-vazio-texto">Crie a primeira para avisar seus clientes automaticamente pelo WhatsApp.</p></div>';
         return;
       }
       el.innerHTML = automacoes.map((a) => `
-        <div class="lista-automacoes-item">
-          <div class="topo">
-            <span class="nome">${escapeHtml(a.nome)} <span class="badge ${a.ativo ? 'sucesso' : 'neutro'}">${a.ativo ? 'ativa' : 'pausada'}</span></span>
-            <div class="acoes-linha">
-              <button type="button" class="btn-secundario" data-alternar-automacao="${a.id}" data-ativo="${!a.ativo}">${a.ativo ? 'Pausar' : 'Ativar'}</button>
-              <button type="button" class="btn-secundario" data-apagar-automacao="${a.id}">Remover</button>
+        <div class="ds-tabela-linha" role="row" data-id="${a.id}">
+          <span role="cell"><span class="ds-tabela-primario">${escapeHtml(a.nome)}</span></span>
+          <span role="cell" class="ds-tabela-mudo" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO[a.gatilho] || a.gatilho)}${a.etapa_nome ? ` — etapa "${escapeHtml(a.etapa_nome)}"` : ''}</span>
+          <span role="cell" data-rotulo="Modelo">${a.whatsapp_template
+            ? `<span class="ds-tabela-primario">${escapeHtml(a.whatsapp_template)}</span>`
+            : '<span class="ds-badge ds-badge-aviso ds-badge-sm" title="Escolha um modelo aprovado pra esta automação disparar">Sem modelo</span>'}</span>
+          <span role="cell">
+            <label class="ds-switch"><input type="checkbox" role="switch" data-alternar-automacao="${a.id}" aria-label="${a.ativo ? 'Pausar' : 'Ativar'} ${escapeHtml(a.nome)}" ${a.ativo ? 'checked' : ''}><span class="ds-switch-trilho"></span></label>
+          </span>
+          <span role="cell" class="ds-tabela-acoes">
+            <div class="ds-acoes" data-id="${a.id}">
+              <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações de ${escapeHtml(a.nome)}">⋯</button>
+              <div class="ds-acoes-menu" role="menu" hidden>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="remover">Remover</button>
+              </div>
             </div>
-          </div>
-          <div class="detalhe">${ROTULO_GATILHO[a.gatilho] || a.gatilho}${a.etapa_nome ? ` — etapa "${escapeHtml(a.etapa_nome)}"` : ''} · Template: ${a.whatsapp_template ? escapeHtml(a.whatsapp_template) : '<span class="vazio" style="padding:0;display:inline">nenhum escolhido</span>'}</div>
+          </span>
         </div>
       `).join('');
-
-      el.querySelectorAll('[data-alternar-automacao]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await apiFetch(`/crm/api/automacoes/${btn.dataset.alternarAutomacao}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ ativo: btn.dataset.ativo === 'true' }),
-          });
-          carregar();
-        });
-      });
-      el.querySelectorAll('[data-apagar-automacao]').forEach((btn) => {
-        btn.addEventListener('click', () => confirmarRemover(btn.dataset.apagarAutomacao));
-      });
     }
+
+    const listaAutomacoes = document.getElementById('lista-automacoes');
+    listaAutomacoes.addEventListener('change', async (e) => {
+      const input = e.target.closest('[data-alternar-automacao]');
+      if (!input) return;
+      await apiFetch(`/crm/api/automacoes/${input.dataset.alternarAutomacao}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ ativo: input.checked }),
+      });
+      carregar();
+    });
+    listaAutomacoes.addEventListener('ds-acoes-escolher', (e) => {
+      if (e.detail.acao === 'remover') confirmarRemover(e.target.closest('[data-id]').dataset.id);
+    });
 
     function confirmarRemover(id) {
       const automacao = automacoes.find((a) => a.id === id);

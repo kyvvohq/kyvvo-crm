@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
   .secao-titulo-whatsapp { font-size:15px; font-weight:700; color:var(--text); margin:0 0 14px; }
+  .conversas-bloco { display:flex; flex-direction:column; gap:var(--space-3); }
 </style>
 </head>
 <body>
@@ -92,10 +93,8 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>WhatsApp</h1></div>
-        </div>
+      <div class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">WhatsApp</h1></div>
       </div>
 
       <!-- Conectar e Conversas viraram blocos da mesma página, sem abas
@@ -110,6 +109,15 @@
 
       <div class="card" id="bloco-conversas" style="margin-top:20px">
         <h2 class="secao-titulo-whatsapp">Conversas</h2>
+        <div class="conversas-bloco">
+        <div class="ds-filtros">
+          <div class="ds-pesquisa">
+            <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="ds-pesquisa-input" type="search" id="conv-busca" placeholder="Buscar cliente ou telefone" aria-label="Buscar cliente ou telefone">
+          </div>
+          <div class="ds-select"><select id="conv-status" aria-label="Status"><option value="">Todos os status</option><option value="atendimento">Em atendimento</option><option value="concluido">Concluído</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-filtros-fim"><button type="button" class="ds-btn ds-btn-ghost ds-btn-sm" id="conv-limpar" hidden>Limpar filtros</button></div>
+        </div>
         <div class="ds-conversas" role="table" aria-label="Conversas">
           <div class="ds-conversas-cabecalho" role="row">
             <span role="columnheader">Conversa</span>
@@ -119,6 +127,8 @@
             <span role="columnheader">Última conversa</span>
           </div>
           <div id="conversas-linhas"><p class="vazio">Carregando…</p></div>
+        </div>
+        <nav class="ds-paginacao" data-ds-paginacao id="conv-paginacao" data-ds-total="0" data-ds-tamanho="10" data-ds-tamanhos="10,25,50"></nav>
         </div>
       </div>
     </div>
@@ -159,9 +169,27 @@
     // "Concluído": enquanto existir registro em crm_conversas_whatsapp
     // (em_atendimento), a conversa tá em andamento; senão, o fluxo do bot já
     // terminou.
+    const estadoConversas = { pagina: 1, tamanho: 10 };
+
+    function conversasFiltradas() {
+      const busca = (document.getElementById('conv-busca').value || '').trim().toLowerCase();
+      const status = document.getElementById('conv-status').value;
+      return conversas.filter((c) => {
+        if (status === 'atendimento' && !c.em_atendimento) return false;
+        if (status === 'concluido' && c.em_atendimento) return false;
+        if (busca && !`${c.cliente_nome || ''} ${c.telefone_e164 || ''}`.toLowerCase().includes(busca)) return false;
+        return true;
+      });
+    }
+
     function renderizarLista() {
+      const lista = conversasFiltradas();
+      const inicio = (estadoConversas.pagina - 1) * estadoConversas.tamanho;
+      const fatia = lista.slice(inicio, inicio + estadoConversas.tamanho);
+      const usaFiltro = document.getElementById('conv-busca').value || document.getElementById('conv-status').value;
+      document.getElementById('conv-limpar').hidden = !usaFiltro;
       const container = document.getElementById('conversas-linhas');
-      container.innerHTML = conversas.length ? conversas.map((c) => `
+      container.innerHTML = fatia.length ? fatia.map((c) => `
         <div class="ds-conversas-linha" role="row" tabindex="0" data-telefone="${escapeHtml(c.telefone_e164)}">
           <span role="cell" class="ds-conversas-nome">${escapeHtml(c.cliente_nome || '—')}</span>
           <span role="cell" class="ds-conversas-whatsapp">${telefoneComBandeiraHtml(c.telefone_e164)}</span>
@@ -174,21 +202,34 @@
               Kyvvo
             </span>
           </span>
-          <span role="cell" class="ds-conversas-data">${formatarDataHoraConversa(c.ultima_em)}</span>
+          <span role="cell" class="ds-conversas-data" title="${KyvvoDS.dataCompleta(c.ultima_em)}">${formatarDataHoraConversa(c.ultima_em)}</span>
         </div>
-      `).join('') : '<p class="vazio">Nenhuma conversa registrada ainda.</p>';
-
-      container.querySelectorAll('[data-telefone]').forEach((linha) => {
-        linha.addEventListener('click', () => abrirConversaDaLista(linha.dataset.telefone));
-        // A linha não é um <button>, então Enter/Espaço não ativam sozinhos
-        // (mesma ressalva do README do design-system).
-        linha.addEventListener('keydown', (e) => {
-          if (e.key !== 'Enter' && e.key !== ' ') return;
-          e.preventDefault();
-          abrirConversaDaLista(linha.dataset.telefone);
-        });
-      });
+      `).join('') : `<div class="ds-vazio"><p class="ds-vazio-titulo">${conversas.length ? 'Nenhuma conversa encontrada' : 'Nenhuma conversa registrada ainda'}</p><p class="ds-vazio-texto">${conversas.length ? 'Ajuste a busca ou o status.' : 'As conversas do bot de atendimento aparecem aqui.'}</p></div>`;
+      KyvvoDS.paginacaoAtualizar(document.getElementById('conv-paginacao'), { total: lista.length, pagina: estadoConversas.pagina, tamanho: estadoConversas.tamanho });
     }
+
+    // Delegado no container (a lista é redesenhada a cada filtro/página). A
+    // linha não é um <button>, então Enter/Espaço precisam de tratamento próprio.
+    document.getElementById('conversas-linhas').addEventListener('click', (e) => {
+      const linha = e.target.closest('[data-telefone]');
+      if (linha) abrirConversaDaLista(linha.dataset.telefone);
+    });
+    document.getElementById('conversas-linhas').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const linha = e.target.closest('[data-telefone]');
+      if (!linha) return;
+      e.preventDefault();
+      abrirConversaDaLista(linha.dataset.telefone);
+    });
+    document.getElementById('conv-paginacao').addEventListener('ds-paginacao-alterar', (e) => {
+      estadoConversas.pagina = e.detail.pagina; estadoConversas.tamanho = e.detail.tamanho; renderizarLista();
+    });
+    document.getElementById('conv-busca').addEventListener('input', () => { estadoConversas.pagina = 1; renderizarLista(); });
+    document.getElementById('conv-status').addEventListener('change', () => { estadoConversas.pagina = 1; renderizarLista(); });
+    document.getElementById('conv-limpar').addEventListener('click', () => {
+      document.getElementById('conv-busca').value = ''; document.getElementById('conv-status').value = '';
+      estadoConversas.pagina = 1; renderizarLista();
+    });
 
     // abrirModalConversa (shell.js) é compartilhada com o Painel Hoje — aqui
     // só resolve o nome do cliente a partir da lista já carregada antes de
@@ -230,24 +271,49 @@
 
       let badge, texto;
       if (status.conectado) {
-        badge = '<span class="badge sucesso">Conectado</span>';
+        badge = '<span class="ds-badge ds-badge-sucesso">Conectado</span>';
         texto = [status.numeroExibido || 'número não informado', status.nomeVerificado, status.qualidade ? `Qualidade: ${status.qualidade}` : null]
           .filter(Boolean).join(' · ');
       } else if (status.erro) {
-        badge = '<span class="badge aviso">Erro de conexão</span>';
+        badge = '<span class="ds-badge ds-badge-aviso">Erro de conexão</span>';
         texto = status.erro;
       } else {
-        badge = '<span class="badge neutro">Não conectado</span>';
+        badge = '<span class="ds-badge">Não conectado</span>';
         texto = 'Conecte o WhatsApp Business da sua empresa pra ativar o bot de atendimento automático.';
       }
 
       card.innerHTML = `
         <div style="margin-bottom:12px">${badge}</div>
         <p class="modal-texto" style="margin:0 0 16px">${escapeHtml(texto)}</p>
-        <button type="button" id="btn-conectar-whatsapp" disabled>Carregando conexão...</button>
+        <div class="ds-btn-grupo">
+          <button type="button" id="btn-conectar-whatsapp" disabled>Carregando conexão...</button>
+          <button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-ver-manual">Ver manual</button>
+        </div>
       `;
       iniciarConexaoWhatsapp();
     }
+
+    // "Ver manual": abre o PDF numa janela própria (não maximizada, centralizada
+    // sobre a atual) e a traz pra frente. Se o navegador bloquear o pop-up,
+    // mostra um link comum no lugar.
+    const URL_MANUAL_WABA = '/crm/manual-whatsapp-waba.pdf';
+    function abrirManualWaba() {
+      const largura = Math.min(980, window.screen.availWidth - 80);
+      const altura = Math.min(860, window.screen.availHeight - 80);
+      const esq = Math.max(0, Math.round((window.screenX || window.screenLeft || 0) + (window.outerWidth - largura) / 2));
+      const topo = Math.max(0, Math.round((window.screenY || window.screenTop || 0) + (window.outerHeight - altura) / 2));
+      const janela = window.open(
+        URL_MANUAL_WABA, 'kyvvo-manual-waba',
+        `popup=yes,width=${largura},height=${altura},left=${esq},top=${topo},resizable=yes,scrollbars=yes`
+      );
+      if (janela) { janela.focus(); return; }
+      const msg = document.getElementById('whatsapp-conectar-msg');
+      msg.className = 'msg erro';
+      msg.innerHTML = `O navegador bloqueou a janela. <a href="${URL_MANUAL_WABA}" target="_blank" rel="noopener">Abrir o manual</a>.`;
+    }
+    document.getElementById('whatsapp-status-card').addEventListener('click', (e) => {
+      if (e.target.closest('#btn-ver-manual')) abrirManualWaba();
+    });
 
     async function iniciarConexaoWhatsapp() {
       const btn = document.getElementById('btn-conectar-whatsapp');
