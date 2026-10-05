@@ -287,10 +287,35 @@
       card.innerHTML = `
         <div style="margin-bottom:12px">${badge}</div>
         <p class="modal-texto" style="margin:0 0 16px">${escapeHtml(texto)}</p>
-        <button type="button" id="btn-conectar-whatsapp" disabled>Carregando conexão...</button>
+        <div class="ds-btn-grupo">
+          <button type="button" id="btn-conectar-whatsapp" disabled>Carregando conexão...</button>
+          <button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-ver-manual">Ver manual</button>
+        </div>
       `;
       iniciarConexaoWhatsapp();
     }
+
+    // "Ver manual": abre o PDF numa janela própria (não maximizada, centralizada
+    // sobre a atual) e a traz pra frente. Se o navegador bloquear o pop-up,
+    // mostra um link comum no lugar.
+    const URL_MANUAL_WABA = '/crm/manual-whatsapp-waba.pdf';
+    function abrirManualWaba() {
+      const largura = Math.min(980, window.screen.availWidth - 80);
+      const altura = Math.min(860, window.screen.availHeight - 80);
+      const esq = Math.max(0, Math.round((window.screenX || window.screenLeft || 0) + (window.outerWidth - largura) / 2));
+      const topo = Math.max(0, Math.round((window.screenY || window.screenTop || 0) + (window.outerHeight - altura) / 2));
+      const janela = window.open(
+        URL_MANUAL_WABA, 'kyvvo-manual-waba',
+        `popup=yes,width=${largura},height=${altura},left=${esq},top=${topo},resizable=yes,scrollbars=yes`
+      );
+      if (janela) { janela.focus(); return; }
+      const msg = document.getElementById('whatsapp-conectar-msg');
+      msg.className = 'msg erro';
+      msg.innerHTML = `O navegador bloqueou a janela. <a href="${URL_MANUAL_WABA}" target="_blank" rel="noopener">Abrir o manual</a>.`;
+    }
+    document.getElementById('whatsapp-status-card').addEventListener('click', (e) => {
+      if (e.target.closest('#btn-ver-manual')) abrirManualWaba();
+    });
 
     async function iniciarConexaoWhatsapp() {
       const btn = document.getElementById('btn-conectar-whatsapp');
