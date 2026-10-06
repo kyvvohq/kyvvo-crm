@@ -21,6 +21,7 @@ const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, chec
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
+const { provisionarWhatsapp } = require('./lib/provisionamento-whatsapp');
 const metaWhatsappService = require('./lib/meta-whatsapp-service');
 const { relatorioPedidos, listarPedidosDetalhado } = require('./lib/relatorios');
 const { novoDocumentoRelatorio, desenharResumo, desenharTabela, formatarMoedaPdf } = require('./lib/pdf-relatorios');
@@ -352,6 +353,12 @@ async function build() {
       }
       throw erro;
     }
+
+    // Onboarding dos modelos padrão (catálogo do admin) — best-effort, não
+    // atrasa nem quebra a resposta da conexão (ver lib/provisionamento-whatsapp).
+    provisionarWhatsapp(pool, { tenantId, wabaId }).catch((erro) => {
+      request.log.error(`[whatsapp] falha ao provisionar modelos padrão pro tenant ${tenantId}: ${erro.message}`);
+    });
 
     return { conectado: true, phoneNumberId, wabaId };
   });
