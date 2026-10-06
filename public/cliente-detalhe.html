@@ -192,11 +192,11 @@
           <h3 style="margin:0 0 14px">Dados de cadastro</h3>
           <div class="grid3">
             <div><label for="ed-nome">Nome</label><input id="ed-nome" value="${escapeHtml(c.nome)}"></div>
-            <div><label for="ed-telefone">Telefone</label><input id="ed-telefone" value="${escapeHtml(c.telefone || '')}"></div>
+            <div><label for="ed-telefone">Telefone</label><input id="ed-telefone" data-ds-mascara="telefone" value="${escapeHtml(c.telefone || '')}"></div>
             <div><label for="ed-email">E-mail</label><input id="ed-email" type="email" value="${escapeHtml(c.email || '')}"></div>
           </div>
           <div class="grid2">
-            <div><label for="ed-documento">CPF ou CNPJ</label><input id="ed-documento" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
+            <div><label for="ed-documento">CPF ou CNPJ</label><input id="ed-documento" data-ds-mascara="${(c.cpf || c.cnpj || '').replace(/\W/g, '').length > 11 ? 'cnpj' : 'cpf'}" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
             <div><label for="ed-nascimento">Data de nascimento</label><input id="ed-nascimento" type="date" value="${c.data_nascimento ? String(c.data_nascimento).slice(0, 10) : ''}"></div>
           </div>
           <div class="grid3">
@@ -331,15 +331,30 @@
         document.getElementById(id).addEventListener('change', () => { btnSalvar.style.display = ''; });
       });
 
+      // CPF (11 díg.) e CNPJ (14, hoje alfanumérico pela Receita) têm
+      // máscaras diferentes no DS — não existe um tipo combinado, então
+      // troca o tipo da máscara sozinho conforme o tamanho do que foi
+      // digitado. Listener direto no elemento (fase de captura/target) roda
+      // antes do listener do DS em `document` (fase de bubble) — o DS lê o
+      // atributo já atualizado na mesma tecla, sem atraso de 1 caractere.
+      // Limpa `data-ds-preparado` pra inputmode/placeholder também
+      // atualizarem pro novo tipo.
+      const campoDocumento = document.getElementById('ed-documento');
+      campoDocumento.addEventListener('input', () => {
+        const digitos = campoDocumento.value.replace(/\W/g, '');
+        const tipoCerto = digitos.length > 11 ? 'cnpj' : 'cpf';
+        if (campoDocumento.getAttribute('data-ds-mascara') !== tipoCerto) {
+          campoDocumento.setAttribute('data-ds-mascara', tipoCerto);
+          campoDocumento.removeAttribute('data-ds-preparado');
+        }
+      });
+
       btnSalvar.addEventListener('click', async () => {
         const nome = document.getElementById('ed-nome').value.trim();
         if (!nome) { document.getElementById('ed-erro').textContent = 'Nome é obrigatório'; return; }
-        const documento = document.getElementById('ed-documento').value.trim();
-        // CPF tem 11 dígitos, CNPJ tem 14 — decide em qual coluna salvar pelo
-        // tamanho depois de limpar a formatação, sem pedir pro usuário
-        // escolher o tipo à parte.
-        const somenteDigitos = documento.replace(/\D/g, '');
-        const ehCnpj = somenteDigitos.length > 11;
+        const tipoDocumento = campoDocumento.getAttribute('data-ds-mascara');
+        const documento = KyvvoDS.mascara.limpar(tipoDocumento, campoDocumento.value);
+        const ehCnpj = tipoDocumento === 'cnpj';
         const res = await apiFetch(`/crm/api/clientes/${c.id}`, {
           method: 'PATCH',
           body: JSON.stringify({
