@@ -217,15 +217,7 @@
     // "Cancelar" na edição reverter sem precisar recarregar da API.
     let destinoSalvo = { email: '', whatsapp: '' };
 
-    // notificacao_whatsapp vem do servidor em E.164 (+5534999998888, mesmo
-    // padrão de crm_clientes.telefone) — a máscara "telefone" do DS espera
-    // só o número local (sem o 55 do país), senão formata errado.
-    function whatsappParaExibicao(valorE164) {
-      if (!valorE164) return '';
-      let digitos = valorE164.replace(/\D/g, '');
-      if (digitos.length > 11 && digitos.startsWith('55')) digitos = digitos.slice(2);
-      return (window.KyvvoDS && KyvvoDS.mascara) ? KyvvoDS.mascara.formatar('telefone', digitos) : digitos;
-    }
+    // whatsappParaExibicao vem de shell.js (compartilhada com cliente-detalhe.html).
 
     async function carregarConfig() {
       const res = await apiFetch('/crm/api/notificacoes/config');
