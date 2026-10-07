@@ -12,22 +12,6 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
-<style>
-  .busca { max-width:320px; }
-  .busca input { height:40px; }
-  tr.linha-cliente { cursor:pointer; }
-  tr.linha-cliente:hover td { background:var(--surface-hover); }
-  tr.linha-cliente td { position:relative; }
-  .menu-acoes-wrap { position:relative; display:inline-block; }
-  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
-  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
-  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
-    box-shadow:var(--shadow-md); min-width:190px; z-index:20; padding:6px; }
-  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
-  .menu-acoes button:hover { background:var(--surface-muted); }
-  .menu-acoes button.perigo { color:var(--danger); }
-  .badge-bloqueado { background:color-mix(in srgb, var(--danger) 20%, transparent); color:var(--danger); }
-</style>
 </head>
 <body>
   <header class="ds-topbar">
@@ -105,33 +89,35 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>Clientes</h1></div>
-        </div>
-        <div class="acoes">
-          <div class="menu-acoes-wrap">
-            <button type="button" class="btn-secundario btn-acoes" id="btn-acoes-clientes" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" style="width:auto">⋯</button>
-            <div class="menu-acoes" id="menu-acoes-clientes" hidden>
-              <button type="button" id="btn-gerenciar-formularios">Formulários</button>
-              <button type="button" id="btn-duplicados">Duplicados</button>
+      <header class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">Clientes</h1></div>
+        <div class="ds-pagina-cab-acoes">
+          <div class="ds-acoes" id="acoes-topo-clientes">
+            <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Mais ações">⋯</button>
+            <div class="ds-acoes-menu" role="menu" hidden>
+              <button type="button" class="ds-acoes-item" role="menuitem" data-acao="formularios">Formulários</button>
+              <button type="button" class="ds-acoes-item" role="menuitem" data-acao="duplicados">Duplicados</button>
             </div>
           </div>
-          <button type="button" id="btn-novo-cliente"><span data-icon="plus" data-size="16"></span>Novo cliente</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-novo-cliente"><span data-icon="plus" data-size="16"></span>Novo cliente</button>
         </div>
-      </div>
+      </header>
 
-      <div class="busca">
-        <input type="search" id="input-busca" placeholder="Buscar por nome, telefone ou CPF…">
-      </div>
-
-      <div class="card" style="padding:0">
-        <table>
-          <thead>
-            <tr><th>Nome</th><th>Telefone</th><th>Cidade</th><th>Segmento</th><th>Origem</th><th>Nascimento</th><th>Desde</th><th></th></tr>
-          </thead>
-          <tbody id="tbody-clientes"></tbody>
-        </table>
+      <div class="ds-tabela" role="table" aria-label="Clientes"
+           style="--ds-colunas: minmax(0,1.3fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,0.8fr) minmax(0,0.8fr) 100px 100px 48px">
+        <div class="ds-filtros">
+          <div class="ds-pesquisa">
+            <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="ds-pesquisa-input" type="search" id="input-busca" placeholder="Buscar por nome, telefone ou CPF…" aria-label="Buscar por nome, telefone ou CPF">
+          </div>
+        </div>
+        <div class="ds-tabela-cabecalho" role="row">
+          <span role="columnheader">Nome</span><span role="columnheader">Telefone</span><span role="columnheader">Cidade</span>
+          <span role="columnheader">Segmento</span><span role="columnheader">Origem</span><span role="columnheader">Nascimento</span>
+          <span role="columnheader">Desde</span><span role="columnheader"></span>
+        </div>
+        <div id="linhas-clientes"></div>
+        <div class="ds-tabela-rodape"><nav data-ds-paginacao id="paginacao-clientes" data-ds-total="0" data-ds-tamanho="25" data-ds-tamanhos="25,50,100"></nav></div>
       </div>
     </div>
   </div>
@@ -147,16 +133,22 @@
     let segmentosOpcoes = [];
     let origensOpcoes = [];
 
-    async function carregar(busca) {
-      const qs = busca ? `?busca=${encodeURIComponent(busca)}` : '';
+    let totalClientes = 0;
+    const estadoClientes = { pagina: 1, tamanho: 25, busca: '' };
+
+    async function carregar() {
+      const qs = new URLSearchParams({ pagina: estadoClientes.pagina, tamanho: estadoClientes.tamanho });
+      if (estadoClientes.busca) qs.set('busca', estadoClientes.busca);
       const [resClientes, resTags, resFormularios, resSegmentos, resOrigens] = await Promise.all([
-        apiFetch(`/crm/api/clientes${qs}`),
+        apiFetch(`/crm/api/clientes?${qs}`),
         apiFetch('/crm/api/tags'),
         apiFetch('/crm/api/formularios'),
         apiFetch('/crm/api/opcoes-cadastro?tipo=segmento'),
         apiFetch('/crm/api/opcoes-cadastro?tipo=origem'),
       ]);
-      clientes = await resClientes.json();
+      const corpoClientes = await resClientes.json();
+      clientes = corpoClientes.dados;
+      totalClientes = corpoClientes.total;
       tags = await resTags.json();
       formularios = await resFormularios.json();
       segmentosOpcoes = await resSegmentos.json();
@@ -171,112 +163,77 @@
     }
 
     function renderizar() {
-      const tbody = document.getElementById('tbody-clientes');
-      if (!clientes.length) {
-        tbody.innerHTML = `<tr><td colspan="8"><div class="vazio">Nenhum cliente ainda — cadastre o primeiro ou espere o primeiro pedido chegar.</div></td></tr>`;
-        return;
-      }
-      tbody.innerHTML = clientes.map((c) => `
-        <tr class="linha-cliente" data-id="${c.id}">
-          <td>${escapeHtml(c.nome)} ${c.bloqueado ? '<span class="badge badge-bloqueado">Bloqueado</span>' : ''}</td>
-          <td>${escapeHtml(c.telefone || '—')}</td>
-          <td>${escapeHtml([c.cidade, c.uf].filter(Boolean).join('/') || '—')}</td>
-          <td>${escapeHtml(c.segmento || '—')}</td>
-          <td>${escapeHtml(c.origem || '—')}</td>
-          <td>${formatarDataSemFuso(c.data_nascimento)}</td>
-          <td>${formatarData(c.criado_em)}</td>
-          <td>
-            <div class="menu-acoes-wrap">
-              <button type="button" class="btn-acoes" data-abrir-menu="${c.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="menu-acoes" data-menu="${c.id}" hidden>
-                <button type="button" data-editar-cliente="${c.id}">Editar</button>
-                <button type="button" data-alternar-bloqueio="${c.id}" data-bloqueado="${!c.bloqueado}">${c.bloqueado ? 'Desbloquear' : 'Bloquear'}</button>
-                <button type="button" data-ver-pedidos="${c.id}">Pedidos</button>
-                <button type="button" data-atendimento="${c.id}">Atendimento</button>
+      const container = document.getElementById('linhas-clientes');
+      container.innerHTML = clientes.length ? clientes.map((c) => `
+        <div class="ds-tabela-linha ds-tabela-linha-clicavel" role="row" tabindex="0" data-id="${c.id}">
+          <span role="cell" data-rotulo="Nome"><span class="ds-tabela-primario">${escapeHtml(c.nome)}</span>${c.bloqueado ? ' <span class="ds-badge ds-badge-erro ds-badge-sm">Bloqueado</span>' : ''}</span>
+          <span role="cell" data-rotulo="Telefone">${escapeHtml(c.telefone || '—')}</span>
+          <span role="cell" data-rotulo="Cidade">${escapeHtml([c.cidade, c.uf].filter(Boolean).join('/') || '—')}</span>
+          <span role="cell" data-rotulo="Segmento">${escapeHtml(c.segmento || '—')}</span>
+          <span role="cell" data-rotulo="Origem">${escapeHtml(c.origem || '—')}</span>
+          <span role="cell" data-rotulo="Nascimento">${formatarDataSemFuso(c.data_nascimento)}</span>
+          <span role="cell" data-rotulo="Desde">${formatarData(c.criado_em)}</span>
+          <span role="cell">
+            <div class="ds-acoes" data-id="${c.id}">
+              <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações de ${escapeHtml(c.nome)}">⋯</button>
+              <div class="ds-acoes-menu" role="menu" hidden>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="editar">Editar</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="bloqueio">${c.bloqueado ? 'Desbloquear' : 'Bloquear'}</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="pedidos">Pedidos</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="atendimento">Atendimento</button>
               </div>
             </div>
-          </td>
-        </tr>
-      `).join('');
-      tbody.querySelectorAll('.linha-cliente').forEach((tr) => {
-        tr.addEventListener('click', (e) => {
-          if (e.target.closest('.menu-acoes-wrap')) return;
-          window.location.href = `/crm/cliente-detalhe.html?id=${tr.dataset.id}`;
+          </span>
+        </div>
+      `).join('') : `<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhum cliente ainda</p><p class="ds-vazio-texto">Cadastre o primeiro ou espere o primeiro pedido chegar.</p></div>`;
+
+      container.querySelectorAll('.ds-tabela-linha-clicavel').forEach((linha) => {
+        linha.addEventListener('click', (e) => {
+          if (e.target.closest('.ds-acoes')) return;
+          window.location.href = `/crm/cliente-detalhe.html?id=${linha.dataset.id}`;
         });
       });
-      ligarEventosLinhasClientes();
+
+      KyvvoDS.paginacaoAtualizar(document.getElementById('paginacao-clientes'), { total: totalClientes, pagina: estadoClientes.pagina, tamanho: estadoClientes.tamanho });
     }
 
-    function fecharMenusAbertosClientes() {
-      document.querySelectorAll('.menu-acoes').forEach((m) => { m.hidden = true; });
-    }
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.menu-acoes-wrap')) fecharMenusAbertosClientes();
+    // Ações por linha — delegado no container (as linhas são recriadas a
+    // cada renderizar()), mesmo padrão de automacoes.html.
+    document.getElementById('linhas-clientes').addEventListener('ds-acoes-escolher', async (e) => {
+      const id = e.target.closest('[data-id]').dataset.id;
+      const cliente = clientes.find((c) => c.id === id);
+      if (e.detail.acao === 'editar') {
+        window.location.href = `/crm/cliente-detalhe.html?id=${id}`;
+      } else if (e.detail.acao === 'bloqueio') {
+        await apiFetch(`/crm/api/clientes/${id}`, { method: 'PATCH', body: JSON.stringify({ bloqueado: !cliente.bloqueado }) });
+        carregar();
+      } else if (e.detail.acao === 'pedidos') {
+        window.location.href = `/crm/pedidos.html?cliente_id=${id}`;
+      } else if (e.detail.acao === 'atendimento') {
+        if (cliente && cliente.telefone) window.open(linkWhatsapp(cliente.telefone), '_blank', 'noopener');
+      }
     });
 
-    function ligarEventosLinhasClientes() {
-      document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const menu = document.querySelector(`[data-menu="${btn.dataset.abrirMenu}"]`);
-          const jaAberto = !menu.hidden;
-          fecharMenusAbertosClientes();
-          menu.hidden = jaAberto;
-        });
-      });
-      document.querySelectorAll('[data-editar-cliente]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          window.location.href = `/crm/cliente-detalhe.html?id=${btn.dataset.editarCliente}`;
-        });
-      });
-      document.querySelectorAll('[data-alternar-bloqueio]').forEach((btn) => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          fecharMenusAbertosClientes();
-          await apiFetch(`/crm/api/clientes/${btn.dataset.alternarBloqueio}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ bloqueado: btn.dataset.bloqueado === 'true' }),
-          });
-          carregar();
-        });
-      });
-      document.querySelectorAll('[data-ver-pedidos]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          window.location.href = `/crm/pedidos.html?cliente_id=${btn.dataset.verPedidos}`;
-        });
-      });
-      document.querySelectorAll('[data-atendimento]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          fecharMenusAbertosClientes();
-          const c = clientes.find((x) => x.id === btn.dataset.atendimento);
-          if (c && c.telefone) window.open(linkWhatsapp(c.telefone), '_blank', 'noopener');
-        });
-      });
-    }
+    document.getElementById('paginacao-clientes').addEventListener('ds-paginacao-alterar', (e) => {
+      estadoClientes.pagina = e.detail.pagina;
+      estadoClientes.tamanho = e.detail.tamanho;
+      carregar();
+    });
 
     let debounceBusca;
     document.getElementById('input-busca').addEventListener('input', (e) => {
       clearTimeout(debounceBusca);
-      debounceBusca = setTimeout(() => carregar(e.target.value.trim()), 300);
+      debounceBusca = setTimeout(() => {
+        estadoClientes.busca = e.target.value.trim();
+        estadoClientes.pagina = 1;
+        carregar();
+      }, 300);
     });
 
-    // --- Formulário de captação (US22) --------------------------------------
-    document.getElementById('btn-gerenciar-formularios').addEventListener('click', () => { fecharMenusAbertosClientes(); abrirModalFormularios(); });
-
-    // --- Menu almôndega de topo (Formulários / Importar CSV / Duplicados) — mesmo padrão
-    // visual/CSS do kebab por linha, só que fixo (não recriado a cada
-    // renderizar()), por isso ligado uma única vez aqui em vez de dentro de
-    // ligarEventosLinhasClientes(). Fecha sozinho via o listener global de
-    // clique fora já existente (checa .menu-acoes-wrap genericamente).
-    document.getElementById('btn-acoes-clientes').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const menu = document.getElementById('menu-acoes-clientes');
-      const jaAberto = !menu.hidden;
-      fecharMenusAbertosClientes();
-      menu.hidden = jaAberto;
+    // --- Formulário de captação (US22) + Duplicados (US17) — kebab de topo --
+    document.getElementById('acoes-topo-clientes').addEventListener('ds-acoes-escolher', (e) => {
+      if (e.detail.acao === 'formularios') abrirModalFormularios();
+      else if (e.detail.acao === 'duplicados') abrirModalDuplicados();
     });
 
     function abrirModalFormularios() {
@@ -363,8 +320,8 @@
       });
     }
 
-    // --- Duplicados (US17) ---------------------------------------------------
-    document.getElementById('btn-duplicados').addEventListener('click', () => { fecharMenusAbertosClientes(); abrirModalDuplicados(); });
+    // --- Duplicados (US17) — abrirModalDuplicados() ligado no kebab de topo,
+    // junto com Formulários, logo acima.
 
     async function abrirModalDuplicados() {
       abrirModal('<h3>Possíveis duplicados</h3>', `
