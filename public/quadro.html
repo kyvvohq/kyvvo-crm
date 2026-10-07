@@ -705,12 +705,13 @@
     function abrirModalNovoRecurso() {
       const overlay = abrirModal('<h3>Novo recurso</h3>', `
         <p class="modal-texto">São as raias do Quadro — ex.: cada impressora 3D, forno, posto de trabalho.</p>
-        <label for="r-nome">Nome</label>
-        <input id="r-nome" placeholder="ex.: Impressora 2" autofocus>
-        <div class="modal-erro" id="r-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="btn-cancelar-recurso">Cancelar</button>
-          <button type="button" id="btn-salvar-recurso">Criar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="r-nome">Nome</label><input class="ds-input" id="r-nome" placeholder="ex.: Impressora 2" autofocus></div>
+          <div class="modal-erro" id="r-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-cancelar-recurso">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-recurso">Criar</button>
+          </div>
         </div>
       `);
       document.getElementById('btn-cancelar-recurso').addEventListener('click', fecharModal);
@@ -765,50 +766,47 @@
           <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
         </div>` : ''}
 
-        <div class="grid2">
-          <div><label for="d-cliente-nome">Nome do cliente</label><input id="d-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
-          <div><label for="d-cliente-telefone">Telefone</label><input id="d-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
-        </div>
-
-        <div class="grid2">
-          <div><label for="d-etapa">Etapa</label>
-            <select id="d-etapa">
-              ${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}
-            </select>
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo"><label class="ds-rotulo" for="d-cliente-nome">Nome do cliente</label><input class="ds-input" id="d-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="d-cliente-telefone">Telefone</label><input class="ds-input" id="d-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="d-etapa">Etapa</label>
+              <div class="ds-select"><select id="d-etapa">
+                ${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}
+              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="d-recurso">Recurso</label>
+              <div class="ds-select"><select id="d-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="d-prioridade">Prioridade</label>
+              <div class="ds-select"><select id="d-prioridade">
+                <option value="">Nenhuma</option>
+                <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
+                <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
+                <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
+                <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
+              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="d-status">Pagamento</label>
+              <div class="ds-select"><select id="d-status">
+                <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
+                <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
+                <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
+              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo"><label class="ds-rotulo" for="d-recebido">Valor recebido</label><input class="ds-input" id="d-recebido" inputmode="decimal"></div>
           </div>
-          <div><label for="d-recurso">Recurso</label>
-            <select id="d-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
-          </div>
-        </div>
+          <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
 
-        <div class="grid2">
-          <div><label for="d-prioridade">Prioridade</label>
-            <select id="d-prioridade">
-              <option value="">Nenhuma</option>
-              <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
-              <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
-              <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
-              <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
-            </select>
+          <div class="modal-erro" id="d-erro"></div>
+          <div class="ds-form-acoes">
+            ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-detalhe">Salvar</button>
           </div>
-        </div>
-
-        <div class="grid2">
-          <div><label for="d-status">Pagamento</label>
-            <select id="d-status">
-              <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
-              <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
-              <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
-            </select>
-          </div>
-          <div><label for="d-recebido">Valor recebido</label><input id="d-recebido" inputmode="decimal"></div>
-        </div>
-        <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
-
-        <div class="modal-erro" id="d-erro"></div>
-        <div class="modal-acoes">
-          ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
-          <button type="button" id="btn-salvar-detalhe">Salvar</button>
         </div>
       `);
 
@@ -889,10 +887,11 @@
     // vínculo errado/automático (bot, importação), não cadastrar do zero.
     function abrirModalVincularCliente(pedidoId) {
       abrirModal('<h3>Vincular a um cliente</h3>', `
-        <label for="busca-cliente-vincular">Buscar cliente</label>
-        <input type="text" id="busca-cliente-vincular" placeholder="Nome, telefone ou CPF...">
-        <div id="lista-clientes-vincular" style="margin-top:8px; max-height:280px; overflow-y:auto"></div>
-        <div class="modal-erro" id="vincular-erro"></div>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="busca-cliente-vincular">Buscar cliente</label><input class="ds-input" type="text" id="busca-cliente-vincular" placeholder="Nome, telefone ou CPF..."></div>
+          <div id="lista-clientes-vincular" style="margin-top:8px; max-height:280px; overflow-y:auto"></div>
+          <div class="modal-erro" id="vincular-erro"></div>
+        </div>
       `, 'modal-card-larga');
 
       const campo = document.getElementById('busca-cliente-vincular');
@@ -938,12 +937,13 @@
       if (!p) return;
       abrirModal('<h3>Confirmar frete</h3>', `
         <p class="modal-texto">${p.frete_pago ? 'Frete já confirmado como pago. Pode ajustar o valor se mudou.' : 'Informe o valor do frete pra marcar como pago.'}</p>
-        <label for="frete-valor-confirmar">Valor do frete</label>
-        <input id="frete-valor-confirmar" inputmode="decimal" placeholder="0,00">
-        <div class="modal-erro" id="frete-confirmar-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="frete-confirmar-cancelar">Cancelar</button>
-          <button type="button" id="frete-confirmar-salvar">Confirmar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="frete-valor-confirmar">Valor do frete</label><input class="ds-input" id="frete-valor-confirmar" inputmode="decimal" placeholder="0,00"></div>
+          <div class="modal-erro" id="frete-confirmar-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="frete-confirmar-cancelar">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="frete-confirmar-salvar">Confirmar</button>
+          </div>
         </div>
       `);
       const campo = document.getElementById('frete-valor-confirmar');
@@ -968,12 +968,13 @@
     function confirmarRemoverPedido(pedidoId) {
       abrirModal('<h3>Remover pedido?</h3>', `
         <p class="modal-texto">Essa ação não pode ser desfeita. O pedido vai pra etapa de "perdido".</p>
-        <label for="remover-motivo">Motivo</label>
-        <textarea id="remover-motivo" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
-        <div class="modal-erro" id="remover-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="remover-voltar">Voltar</button>
-          <button type="button" class="btn-perigo" id="remover-confirmar">Remover pedido</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="remover-motivo">Motivo</label><textarea class="ds-textarea" id="remover-motivo" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea></div>
+          <div class="modal-erro" id="remover-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="remover-voltar">Voltar</button>
+            <button type="button" class="ds-btn ds-btn-perigo" id="remover-confirmar">Remover pedido</button>
+          </div>
         </div>
       `);
       document.getElementById('remover-voltar').addEventListener('click', fecharModal);
