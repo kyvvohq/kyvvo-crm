@@ -271,6 +271,16 @@ function linkWhatsapp(telefone, mensagem) {
   const digitos = String(telefone || '').replace(/\D/g, '');
   return `https://wa.me/${digitos}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
 }
+// Telefone vem do servidor em E.164 (+5534999998888) — a máscara "telefone"
+// do DS espera só o número local (sem o 55 do país), senão formata errado
+// (achado real ao pré-preencher um campo com máscara, 2026-10-07). Use
+// sempre que for jogar um telefone JÁ SALVO num campo com data-ds-mascara.
+function whatsappParaExibicao(valorE164) {
+  if (!valorE164) return '';
+  let digitos = valorE164.replace(/\D/g, '');
+  if (digitos.length > 11 && digitos.startsWith('55')) digitos = digitos.slice(2);
+  return (window.KyvvoDS && KyvvoDS.mascara) ? KyvvoDS.mascara.formatar('telefone', digitos) : digitos;
+}
 
 // --- Máscara de moeda (R$ 0,00) — digita só números, formata sozinho.
 // O valor "de verdade" pra mandar pro backend sai de valorMoedaParaNumero,

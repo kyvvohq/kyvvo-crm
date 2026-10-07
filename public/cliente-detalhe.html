@@ -14,9 +14,6 @@
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
   .bloco-cliente { margin-bottom:20px; }
-  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 16px; }
-  @media(max-width:700px) { .grid3 { grid-template-columns:1fr 1fr; } }
-  @media(max-width:480px) { .grid3 { grid-template-columns:1fr; } }
   .ficha-metricas { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
   @media(max-width:560px) { .ficha-metricas { grid-template-columns:1fr 1fr; } }
   .ficha-metrica { background:var(--surface-muted); border-radius:var(--radius-md); padding:12px 14px; }
@@ -190,37 +187,41 @@
 
         <div class="card bloco-cliente">
           <h3 style="margin:0 0 14px">Dados de cadastro</h3>
-          <div class="grid3">
-            <div><label for="ed-nome">Nome</label><input id="ed-nome" value="${escapeHtml(c.nome)}"></div>
-            <div><label for="ed-telefone">Telefone</label><input id="ed-telefone" data-ds-mascara="telefone" value="${escapeHtml(c.telefone || '')}"></div>
-            <div><label for="ed-email">E-mail</label><input id="ed-email" type="email" value="${escapeHtml(c.email || '')}"></div>
-          </div>
-          <div class="grid2">
-            <div><label for="ed-documento">CPF ou CNPJ</label><input id="ed-documento" data-ds-mascara="${(c.cpf || c.cnpj || '').replace(/\W/g, '').length > 11 ? 'cnpj' : 'cpf'}" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
-            <div><label for="ed-nascimento">Data de nascimento</label><input id="ed-nascimento" type="date" value="${c.data_nascimento ? String(c.data_nascimento).slice(0, 10) : ''}"></div>
-          </div>
-          <div class="grid3">
-            <div><label for="ed-endereco">Endereço completo</label><input id="ed-endereco" placeholder="Rua, número, complemento, bairro, cidade - UF, CEP" value="${escapeHtml(c.endereco_completo || '')}"></div>
-            <div><label for="ed-cidade">Cidade</label><input id="ed-cidade" value="${escapeHtml(c.cidade || '')}"></div>
-            <div><label for="ed-uf">UF</label><input id="ed-uf" maxlength="2" style="text-transform:uppercase" value="${escapeHtml(c.uf || '')}"></div>
-          </div>
-          <div class="grid2">
-            <div><label for="ed-segmento">Segmento</label><select id="ed-segmento">${opcoesComboHtml(segmentosOpcoes, c.segmento)}</select></div>
-            <div><label for="ed-origem">Origem</label><select id="ed-origem">${opcoesComboHtml(origensOpcoes, c.origem)}</select></div>
-          </div>
+          <div class="ds-form">
+            <div class="ds-form-grade">
+              <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="ed-nome">Nome</label><input class="ds-input" id="ed-nome" value="${escapeHtml(c.nome)}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="ed-telefone">Telefone</label><input class="ds-input" id="ed-telefone" data-ds-mascara="telefone" value="${escapeHtml(whatsappParaExibicao(c.telefone))}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="ed-email">E-mail</label><input class="ds-input" id="ed-email" type="email" value="${escapeHtml(c.email || '')}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="ed-documento">CPF ou CNPJ</label><input class="ds-input" id="ed-documento" data-ds-mascara="${(c.cpf || c.cnpj || '').replace(/\W/g, '').length > 11 ? 'cnpj' : 'cpf'}" value="${escapeHtml(c.cpf || c.cnpj || '')}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="ed-nascimento">Data de nascimento</label><input class="ds-input" id="ed-nascimento" type="date" value="${c.data_nascimento ? String(c.data_nascimento).slice(0, 10) : ''}"></div>
+              <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="ed-endereco">Endereço completo</label><input class="ds-input" id="ed-endereco" placeholder="Rua, número, complemento, bairro, cidade - UF, CEP" value="${escapeHtml(c.endereco_completo || '')}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="ed-cidade">Cidade</label><input class="ds-input" id="ed-cidade" value="${escapeHtml(c.cidade || '')}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="ed-uf">UF</label><input class="ds-input" id="ed-uf" maxlength="2" style="text-transform:uppercase" value="${escapeHtml(c.uf || '')}"></div>
+              <div class="ds-campo">
+                <label class="ds-rotulo" for="ed-segmento">Segmento</label>
+                <div class="ds-select"><select id="ed-segmento">${opcoesComboHtml(segmentosOpcoes, c.segmento)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+              </div>
+              <div class="ds-campo">
+                <label class="ds-rotulo" for="ed-origem">Origem</label>
+                <div class="ds-select"><select id="ed-origem">${opcoesComboHtml(origensOpcoes, c.origem)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+              </div>
+            </div>
 
-          <div class="ficha-secao">
-            <h4>Tags</h4>
-            <div class="ficha-tags">${(c.tags || []).map((t) => `<span class="badge destaque">${escapeHtml(t.nome)}<button type="button" class="remover-tag-chip" data-remover-tag="${t.id}" aria-label="Remover tag">×</button></span>`).join('') || '<span class="vazio" style="padding:0">Nenhuma ainda.</span>'}</div>
-            <input type="text" id="ficha-nova-tag" placeholder="+ Nova tag (Enter)" style="margin-top:8px;max-width:220px">
-          </div>
+            <div class="ficha-secao">
+              <h4>Tags</h4>
+              <div class="ficha-tags">${(c.tags || []).map((t) => `<span class="badge destaque">${escapeHtml(t.nome)}<button type="button" class="remover-tag-chip" data-remover-tag="${t.id}" aria-label="Remover tag">×</button></span>`).join('') || '<span class="vazio" style="padding:0">Nenhuma ainda.</span>'}</div>
+              <input class="ds-input" type="text" id="ficha-nova-tag" placeholder="+ Nova tag (Enter)" style="margin-top:8px;max-width:220px">
+            </div>
 
-          <label for="ed-observacoes">Observações</label>
-          <textarea id="ed-observacoes">${escapeHtml(c.observacoes || '')}</textarea>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="ed-observacoes">Observações</label>
+              <textarea class="ds-textarea" id="ed-observacoes">${escapeHtml(c.observacoes || '')}</textarea>
+            </div>
 
-          <div class="modal-erro" id="ed-erro" style="margin-top:12px"></div>
-          <div class="modal-acoes">
-            <button type="button" id="btn-salvar-cliente" style="display:none">Salvar alterações</button>
+            <div class="modal-erro" id="ed-erro"></div>
+            <div class="ds-form-acoes">
+              <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-cliente" style="display:none">Salvar alterações</button>
+            </div>
           </div>
         </div>
 
