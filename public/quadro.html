@@ -628,8 +628,8 @@
         <p class="modal-texto">Essa ação não pode ser desfeita. Se ainda houver pedidos em "${escapeHtml(nome)}", mova-os antes de apagar.</p>
         <div class="modal-erro" id="apagar-etapa-erro"></div>
         <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="cancelar-apagar-etapa">Cancelar</button>
-          <button type="button" class="btn-perigo" id="confirmar-apagar-etapa">Apagar etapa</button>
+          <button type="button" class="ds-btn ds-btn-secundario" id="cancelar-apagar-etapa">Cancelar</button>
+          <button type="button" class="ds-btn ds-btn-perigo" id="confirmar-apagar-etapa">Apagar etapa</button>
         </div>
       `);
       document.getElementById('cancelar-apagar-etapa').addEventListener('click', fecharModal);
@@ -730,8 +730,8 @@
       const overlay = abrirModal('<h3>Apagar recurso?</h3>', `
         <p class="modal-texto">Pedidos em "${escapeHtml(nome)}" voltam pra raia "Sem recurso" — nenhum é apagado.</p>
         <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="cancelar-apagar-recurso">Cancelar</button>
-          <button type="button" class="btn-perigo" id="confirmar-apagar-recurso">Apagar recurso</button>
+          <button type="button" class="ds-btn ds-btn-secundario" id="cancelar-apagar-recurso">Cancelar</button>
+          <button type="button" class="ds-btn ds-btn-perigo" id="confirmar-apagar-recurso">Apagar recurso</button>
         </div>
       `);
       document.getElementById('cancelar-apagar-recurso').addEventListener('click', fecharModal);
@@ -804,7 +804,7 @@
 
           <div class="modal-erro" id="d-erro"></div>
           <div class="ds-form-acoes">
-            ${p.cliente_telefone ? `<a class="btn btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
+            ${p.cliente_telefone ? `<a class="ds-btn ds-btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
             <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-detalhe">Salvar</button>
           </div>
         </div>

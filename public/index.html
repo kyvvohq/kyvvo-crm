@@ -31,11 +31,6 @@
   .header-acoes { display:flex; align-items:center; gap:18px; }
   .link-entrar { font-size:13.5px; font-weight:600; color:var(--muted-strong); text-decoration:none; }
   .link-entrar:hover { color:var(--text); }
-  .btn { display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff; font-weight:600;
-    border:none; border-radius:var(--radius-md); height:40px; padding:0 20px; font-size:14px; cursor:pointer;
-    text-decoration:none; font-family:var(--font-ui); }
-  .btn:hover { background:var(--accent-dark); }
-
   .hero { padding:80px 24px 60px; text-align:center; }
   .hero-eyebrow { display:inline-flex; align-items:center; gap:8px; background:var(--accent-tint); border:1px solid var(--accent);
     border-radius:var(--radius-full); padding:6px 16px; font-size:12px; font-weight:600; color:var(--accent-strong);
@@ -44,8 +39,6 @@
   .hero .destaque { background:linear-gradient(120deg,var(--accent-dark),var(--accent)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
   .hero p.sub { color:var(--muted-strong); font-size:16px; line-height:1.7; max-width:560px; margin:0 auto 32px; }
   .hero-ctas { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
-  .btn-secundario { background:var(--card); color:var(--text-secondary); border:1px solid var(--border-strong); }
-  .btn-secundario:hover { background:var(--surface-muted); }
 
   .perguntas { padding:50px 24px 70px; }
   .perguntas h2 { text-align:center; font-size:26px; margin:0 0 40px; }
@@ -88,7 +81,7 @@
       </a>
       <div class="header-acoes">
         <a class="link-entrar" href="/crm/login.html">Entrar</a>
-        <a class="btn" href="/crm/cadastro.html">Criar conta</a>
+        <a class="ds-btn ds-btn-primario" href="/crm/cadastro.html">Criar conta</a>
       </div>
     </div>
   </header>
@@ -99,8 +92,8 @@
       <h1>Marketplace, WhatsApp e loja própria — <span class="destaque">numa base de clientes só</span></h1>
       <p class="sub">Tire a operação da sua cabeça: cadastro de clientes, funil de pedidos por etapa e um painel diário que já te diz com quem falar no WhatsApp hoje.</p>
       <div class="hero-ctas">
-        <a class="btn" href="/crm/cadastro.html">Criar conta grátis</a>
-        <a class="btn btn-secundario" href="/crm/login.html">Já tenho conta</a>
+        <a class="ds-btn ds-btn-primario" href="/crm/cadastro.html">Criar conta grátis</a>
+        <a class="ds-btn ds-btn-secundario" href="/crm/login.html">Já tenho conta</a>
       </div>
     </div>
   </section>
@@ -149,7 +142,7 @@
     <div class="wrap">
       <h2>Comece agora, sem cartão</h2>
       <p>Cria a conta em menos de um minuto e já cai no Painel Hoje.</p>
-      <a class="btn" href="/crm/cadastro.html">Criar conta grátis</a>
+      <a class="ds-btn ds-btn-primario" href="/crm/cadastro.html">Criar conta grátis</a>
     </div>
   </section>
 

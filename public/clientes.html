@@ -249,7 +249,7 @@
         <textarea id="fm-perguntas" placeholder="ex.: Quantas peças por mês você revende?"></textarea>
         <div class="modal-erro" id="fm-erro"></div>
         <div class="modal-acoes">
-          <button type="button" id="fm-adicionar">Criar formulário</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="fm-adicionar">Criar formulário</button>
         </div>
       `, 'modal-card-larga');
       renderizarListaFormularios();
@@ -283,9 +283,9 @@
             <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
               <span>${escapeHtml(f.nome)} ${f.ativo ? '<span class="badge sucesso">ativo</span>' : '<span class="badge neutro">desativado</span>'}</span>
               <div style="display:flex;gap:6px">
-                <button type="button" class="btn-secundario btn-remover-recurso" data-copiar-link="${link}">Copiar link</button>
-                <button type="button" class="btn-secundario btn-remover-recurso" data-alternar-formulario="${f.id}" data-ativo="${!f.ativo}">${f.ativo ? 'Desativar' : 'Ativar'}</button>
-                <button type="button" class="btn-secundario btn-remover-recurso" data-apagar-formulario="${f.id}">Remover</button>
+                <button type="button" class="ds-btn ds-btn-secundario btn-remover-recurso" data-copiar-link="${link}">Copiar link</button>
+                <button type="button" class="ds-btn ds-btn-secundario btn-remover-recurso" data-alternar-formulario="${f.id}" data-ativo="${!f.ativo}">${f.ativo ? 'Desativar' : 'Ativar'}</button>
+                <button type="button" class="ds-btn ds-btn-secundario btn-remover-recurso" data-apagar-formulario="${f.id}">Remover</button>
               </div>
             </div>
           </div>
@@ -346,7 +346,7 @@
               <span>${escapeHtml(c.nome)}${c.telefone ? ' · ' + escapeHtml(c.telefone) : ''}${c.quantidade_pedidos ? ' · ' + c.quantidade_pedidos + ' pedido(s)' : ''}</span>
             </label>
           `).join('')}
-          <button type="button" class="btn-secundario" data-mesclar-grupo="${i}">Mesclar — mantém a ficha marcada</button>
+          <button type="button" class="ds-btn ds-btn-secundario" data-mesclar-grupo="${i}">Mesclar — mantém a ficha marcada</button>
         </div>
       `).join('') : '<p class="vazio">Nenhum duplicado encontrado.</p>';
 

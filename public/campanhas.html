@@ -110,7 +110,7 @@
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
           <h2 style="font-size:15px;margin:0;color:var(--text)">Nova campanha</h2>
-          <button type="button" class="btn-secundario" id="btn-privacidade" title="Ocultar dados dos clientes na tela" aria-pressed="false" style="width:36px;height:36px;padding:0">
+          <button type="button" class="ds-btn ds-btn-secundario ds-btn-icone" id="btn-privacidade" title="Ocultar dados dos clientes na tela" aria-pressed="false">
             <span data-icon="eye" data-size="16"></span>
           </button>
         </div>
@@ -298,9 +298,9 @@
               <div style="color:var(--muted);font-size:12px">${formatarDataHora(s.criado_em)}</div>
             </div>
             <div class="acoes-linha">
-              <button type="button" class="btn-secundario" data-ver-segmento="${s.id}">Ver</button>
-              <button type="button" data-sortear-segmento="${s.id}" data-nome-segmento="${escapeHtml(s.nome)}">Sortear</button>
-              <button type="button" class="btn-perigo" data-apagar-segmento="${s.id}">Excluir</button>
+              <button type="button" class="ds-btn ds-btn-secundario" data-ver-segmento="${s.id}">Ver</button>
+              <button type="button" class="ds-btn ds-btn-primario" data-sortear-segmento="${s.id}" data-nome-segmento="${escapeHtml(s.nome)}">Sortear</button>
+              <button type="button" class="ds-btn ds-btn-perigo" data-apagar-segmento="${s.id}">Excluir</button>
             </div>
           </div>
         </div>
@@ -347,7 +347,7 @@
         if (!res.ok) { document.getElementById('sorteio-erro').textContent = dados.error || 'Falha ao sortear'; return; }
         abrirModal('<h3>🎉 Resultado do sorteio</h3>', `
           ${dados.vencedores.map((v) => `<div class="linha-item"><span>${escapeHtml(v.nome)}</span><span style="color:var(--muted)">${escapeHtml(v.telefone || '—')}</span></div>`).join('')}
-          <div class="modal-acoes"><button type="button" id="sorteio-fechar">Fechar</button></div>
+          <div class="modal-acoes"><button type="button" class="ds-btn ds-btn-primario" id="sorteio-fechar">Fechar</button></div>
         `);
         document.getElementById('sorteio-fechar').addEventListener('click', () => { fecharModal(); carregar(); });
       });

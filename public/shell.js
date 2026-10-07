@@ -210,7 +210,7 @@ function avisar(titulo, mensagem) {
     `
       <p class="modal-texto">${mensagem}</p>
       <div class="modal-acoes">
-        <button type="button" class="btn" id="btn-ok-aviso">OK</button>
+        <button type="button" class="ds-btn ds-btn-primario" id="btn-ok-aviso">OK</button>
       </div>
     `
   );
@@ -229,8 +229,8 @@ function confirmarAcao(titulo, mensagem, aoConfirmar, opts = {}) {
     `
       <p class="modal-texto">${mensagem}</p>
       <div class="modal-acoes">
-        <button type="button" class="btn-secundario" id="confirmar-acao-cancelar">${textoCancelar}</button>
-        <button type="button" class="btn-perigo" id="confirmar-acao-confirmar">${textoConfirmar}</button>
+        <button type="button" class="ds-btn ds-btn-secundario" id="confirmar-acao-cancelar">${textoCancelar}</button>
+        <button type="button" class="ds-btn ds-btn-perigo" id="confirmar-acao-confirmar">${textoConfirmar}</button>
       </div>
     `
   );
@@ -381,8 +381,8 @@ function pedirTexto(titulo, label, placeholder, textoBotaoConfirmar) {
       <textarea id="pedir-texto-campo" placeholder="${escapeHtml(placeholder || '')}"></textarea>
       <div class="modal-erro" id="pedir-texto-erro"></div>
       <div class="modal-acoes">
-        <button type="button" class="btn-secundario" id="pedir-texto-cancelar">Cancelar</button>
-        <button type="button" class="btn-perigo" id="pedir-texto-confirmar">${textoBotaoConfirmar}</button>
+        <button type="button" class="ds-btn ds-btn-secundario" id="pedir-texto-cancelar">Cancelar</button>
+        <button type="button" class="ds-btn ds-btn-perigo" id="pedir-texto-confirmar">${textoBotaoConfirmar}</button>
       </div>
     `, { titulo, aoFechar: () => finalizar(null) });
     document.getElementById('pedir-texto-cancelar').addEventListener('click', fecharModal);
@@ -499,8 +499,8 @@ function abrirModalDisparoIndividual(telefone, nomeCliente, mensagemPadrao) {
       <textarea id="disparo-mensagem">${escapeHtml(mensagemPadrao || '')}</textarea>
       <div class="modal-erro" id="disparo-erro"></div>
       <div class="modal-acoes">
-        <button type="button" class="btn-secundario" id="disparo-cancelar">Cancelar</button>
-        <button type="button" id="disparo-enviar">Enviar</button>
+        <button type="button" class="ds-btn ds-btn-secundario" id="disparo-cancelar">Cancelar</button>
+        <button type="button" class="ds-btn ds-btn-primario" id="disparo-enviar">Enviar</button>
       </div>
     `
   );
