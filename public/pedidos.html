@@ -14,7 +14,6 @@
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
   .ds-filtros-pedidos-data { display:flex; align-items:center; gap:6px; }
-  .modal-compacto input, .modal-compacto select { height:38px; }
   .lista-itens-pedido { border:1px solid var(--border); border-radius:var(--radius-md); padding:2px 10px; margin-top:6px; }
   .linha-item-pedido { padding:7px 0; border-top:1px solid var(--border); font-size:13px; color:var(--text-secondary); }
   .linha-item-pedido:first-child { border-top:none; }
@@ -307,12 +306,13 @@
     function confirmarCancelarPedido(pedidoId) {
       const overlay = abrirModal('<h3>Cancelar pedido?</h3>', `
         <p class="modal-texto">Essa ação não pode ser desfeita. O pedido vai pra etapa de "perdido".</p>
-        <label for="cancelar-motivo">Motivo</label>
-        <textarea id="cancelar-motivo" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
-        <div class="modal-erro" id="cancelar-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="cancelar-voltar">Voltar</button>
-          <button type="button" class="btn-perigo" id="cancelar-confirmar">Cancelar pedido</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="cancelar-motivo">Motivo</label><textarea class="ds-textarea" id="cancelar-motivo" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea></div>
+          <div class="modal-erro" id="cancelar-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="cancelar-voltar">Voltar</button>
+            <button type="button" class="ds-btn ds-btn-perigo" id="cancelar-confirmar">Cancelar pedido</button>
+          </div>
         </div>
       `);
       document.getElementById('cancelar-voltar').addEventListener('click', fecharModal);
@@ -341,12 +341,13 @@
     function pedirMotivoPerda() {
       return new Promise((resolve) => {
         const overlay = abrirModal('<h3>Motivo da perda</h3>', `
-          <label for="motivo-perda-texto">Por que este pedido foi perdido?</label>
-          <textarea id="motivo-perda-texto" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea>
-          <div class="modal-erro" id="motivo-perda-erro"></div>
-          <div class="modal-acoes">
-            <button type="button" class="btn-secundario" id="motivo-perda-cancelar">Cancelar</button>
-            <button type="button" class="btn-perigo" id="motivo-perda-confirmar">Marcar como perdido</button>
+          <div class="ds-form">
+            <div class="ds-campo"><label class="ds-rotulo" for="motivo-perda-texto">Por que este pedido foi perdido?</label><textarea class="ds-textarea" id="motivo-perda-texto" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea></div>
+            <div class="modal-erro" id="motivo-perda-erro"></div>
+            <div class="ds-form-acoes">
+              <button type="button" class="ds-btn ds-btn-secundario" id="motivo-perda-cancelar">Cancelar</button>
+              <button type="button" class="ds-btn ds-btn-perigo" id="motivo-perda-confirmar">Marcar como perdido</button>
+            </div>
           </div>
         `);
         let resolvido = false;
@@ -376,55 +377,59 @@
       abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
         <p class="modal-texto">${escapeHtml(p.origem)}</p>
         ${ehOrigemPropria(p.origem) ? `<div class="banner-assinatura" style="margin-top:12px"><span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span></div>` : ''}
-        <div class="grid2">
-          <div><label for="e-cliente-nome">Nome do cliente</label><input id="e-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
-          <div><label for="e-cliente-telefone">Telefone</label><input id="e-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
-        </div>
-        <div class="grid2">
-          <div><label for="e-etapa">Etapa</label>
-            <select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo"><label class="ds-rotulo" for="e-cliente-nome">Nome do cliente</label><input class="ds-input" id="e-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="e-cliente-telefone">Telefone</label><input class="ds-input" id="e-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="e-etapa">Etapa</label>
+              <div class="ds-select"><select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="e-prioridade">Prioridade</label>
+              <div class="ds-select"><select id="e-prioridade">
+                <option value="">Nenhuma</option>
+                <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
+                <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
+                <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
+                <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
+              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="e-status">Pagamento</label>
+              <div class="ds-select"><select id="e-status">
+                <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
+                <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
+                <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
+              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo"><label class="ds-rotulo" for="e-recebido">Valor recebido</label><input class="ds-input" id="e-recebido" inputmode="decimal"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="e-tipo-entrega">Tipo de frete</label>
+              <div class="ds-select"><select id="e-tipo-entrega"><option value="">Selecione…</option>${tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === p.tipo_entrega ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo"><label class="ds-rotulo" for="e-frete">Valor de frete</label><input class="ds-input" id="e-frete" inputmode="decimal" placeholder="0,00"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="e-entrega">Data de entrega</label><input class="ds-input" id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
           </div>
-          <div><label for="e-prioridade">Prioridade</label>
-            <select id="e-prioridade">
-              <option value="">Nenhuma</option>
-              <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
-              <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
-              <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
-              <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
-            </select>
+          <div class="ds-campo">
+            <label class="ds-rotulo" for="e-observacoes">Observação</label>
+            <textarea class="ds-textarea" id="e-observacoes" placeholder="opcional">${p.observacoes ? escapeHtml(p.observacoes) : ''}</textarea>
+          </div>
+          ${p.itens && p.itens.length ? `
+            <div class="ds-campo">
+              <label class="ds-rotulo">Itens do pedido</label>
+              <div class="lista-itens-pedido">
+                ${p.itens.map((i) => `<div class="linha-item-pedido">${i.quantidade}x ${escapeHtml(i.descricao || 'Item sem descrição')}</div>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+          <p class="modal-texto" style="margin-top:0">Valor do pedido: ${formatarMoeda(p.valor_total)}</p>
+          <div class="modal-erro" id="e-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-edicao">Salvar</button>
           </div>
         </div>
-        <div class="grid2">
-          <div><label for="e-status">Pagamento</label>
-            <select id="e-status">
-              <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
-              <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
-              <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
-            </select>
-          </div>
-          <div><label for="e-recebido">Valor recebido</label><input id="e-recebido" inputmode="decimal"></div>
-        </div>
-        <div class="grid2">
-          <div><label for="e-tipo-entrega">Tipo de frete</label>
-            <select id="e-tipo-entrega"><option value="">Selecione…</option>${tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === p.tipo_entrega ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}</select>
-          </div>
-          <div><label for="e-frete">Valor de frete</label><input id="e-frete" inputmode="decimal" placeholder="0,00"></div>
-        </div>
-        <label for="e-entrega">Data de entrega</label><input id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}">
-        <label for="e-observacoes">Observação</label>
-        <textarea id="e-observacoes" placeholder="opcional">${p.observacoes ? escapeHtml(p.observacoes) : ''}</textarea>
-        ${p.itens && p.itens.length ? `
-          <label>Itens do pedido</label>
-          <div class="lista-itens-pedido">
-            ${p.itens.map((i) => `<div class="linha-item-pedido">${i.quantidade}x ${escapeHtml(i.descricao || 'Item sem descrição')}</div>`).join('')}
-          </div>
-        ` : ''}
-        <p class="modal-texto" style="margin-top:14px">Valor do pedido: ${formatarMoeda(p.valor_total)}</p>
-        <div class="modal-erro" id="e-erro"></div>
-        <div class="modal-acoes" style="justify-content:flex-end">
-          <button type="button" id="btn-salvar-edicao">Salvar</button>
-        </div>
-      `, 'modal-compacto');
+      `);
       const campoRecebido = document.getElementById('e-recebido');
       campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       aplicarMascaraMoeda(campoRecebido);
@@ -498,38 +503,36 @@
       const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
       const opcoesTipoEntrega = tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
       abrirModal('<h3>Novo pedido</h3>', `
-        <div class="grid2">
-          <div><label for="p-telefone">Telefone do cliente</label><input id="p-telefone" placeholder="(34) 99999-9999"></div>
-          <div><label for="p-nome-cliente">Nome (se cliente novo)</label><input id="p-nome-cliente"></div>
-        </div>
-        ${produtos.length ? `
-        <label for="p-produto">Produto do catálogo (opcional)</label>
-        <select id="p-produto"><option value="">— escolher da lista preenche descrição e valor —</option>${opcoesProduto}</select>
-        ` : ''}
-        <div class="grid2">
-          <div><label for="p-descricao">Item / descrição</label><input id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
-          <div><label for="p-quantidade">Quantidade</label><input id="p-quantidade" type="number" min="1" step="1" value="1"></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-valor">Valor do pedido</label><input id="p-valor" inputmode="decimal" placeholder="0,00"></div>
-          <div><label for="p-origem">Origem<span class="obrigatorio">*</span></label><input id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-tipo-entrega">Tipo de frete</label>
-            <select id="p-tipo-entrega"><option value="">Selecione…</option>${opcoesTipoEntrega}</select>
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo"><label class="ds-rotulo" for="p-telefone">Telefone do cliente</label><input class="ds-input" id="p-telefone" placeholder="(34) 99999-9999"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="p-nome-cliente">Nome (se cliente novo)</label><input class="ds-input" id="p-nome-cliente"></div>
+            ${produtos.length ? `
+            <div class="ds-campo ds-campo-largo">
+              <label class="ds-rotulo" for="p-produto">Produto do catálogo (opcional)</label>
+              <div class="ds-select"><select id="p-produto"><option value="">— escolher da lista preenche descrição e valor —</option>${opcoesProduto}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            ` : ''}
+            <div class="ds-campo"><label class="ds-rotulo" for="p-descricao">Item / descrição</label><input class="ds-input" id="p-descricao" placeholder="ex.: Vaso decorativo P"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="p-quantidade">Quantidade</label><input class="ds-input" id="p-quantidade" type="number" min="1" step="1" value="1"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="p-valor">Valor do pedido</label><input class="ds-input" id="p-valor" inputmode="decimal" placeholder="0,00"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="p-origem">Origem<span class="obrigatorio">*</span></label><input class="ds-input" id="p-origem" placeholder="whatsapp, shopee, site…" required></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="p-tipo-entrega">Tipo de frete</label>
+              <div class="ds-select"><select id="p-tipo-entrega"><option value="">Selecione…</option>${opcoesTipoEntrega}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo"><label class="ds-rotulo" for="p-frete">Valor de frete</label><input class="ds-input" id="p-frete" inputmode="decimal" placeholder="0,00"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="p-data-entrega">Data de entrega</label><input class="ds-input" id="p-data-entrega" type="date"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="p-recurso">Recurso</label>
+              <div class="ds-select"><select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
           </div>
-          <div><label for="p-frete">Valor de frete</label><input id="p-frete" inputmode="decimal" placeholder="0,00"></div>
-        </div>
-        <div class="grid2">
-          <div><label for="p-data-entrega">Data de entrega</label><input id="p-data-entrega" type="date"></div>
-          <div><label for="p-recurso">Recurso</label>
-            <select id="p-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select>
+          <div class="modal-erro" id="p-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-cancelar-pedido">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-pedido">Criar pedido</button>
           </div>
-        </div>
-        <div class="modal-erro" id="p-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="btn-cancelar-pedido">Cancelar</button>
-          <button type="button" id="btn-salvar-pedido">Criar pedido</button>
         </div>
       `);
       const campoValorPedido = document.getElementById('p-valor');
