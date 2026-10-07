@@ -202,20 +202,19 @@
 
     function abrirModalProduto(produto) {
       const overlay = abrirModal(`<h3>${produto ? 'Editar produto' : 'Novo produto'}</h3>`, `
-        <label for="pr-nome">Nome</label>
-        <input type="text" id="pr-nome" placeholder="ex.: Vaso decorativo P" value="${produto ? escapeHtml(produto.nome) : ''}">
-        <label for="pr-id">ID</label>
-        <input type="text" id="pr-id" placeholder="SKU" value="${produto && produto.identificador_externo ? escapeHtml(produto.identificador_externo) : ''}">
-        <label for="pr-quantidade">Quantidade</label>
-        <input type="text" inputmode="numeric" id="pr-quantidade" placeholder="0" value="${produto ? (produto.quantidade ?? 0) : ''}">
-        <label for="pr-preco">Valor</label>
-        <input type="text" id="pr-preco" placeholder="0,00" value="${produto && produto.preco_referencia ? Number(produto.preco_referencia).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}">
-        <label for="pr-observacao">Observação</label>
-        <input type="text" id="pr-observacao" placeholder="opcional" value="${produto && produto.observacao ? escapeHtml(produto.observacao) : ''}">
-        <div class="modal-erro" id="pr-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="pr-cancelar">Cancelar</button>
-          <button type="button" id="pr-salvar">Salvar</button>
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="pr-nome">Nome</label><input class="ds-input" type="text" id="pr-nome" placeholder="ex.: Vaso decorativo P" value="${produto ? escapeHtml(produto.nome) : ''}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="pr-id">ID</label><input class="ds-input" type="text" id="pr-id" placeholder="SKU" value="${produto && produto.identificador_externo ? escapeHtml(produto.identificador_externo) : ''}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="pr-quantidade">Quantidade</label><input class="ds-input" type="text" inputmode="numeric" id="pr-quantidade" placeholder="0" value="${produto ? (produto.quantidade ?? 0) : ''}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="pr-preco">Valor</label><input class="ds-input" type="text" id="pr-preco" placeholder="0,00" value="${produto && produto.preco_referencia ? Number(produto.preco_referencia).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="pr-observacao">Observação</label><input class="ds-input" type="text" id="pr-observacao" placeholder="opcional" value="${produto && produto.observacao ? escapeHtml(produto.observacao) : ''}"></div>
+          </div>
+          <div class="modal-erro" id="pr-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="pr-cancelar">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="pr-salvar">Salvar</button>
+          </div>
         </div>
       `);
       aplicarMascaraMoeda(document.getElementById('pr-preco'));
