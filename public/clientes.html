@@ -369,30 +369,33 @@
 
     function campoFormNovoCliente() {
       return `
-        <label for="f-nome">Nome<span class="obrigatorio">*</span></label>
-        <input id="f-nome" required>
-        <div class="grid2">
-          <div><label for="f-telefone">Telefone (WhatsApp)</label><input id="f-telefone" data-ds-mascara="telefone" placeholder="(34) 99999-9999"></div>
-          <div><label for="f-email">E-mail</label><input id="f-email" type="email"></div>
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="f-nome">Nome<span class="obrigatorio">*</span></label><input class="ds-input" id="f-nome" required></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="f-telefone">Telefone (WhatsApp)</label><input class="ds-input" id="f-telefone" data-ds-mascara="telefone" placeholder="(34) 99999-9999"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="f-email">E-mail</label><input class="ds-input" id="f-email" type="email"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="f-cidade">Cidade</label><input class="ds-input" id="f-cidade"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="f-uf">UF</label><input class="ds-input" id="f-uf" maxlength="2" style="text-transform:uppercase"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="f-segmento">Segmento</label>
+              <div class="ds-select"><select id="f-segmento"><option value="">Selecione…</option>${opcoesSelectHtml(segmentosOpcoes)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="f-origem">Origem</label>
+              <div class="ds-select"><select id="f-origem"><option value="">Selecione…</option>${opcoesSelectHtml(origensOpcoes)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+          </div>
+          <div class="modal-erro" id="f-erro"></div>
         </div>
-        <div class="grid2">
-          <div><label for="f-cidade">Cidade</label><input id="f-cidade"></div>
-          <div><label for="f-uf">UF</label><input id="f-uf" maxlength="2" style="text-transform:uppercase"></div>
-        </div>
-        <label for="f-segmento">Segmento</label>
-        <select id="f-segmento"><option value="">Selecione…</option>${opcoesSelectHtml(segmentosOpcoes)}</select>
-        <label for="f-origem">Origem</label>
-        <select id="f-origem"><option value="">Selecione…</option>${opcoesSelectHtml(origensOpcoes)}</select>
-        <div class="modal-erro" id="f-erro"></div>
       `;
     }
 
     document.getElementById('btn-novo-cliente').addEventListener('click', () => {
       const overlay = abrirModal('<h3>Novo cliente</h3>', `
         ${campoFormNovoCliente()}
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="btn-cancelar-cliente">Cancelar</button>
-          <button type="button" id="btn-salvar-cliente">Salvar</button>
+        <div class="ds-form-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="btn-cancelar-cliente">Cancelar</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-cliente">Salvar</button>
         </div>
       `);
       document.getElementById('btn-cancelar-cliente').addEventListener('click', fecharModal);
