@@ -19,11 +19,8 @@
   .config-geral-grupo .textos h3 { margin:0 0 4px; font-size:14px; }
   .config-geral-grupo .textos p { margin:0; font-size:12.5px; color:var(--muted); line-height:1.5; }
   .config-geral-grupo .campos { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
-  .config-geral-grupo .campo { flex:0 1 110px; min-width:90px; }
-  .config-geral-grupo .campo label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
-  .config-geral-grupo .campo input { height:38px; }
+  .config-geral-grupo .ds-campo { flex:0 1 110px; min-width:90px; }
   .config-geral-acoes { display:flex; justify-content:flex-end; margin-top:20px; }
-  .config-geral-acoes button { height:38px; }
   .config-geral-erro { color:var(--danger); font-size:13px; margin-top:10px; text-align:right; }
   .config-geral-salvo { color:var(--success); font-size:13px; margin-top:10px; text-align:right; }
 </style>
@@ -117,13 +114,13 @@
             <p>Quando o cliente pede pra falar com um atendente no bot do WhatsApp, fora desse horário (Seg. a Sex.) ele recebe um aviso em vez de acionar a equipe.</p>
           </div>
           <div class="campos">
-            <div class="campo">
-              <label for="cfg-horario-inicio">Início (h)</label>
-              <input type="number" id="cfg-horario-inicio" min="0" max="23" step="1">
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cfg-horario-inicio">Início (h)</label>
+              <input class="ds-input" type="number" id="cfg-horario-inicio" min="0" max="23" step="1">
             </div>
-            <div class="campo">
-              <label for="cfg-horario-fim">Fim (h)</label>
-              <input type="number" id="cfg-horario-fim" min="0" max="23" step="1">
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cfg-horario-fim">Fim (h)</label>
+              <input class="ds-input" type="number" id="cfg-horario-fim" min="0" max="23" step="1">
             </div>
           </div>
         </div>
@@ -134,9 +131,9 @@
             <p>Se o cliente não avançar a conversa no bot nesse tempo, ela reinicia do zero na próxima mensagem — evita respostas fora de contexto a uma pergunta de muito tempo atrás.</p>
           </div>
           <div class="campos">
-            <div class="campo">
-              <label for="cfg-retomada-horas">Horas</label>
-              <input type="number" id="cfg-retomada-horas" min="1" step="1">
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cfg-retomada-horas">Horas</label>
+              <input class="ds-input" type="number" id="cfg-retomada-horas" min="1" step="1">
             </div>
           </div>
         </div>
@@ -147,15 +144,15 @@
             <p>Pedidos parados há mais tempo que isso na última coluna (a etapa final) somem da visão do Quadro — continuam existindo e aparecem normalmente em Pedidos.</p>
           </div>
           <div class="campos">
-            <div class="campo">
-              <label for="cfg-quadro-dias">Dias</label>
-              <input type="number" id="cfg-quadro-dias" min="1" step="1">
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cfg-quadro-dias">Dias</label>
+              <input class="ds-input" type="number" id="cfg-quadro-dias" min="1" step="1">
             </div>
           </div>
         </div>
 
         <div class="config-geral-acoes">
-          <button type="button" id="btn-salvar-geral">Salvar</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-geral">Salvar</button>
         </div>
         <div class="config-geral-erro" id="config-geral-erro" hidden></div>
         <div class="config-geral-salvo" id="config-geral-salvo" hidden>Salvo!</div>
