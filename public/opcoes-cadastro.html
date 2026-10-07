@@ -209,12 +209,13 @@
       const editando = !!opcao;
       const label = document.querySelector(`[data-novo-opcao="${tipo}"]`).dataset.labelOpcao;
       abrirModal(`<h3>${editando ? 'Editar' : 'Novo'} ${label.toLowerCase()}</h3>`, `
-        <label for="opcao-valor">Nome</label>
-        <input id="opcao-valor" value="${editando ? escapeHtml(opcao.valor) : ''}" autofocus>
-        <div class="modal-erro" id="opcao-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="opcao-cancelar">Cancelar</button>
-          <button type="button" id="opcao-salvar">Salvar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="opcao-valor">Nome</label><input class="ds-input" id="opcao-valor" value="${editando ? escapeHtml(opcao.valor) : ''}" autofocus></div>
+          <div class="modal-erro" id="opcao-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="opcao-cancelar">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="opcao-salvar">Salvar</button>
+          </div>
         </div>
       `);
       document.getElementById('opcao-cancelar').addEventListener('click', fecharModal);
