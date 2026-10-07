@@ -1065,9 +1065,16 @@ async function build() {
   // prioridade/cliente_id) — usados pela tela de lista de Pedidos e pelo
   // atalho "Pedidos" no menu de ações de um cliente (o Quadro carrega tudo
   // de uma vez, sem filtro, pra desenhar o kanban inteiro).
+  // Mesma regra de paginação opt-in de /crm/api/clientes e /crm/api/produtos:
+  // quadro.html chama esta rota sem `pagina` (precisa do board inteiro de
+  // uma vez) — só a tela de Pedidos (padrão de listagem do DS) manda
+  // `pagina`/`tamanho` e recebe { dados, total }.
   fastify.get('/crm/api/pedidos', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
-    const { etapa_id, recurso_id, status_pagamento, prioridade, cliente_id, tipo_entrega: tipoEntrega, data_inicio: dataInicio, data_fim: dataFim, ocultar_antigos_ultima_coluna: ocultarAntigos } = request.query || {};
+    const {
+      etapa_id, recurso_id, status_pagamento, prioridade, cliente_id, busca,
+      tipo_entrega: tipoEntrega, data_inicio: dataInicio, data_fim: dataFim, ocultar_antigos_ultima_coluna: ocultarAntigos,
+    } = request.query || {};
     const condicoes = ['p.tenant_id = $1'];
     const params = [tenantId];
     if (etapa_id) { params.push(etapa_id); condicoes.push(`p.etapa_id = $${params.length}`); }
@@ -1078,6 +1085,7 @@ async function build() {
     if (tipoEntrega) { params.push(tipoEntrega); condicoes.push(`p.tipo_entrega = $${params.length}`); }
     if (dataInicio) { params.push(dataInicio); condicoes.push(`p.criado_em >= $${params.length}::date`); }
     if (dataFim) { params.push(dataFim); condicoes.push(`p.criado_em < $${params.length}::date + interval '1 day'`); }
+    if (busca) { params.push(`%${busca.trim().toLowerCase()}%`); condicoes.push(`lower(c.nome) like $${params.length}`); }
     // Usado só pelo Quadro (pedido do Bruno, 2026-10-03) — some da visão do
     // board um pedido parado há tempo demais na última coluna (maior
     // `ordem` de crm_etapas), configurável em Configurações > Geral. A lista
@@ -1091,6 +1099,40 @@ async function build() {
       )`);
     }
 
+    const camposBase = `p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
+              extract(day from now() - p.entrou_na_etapa_em)::int as dias_na_etapa,
+              coalesce((select sum(quantidade) from crm_pedidos_itens where pedido_id = p.id), 0) as quantidade_itens,
+              coalesce((
+                select json_agg(json_build_object('descricao', coalesce(pr.nome, i.descricao), 'quantidade', i.quantidade))
+                from crm_pedidos_itens i left join crm_produtos pr on pr.id = i.produto_id where i.pedido_id = p.id
+              ), '[]') as itens`;
+    const dosJoins = `from crm_pedidos p
+       join crm_clientes c on c.id = p.cliente_id
+       left join crm_recursos r on r.id = p.recurso_id
+       where ${condicoes.join(' and ')}`;
+
+    const pagina = Number.parseInt(request.query.pagina, 10);
+    if (!pagina || pagina < 1) {
+      const { rows } = await pool.query(`select ${camposBase} ${dosJoins} order by p.criado_em desc`, params);
+      return rows;
+    }
+
+    const tamanho = Math.min(Math.max(Number.parseInt(request.query.tamanho, 10) || 25, 1), 100);
+    params.push(tamanho, (pagina - 1) * tamanho);
+    const { rows } = await pool.query(
+      `select ${camposBase}, count(*) over()::int as total_geral ${dosJoins}
+       order by p.criado_em desc limit $${params.length - 1} offset $${params.length}`,
+      params
+    );
+    const total = rows[0] ? rows[0].total_geral : 0;
+    return { dados: rows.map(({ total_geral, ...resto }) => resto), total };
+  });
+
+  // Busca 1 pedido específico — usado pelo link direto `?abrir_pedido=<id>`
+  // (Painel Hoje: clique na data de um orçamento parado/pagamento pendente).
+  // Precisou existir à parte da listagem acima porque, com paginação real,
+  // o pedido-alvo pode não estar na página carregada.
+  fastify.get('/crm/api/pedidos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { rows } = await pool.query(
       `select p.*, c.nome as cliente_nome, c.telefone as cliente_telefone, r.nome as recurso_nome,
               extract(day from now() - p.entrou_na_etapa_em)::int as dias_na_etapa,
@@ -1102,11 +1144,11 @@ async function build() {
        from crm_pedidos p
        join crm_clientes c on c.id = p.cliente_id
        left join crm_recursos r on r.id = p.recurso_id
-       where ${condicoes.join(' and ')}
-       order by p.criado_em desc`,
-      params
+       where p.id = $1 and p.tenant_id = $2`,
+      [request.params.id, request.user.tenantId]
     );
-    return rows;
+    if (!rows[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+    return rows[0];
   });
 
   // Criação rápida (seção 7.2): telefone (acha ou cria cliente), itens ou
