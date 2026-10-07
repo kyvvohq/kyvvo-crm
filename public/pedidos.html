@@ -13,29 +13,7 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .filtros { display:grid; grid-template-columns:repeat(5,1fr); gap:0 12px; margin-bottom:8px; }
-  .filtros > div { min-width:0; }
-  .filtros label { margin-top:0; font-size:12px; }
-  .filtros input, .filtros select { height:36px; font-size:13px; }
-  @media(max-width:1100px) { .filtros { grid-template-columns:repeat(3,1fr); } }
-  @media(max-width:640px) { .filtros { grid-template-columns:1fr 1fr; } }
-  @media(max-width:420px) { .filtros { grid-template-columns:1fr; } }
-  tr.linha-pedido { cursor:pointer; }
-  tr.linha-pedido:hover td { background:var(--surface-hover); }
-  tr.linha-pedido td { position:relative; }
-  .menu-acoes-wrap { position:relative; display:inline-block; }
-  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
-  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
-  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
-    box-shadow:var(--shadow-md); min-width:190px; z-index:20; padding:6px; }
-  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
-  .menu-acoes button:hover { background:var(--surface-muted); }
-  .menu-acoes button.perigo { color:var(--danger); }
-  #tbody-pedidos .badge::before { display:none; }
-  .badge-prioridade-altissima { background:color-mix(in srgb, var(--danger) 20%, transparent); color:var(--danger); }
-  .badge-prioridade-alta { background:var(--warning-bg); color:var(--warning-text); }
-  .badge-prioridade-media { background:color-mix(in srgb, #eab308 20%, transparent); color:#a16207; }
-  .badge-prioridade-baixa { background:var(--success-bg); color:var(--success); }
+  .ds-filtros-pedidos-data { display:flex; align-items:center; gap:6px; }
   .modal-compacto input, .modal-compacto select { height:38px; }
   .lista-itens-pedido { border:1px solid var(--border); border-radius:var(--radius-md); padding:2px 10px; margin-top:6px; }
   .linha-item-pedido { padding:7px 0; border-top:1px solid var(--border); font-size:13px; color:var(--text-secondary); }
@@ -118,49 +96,54 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>Pedidos</h1></div>
-          <p class="descricao" id="aviso-filtro-cliente" hidden>Mostrando só os pedidos deste cliente — <a href="/crm/pedidos.html">ver todos</a>.</p>
+      <header class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto">
+          <h1 class="ds-pagina-cab-titulo">Pedidos</h1>
+          <p class="ds-pagina-cab-sub" id="aviso-filtro-cliente" hidden>Mostrando só os pedidos deste cliente — <a href="/crm/pedidos.html">ver todos</a>.</p>
         </div>
-        <div class="acoes">
-          <button type="button" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
+        <div class="ds-pagina-cab-acoes">
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-novo-pedido"><span data-icon="plus" data-size="16"></span>Novo pedido</button>
         </div>
-      </div>
+      </header>
 
-      <div class="filtros">
-        <div><label for="f-cliente">Cliente</label><input type="search" id="f-cliente" placeholder="Buscar cliente…"></div>
-        <div><label for="f-etapa">Etapa</label><select id="f-etapa"><option value="">Qualquer</option></select></div>
-        <div><label for="f-recurso">Recurso</label><select id="f-recurso"><option value="">Qualquer</option></select></div>
-        <div><label for="f-pagamento">Pagamento</label>
-          <select id="f-pagamento">
-            <option value="">Qualquer</option>
+      <div class="ds-tabela" role="table" aria-label="Pedidos"
+           style="--ds-colunas: minmax(0,1.2fr) minmax(0,1fr) 110px 100px minmax(0,0.8fr) 110px 48px">
+        <div class="ds-filtros">
+          <div class="ds-pesquisa">
+            <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="ds-pesquisa-input" type="search" id="f-cliente" placeholder="Buscar cliente…" aria-label="Buscar cliente">
+          </div>
+          <div class="ds-select"><select id="f-etapa" aria-label="Etapa"><option value="">Qualquer etapa</option></select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-select"><select id="f-recurso" aria-label="Recurso"><option value="">Qualquer recurso</option></select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-select"><select id="f-pagamento" aria-label="Pagamento">
+            <option value="">Qualquer pagamento</option>
             <option value="pendente">Pendente</option>
             <option value="parcial">Parcial</option>
             <option value="pago">Pago</option>
-          </select>
-        </div>
-        <div><label for="f-prioridade">Prioridade</label>
-          <select id="f-prioridade">
-            <option value="">Qualquer</option>
+          </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-select"><select id="f-prioridade" aria-label="Prioridade">
+            <option value="">Qualquer prioridade</option>
             <option value="altissima">Altíssima</option>
             <option value="alta">Alta</option>
             <option value="media">Média</option>
             <option value="baixa">Baixa</option>
-          </select>
+          </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-select"><select id="f-tipo-entrega" aria-label="Tipo de frete"><option value="">Qualquer frete</option></select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-filtros-pedidos-data">
+            <label for="f-data-inicio" class="ds-rotulo" style="margin:0">De</label><input class="ds-input" type="date" id="f-data-inicio">
+            <label for="f-data-fim" class="ds-rotulo" style="margin:0">Até</label><input class="ds-input" type="date" id="f-data-fim">
+          </div>
         </div>
-        <div><label for="f-tipo-entrega">Tipo de frete</label><select id="f-tipo-entrega"><option value="">Qualquer</option></select></div>
-        <div><label for="f-data-inicio">De</label><input type="date" id="f-data-inicio"></div>
-        <div><label for="f-data-fim">Até</label><input type="date" id="f-data-fim"></div>
-      </div>
-
-      <div class="card" style="padding:0">
-        <table>
-          <thead>
-            <tr><th>Cliente</th><th>Etapa</th><th>Prioridade</th><th>Pagamento</th><th>Valor do pedido</th><th>Data do pedido</th><th></th></tr>
-          </thead>
-          <tbody id="tbody-pedidos"></tbody>
-        </table>
+        <div class="ds-tabela-cabecalho" role="row">
+          <span role="columnheader">Cliente</span><span role="columnheader">Etapa</span><span role="columnheader">Prioridade</span>
+          <span role="columnheader">Pagamento</span><span role="columnheader">Valor do pedido</span><span role="columnheader">Data do pedido</span>
+          <span role="columnheader"></span>
+        </div>
+        <div id="linhas-pedidos"></div>
+        <div class="ds-tabela-rodape"><nav data-ds-paginacao id="paginacao-pedidos" data-ds-total="0" data-ds-tamanho="25" data-ds-tamanhos="25,50,100"></nav></div>
       </div>
     </div>
   </div>
@@ -175,7 +158,8 @@
     let recursos = [];
     let produtos = [];
     let tiposEntrega = [];
-    let termoBuscaCliente = '';
+    let totalPedidos = 0;
+    const estadoPedidos = { pagina: 1, tamanho: 25, busca: '' };
 
     // Atalho "Pedidos" no menu de ações de um cliente (tela de Clientes)
     // chega aqui como ?cliente_id=... — filtro fixo, não aparece nos
@@ -184,11 +168,14 @@
     document.getElementById('aviso-filtro-cliente').hidden = !clienteIdFiltroFixo;
     // ?abrir_pedido=<id> (vindo do Painel Hoje — clique na data do pedido em
     // Orçamentos parados/Pagamentos pendentes, ou o "Editar" do kebab) abre
-    // o modal de edição direto, sem precisar achar a linha na lista.
+    // o modal de edição direto, sem precisar achar a linha na lista — o
+    // pedido-alvo pode nem estar na página carregada, por isso
+    // abrirEdicaoPedido busca individualmente quando não encontra localmente.
     const pedidoAbrirDireto = new URLSearchParams(window.location.search).get('abrir_pedido');
 
     async function carregar() {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ pagina: estadoPedidos.pagina, tamanho: estadoPedidos.tamanho });
+      if (estadoPedidos.busca) params.set('busca', estadoPedidos.busca);
       if (clienteIdFiltroFixo) params.set('cliente_id', clienteIdFiltroFixo);
       if (document.getElementById('f-etapa').value) params.set('etapa_id', document.getElementById('f-etapa').value);
       if (document.getElementById('f-recurso').value) params.set('recurso_id', document.getElementById('f-recurso').value);
@@ -197,25 +184,26 @@
       if (document.getElementById('f-tipo-entrega').value) params.set('tipo_entrega', document.getElementById('f-tipo-entrega').value);
       if (document.getElementById('f-data-inicio').value) params.set('data_inicio', document.getElementById('f-data-inicio').value);
       if (document.getElementById('f-data-fim').value) params.set('data_fim', document.getElementById('f-data-fim').value);
-      const qs = params.toString();
 
       const [resPedidos, resEtapas, resRecursos, resProdutos, resTiposEntrega] = await Promise.all([
-        apiFetch(`/crm/api/pedidos${qs ? '?' + qs : ''}`),
+        apiFetch(`/crm/api/pedidos?${params}`),
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
         apiFetch('/crm/api/produtos'),
         apiFetch('/crm/api/opcoes-cadastro?tipo=tipo_entrega'),
       ]);
-      pedidos = await resPedidos.json();
+      const corpoPedidos = await resPedidos.json();
+      pedidos = corpoPedidos.dados;
+      totalPedidos = corpoPedidos.total;
       etapas = await resEtapas.json();
       recursos = await resRecursos.json();
       produtos = await resProdutos.json();
       tiposEntrega = (await resTiposEntrega.json()).filter((o) => o.ativo);
 
-      document.getElementById('f-etapa').innerHTML = '<option value="">Qualquer</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
-      document.getElementById('f-recurso').innerHTML = '<option value="">Qualquer</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
+      document.getElementById('f-etapa').innerHTML = '<option value="">Qualquer etapa</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
+      document.getElementById('f-recurso').innerHTML = '<option value="">Qualquer recurso</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
       if (!document.getElementById('f-tipo-entrega').dataset.preenchido) {
-        document.getElementById('f-tipo-entrega').innerHTML = '<option value="">Qualquer</option>' + tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
+        document.getElementById('f-tipo-entrega').innerHTML = '<option value="">Qualquer frete</option>' + tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
         document.getElementById('f-tipo-entrega').dataset.preenchido = '1';
       }
 
@@ -223,118 +211,98 @@
 
       if (pedidoAbrirDireto && !pedidoAbrirDiretoJaProcessado) {
         pedidoAbrirDiretoJaProcessado = true;
-        if (pedidos.some((p) => p.id === pedidoAbrirDireto)) abrirEdicaoPedido(pedidoAbrirDireto);
+        abrirEdicaoPedido(pedidoAbrirDireto);
       }
     }
     let pedidoAbrirDiretoJaProcessado = false;
 
     ['f-etapa', 'f-recurso', 'f-pagamento', 'f-prioridade', 'f-tipo-entrega', 'f-data-inicio', 'f-data-fim'].forEach((id) => {
-      document.getElementById(id).addEventListener('change', carregar);
+      document.getElementById(id).addEventListener('change', () => { estadoPedidos.pagina = 1; carregar(); });
     });
 
     let debounceBuscaCliente;
     document.getElementById('f-cliente').addEventListener('input', (e) => {
       clearTimeout(debounceBuscaCliente);
-      debounceBuscaCliente = setTimeout(() => { termoBuscaCliente = e.target.value; renderizar(); }, 200);
+      debounceBuscaCliente = setTimeout(() => {
+        estadoPedidos.busca = e.target.value.trim();
+        estadoPedidos.pagina = 1;
+        carregar();
+      }, 300);
+    });
+
+    document.getElementById('paginacao-pedidos').addEventListener('ds-paginacao-alterar', (e) => {
+      estadoPedidos.pagina = e.detail.pagina;
+      estadoPedidos.tamanho = e.detail.tamanho;
+      carregar();
     });
 
     const ROTULO_PRIORIDADE = { altissima: 'Altíssima', alta: 'Alta', media: 'Média', baixa: 'Baixa' };
-    const BADGE_PRIORIDADE = { altissima: 'badge-prioridade-altissima', alta: 'badge-prioridade-alta', media: 'badge-prioridade-media', baixa: 'badge-prioridade-baixa' };
-    const BADGE_PAGAMENTO = { pendente: 'perigo', parcial: 'aviso', pago: 'sucesso' };
+    // DS só tem 4 tons semânticos (sucesso/aviso/erro/info) — mapeando os 4
+    // níveis de prioridade por severidade decrescente (altíssima=erro é o
+    // mais urgente, baixa=sucesso é o menos). Antes "alta" e "média" tinham
+    // cores customizadas quase iguais (ambas um tom de amarelo); aqui ficam
+    // visualmente distintas (aviso vs. info).
+    const BADGE_PRIORIDADE = { altissima: 'ds-badge-erro', alta: 'ds-badge-aviso', media: 'ds-badge-info', baixa: 'ds-badge-sucesso' };
+    const BADGE_PAGAMENTO = { pendente: 'ds-badge-erro', parcial: 'ds-badge-aviso', pago: 'ds-badge-sucesso' };
+    const ROTULO_PAGAMENTO = { pendente: 'Pendente', parcial: 'Parcial', pago: 'Pago' };
 
     function renderizar() {
-      const tbody = document.getElementById('tbody-pedidos');
-      const termo = termoBuscaCliente.trim().toLowerCase();
-      const lista = termo ? pedidos.filter((p) => (p.cliente_nome || '').toLowerCase().includes(termo)) : pedidos;
-      if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="7"><div class="vazio">${pedidos.length ? 'Nenhum pedido bate com essa busca.' : 'Nenhum pedido com esses filtros.'}</div></td></tr>`;
-        return;
-      }
-      tbody.innerHTML = lista.map((p) => {
+      const container = document.getElementById('linhas-pedidos');
+      container.innerHTML = pedidos.length ? pedidos.map((p) => {
         const etapa = etapas.find((e) => e.id === p.etapa_id);
         return `
-        <tr class="linha-pedido" data-id="${p.id}">
-          <td>${escapeHtml(p.cliente_nome)}</td>
-          <td>${escapeHtml(etapa ? etapa.nome : '—')}</td>
-          <td>${p.prioridade ? `<span class="badge ${BADGE_PRIORIDADE[p.prioridade]}">${ROTULO_PRIORIDADE[p.prioridade]}</span>` : '—'}</td>
-          <td><span class="badge ${BADGE_PAGAMENTO[p.status_pagamento]}">${p.status_pagamento}</span></td>
-          <td>${formatarMoeda(p.valor_total)}</td>
-          <td>${formatarData(p.criado_em)}</td>
-          <td>
-            <div class="menu-acoes-wrap">
-              <button type="button" class="btn-acoes" data-abrir-menu="${p.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="menu-acoes" data-menu="${p.id}" hidden>
-                <button type="button" data-editar-pedido="${p.id}">Editar pedido</button>
-                <button type="button" data-pagamento-confirmado="${p.id}">Confirmar Pagamento</button>
-                <button type="button" data-acionar-cliente="${p.id}">Chamar Agente</button>
-                <button type="button" data-chamar-whatsapp="${p.id}">WhatsApp</button>
-                <button type="button" class="perigo" data-cancelar-pedido="${p.id}">Cancelar pedido</button>
+        <div class="ds-tabela-linha ds-tabela-linha-clicavel" role="row" tabindex="0" data-id="${p.id}">
+          <span role="cell" data-rotulo="Cliente"><span class="ds-tabela-primario">${escapeHtml(p.cliente_nome)}</span></span>
+          <span role="cell" data-rotulo="Etapa">${escapeHtml(etapa ? etapa.nome : '—')}</span>
+          <span role="cell" data-rotulo="Prioridade">${p.prioridade ? `<span class="ds-badge ${BADGE_PRIORIDADE[p.prioridade]} ds-badge-sm">${ROTULO_PRIORIDADE[p.prioridade]}</span>` : '—'}</span>
+          <span role="cell" data-rotulo="Pagamento"><span class="ds-badge ${BADGE_PAGAMENTO[p.status_pagamento]} ds-badge-sm">${ROTULO_PAGAMENTO[p.status_pagamento] || p.status_pagamento}</span></span>
+          <span role="cell" data-rotulo="Valor">${formatarMoeda(p.valor_total)}</span>
+          <span role="cell" data-rotulo="Data">${formatarData(p.criado_em)}</span>
+          <span role="cell">
+            <div class="ds-acoes" data-id="${p.id}">
+              <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações do pedido de ${escapeHtml(p.cliente_nome)}">⋯</button>
+              <div class="ds-acoes-menu" role="menu" hidden>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="editar">Editar pedido</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="confirmar-pagamento">Confirmar Pagamento</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="chamar-agente">Chamar Agente</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="whatsapp">WhatsApp</button>
+                <button type="button" class="ds-acoes-item ds-acoes-item-perigo" role="menuitem" data-acao="cancelar">Cancelar pedido</button>
               </div>
             </div>
-          </td>
-        </tr>
+          </span>
+        </div>
       `;
-      }).join('');
-      ligarEventosLinhas();
+      }).join('') : `<div class="ds-vazio"><p class="ds-vazio-titulo">${estadoPedidos.busca ? 'Nenhum pedido bate com essa busca' : 'Nenhum pedido com esses filtros'}</p></div>`;
+
+      container.querySelectorAll('.ds-tabela-linha-clicavel').forEach((linha) => {
+        linha.addEventListener('click', (e) => {
+          if (e.target.closest('.ds-acoes')) return;
+          abrirEdicaoPedido(linha.dataset.id);
+        });
+      });
+
+      KyvvoDS.paginacaoAtualizar(document.getElementById('paginacao-pedidos'), { total: totalPedidos, pagina: estadoPedidos.pagina, tamanho: estadoPedidos.tamanho });
     }
 
-    function fecharMenusAbertos() {
-      document.querySelectorAll('.menu-acoes').forEach((m) => { m.hidden = true; });
-    }
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.menu-acoes-wrap')) fecharMenusAbertos();
+    document.getElementById('linhas-pedidos').addEventListener('ds-acoes-escolher', async (e) => {
+      const id = e.target.closest('[data-id]').dataset.id;
+      const pedido = pedidos.find((x) => x.id === id);
+      if (e.detail.acao === 'editar') {
+        abrirEdicaoPedido(id);
+      } else if (e.detail.acao === 'confirmar-pagamento') {
+        await apiFetch(`/crm/api/pedidos/${id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: 'pago' }) });
+        carregar();
+      } else if (e.detail.acao === 'chamar-agente') {
+        // Abre a conversa do bot com esse cliente (Configurações > WhatsApp
+        // > Conversas) — "WhatsApp" abaixo preserva o comportamento antigo
+        // (wa.me direto, fora do bot).
+        if (pedido && pedido.cliente_telefone) window.location.href = `/crm/whatsapp.html?telefone=${encodeURIComponent(pedido.cliente_telefone)}`;
+      } else if (e.detail.acao === 'whatsapp') {
+        if (pedido && pedido.cliente_telefone) window.open(linkWhatsapp(pedido.cliente_telefone), '_blank', 'noopener');
+      } else if (e.detail.acao === 'cancelar') {
+        confirmarCancelarPedido(id);
+      }
     });
-
-    function ligarEventosLinhas() {
-      document.querySelectorAll('.linha-pedido').forEach((tr) => {
-        tr.addEventListener('click', (e) => {
-          if (e.target.closest('.menu-acoes-wrap')) return;
-          abrirEdicaoPedido(tr.dataset.id);
-        });
-      });
-      document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const menu = document.querySelector(`[data-menu="${btn.dataset.abrirMenu}"]`);
-          const jaAberto = !menu.hidden;
-          fecharMenusAbertos();
-          menu.hidden = jaAberto;
-        });
-      });
-      document.querySelectorAll('[data-editar-pedido]').forEach((btn) => {
-        btn.addEventListener('click', (e) => { e.stopPropagation(); fecharMenusAbertos(); abrirEdicaoPedido(btn.dataset.editarPedido); });
-      });
-      document.querySelectorAll('[data-pagamento-confirmado]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          fecharMenusAbertos();
-          await apiFetch(`/crm/api/pedidos/${btn.dataset.pagamentoConfirmado}/pagamento`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status_pagamento: 'pago' }),
-          });
-          carregar();
-        });
-      });
-      // "Chamar Agente" abre a conversa do bot com esse cliente
-      // (Configurações > WhatsApp > Conversas) — "WhatsApp" preserva
-      // o comportamento antigo (wa.me direto, fora do bot).
-      document.querySelectorAll('[data-acionar-cliente]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          fecharMenusAbertos();
-          const p = pedidos.find((x) => x.id === btn.dataset.acionarCliente);
-          if (p && p.cliente_telefone) window.location.href = `/crm/whatsapp.html?telefone=${encodeURIComponent(p.cliente_telefone)}`;
-        });
-      });
-      document.querySelectorAll('[data-chamar-whatsapp]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          fecharMenusAbertos();
-          const p = pedidos.find((x) => x.id === btn.dataset.chamarWhatsapp);
-          if (p && p.cliente_telefone) window.open(linkWhatsapp(p.cliente_telefone), '_blank', 'noopener');
-        });
-      });
-      document.querySelectorAll('[data-cancelar-pedido]').forEach((btn) => {
-        btn.addEventListener('click', () => { fecharMenusAbertos(); confirmarCancelarPedido(btn.dataset.cancelarPedido); });
-      });
-    }
 
     function confirmarCancelarPedido(pedidoId) {
       const overlay = abrirModal('<h3>Cancelar pedido?</h3>', `
@@ -395,9 +363,16 @@
       });
     }
 
-    function abrirEdicaoPedido(pedidoId) {
-      const p = pedidos.find((x) => x.id === pedidoId);
-      if (!p) return;
+    // Pedido pode não estar na página carregada (lista agora é paginada) —
+    // busca individualmente nesse caso, usado sobretudo pelo link direto
+    // ?abrir_pedido=<id> vindo do Painel Hoje.
+    async function abrirEdicaoPedido(pedidoId) {
+      let p = pedidos.find((x) => x.id === pedidoId);
+      if (!p) {
+        const res = await apiFetch(`/crm/api/pedidos/${pedidoId}`);
+        if (!res.ok) return;
+        p = await res.json();
+      }
       abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
         <p class="modal-texto">${escapeHtml(p.origem)}</p>
         ${ehOrigemPropria(p.origem) ? `<div class="banner-assinatura" style="margin-top:12px"><span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span></div>` : ''}
@@ -519,7 +494,6 @@
 
     // --- Novo pedido (US do Bruno: saiu do Quadro, mora só aqui agora) -------
     document.getElementById('btn-novo-pedido').addEventListener('click', () => {
-      fecharMenusAbertos();
       const opcoesRecurso = recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
       const opcoesProduto = produtos.map((p) => `<option value="${p.id}" data-preco="${p.preco_referencia || ''}">${escapeHtml(p.nome)}</option>`).join('');
       const opcoesTipoEntrega = tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
