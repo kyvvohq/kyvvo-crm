@@ -212,34 +212,43 @@
       const opcoesTemplate = ['<option value="">Nenhum ainda</option>', ...templates.map((t) => `<option value="${escapeHtml(t.nome)}">${escapeHtml(t.nome)} (${t.status})</option>`)].join('');
       const gatilhoInicialValido = GATILHOS_VALIDOS_UI.includes(gatilhoInicial) ? gatilhoInicial : 'mudanca_etapa';
       abrirModal('<h3>Nova automação</h3>', `
-        <label for="au-nome">Nome</label>
-        <input id="au-nome" placeholder="ex.: Aviso de pedido pronto">
-        <label for="au-gatilho">Gatilho</label>
-        <select id="au-gatilho">
-          <option value="mudanca_etapa" ${gatilhoInicialValido === 'mudanca_etapa' ? 'selected' : ''}>Pedido muda de etapa</option>
-          <option value="pedido_criado" ${gatilhoInicialValido === 'pedido_criado' ? 'selected' : ''}>Pedido criado</option>
-          <option value="pedido_parado" ${gatilhoInicialValido === 'pedido_parado' ? 'selected' : ''}>Pedido parado numa etapa</option>
-          <option value="aniversario_cliente" ${gatilhoInicialValido === 'aniversario_cliente' ? 'selected' : ''}>Aniversário do cliente</option>
-        </select>
-        <div id="au-etapa-wrap">
-          <label for="au-etapa">Etapa</label>
-          <select id="au-etapa">${opcoesEtapa}</select>
-          <p class="modal-texto" style="margin-top:6px;font-size:12.5px" id="au-etapa-ajuda"></p>
-        </div>
-        <label for="au-template">Template aprovado no WhatsApp</label>
-        <select id="au-template">${opcoesTemplate}</select>
-        ${!templates.length ? '<p class="modal-texto" style="font-size:12.5px">Nenhum template encontrado — confira se o número de WhatsApp já está vinculado (Configurações no admin) e se há templates aprovados na Meta.</p>' : ''}
-        <div class="modal-erro" id="au-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="au-cancelar">Cancelar</button>
-          <button type="button" id="au-salvar">Salvar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="au-nome">Nome</label><input class="ds-input" id="au-nome" placeholder="ex.: Aviso de pedido pronto"></div>
+          <div class="ds-campo">
+            <label class="ds-rotulo" for="au-gatilho">Gatilho</label>
+            <div class="ds-select"><select id="au-gatilho">
+              <option value="mudanca_etapa" ${gatilhoInicialValido === 'mudanca_etapa' ? 'selected' : ''}>Pedido muda de etapa</option>
+              <option value="pedido_criado" ${gatilhoInicialValido === 'pedido_criado' ? 'selected' : ''}>Pedido criado</option>
+              <option value="pedido_parado" ${gatilhoInicialValido === 'pedido_parado' ? 'selected' : ''}>Pedido parado numa etapa</option>
+              <option value="aniversario_cliente" ${gatilhoInicialValido === 'aniversario_cliente' ? 'selected' : ''}>Aniversário do cliente</option>
+            </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          </div>
+          <div class="ds-campo" id="au-etapa-wrap">
+            <label class="ds-rotulo" for="au-etapa">Etapa</label>
+            <div class="ds-select"><select id="au-etapa">${opcoesEtapa}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            <p class="modal-texto" style="margin-top:6px;font-size:12.5px" id="au-etapa-ajuda"></p>
+          </div>
+          <div class="ds-campo">
+            <label class="ds-rotulo" for="au-template">Template aprovado no WhatsApp</label>
+            <div class="ds-select"><select id="au-template">${opcoesTemplate}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            ${!templates.length ? '<p class="modal-texto" style="font-size:12.5px">Nenhum template encontrado — confira se o número de WhatsApp já está vinculado (Configurações no admin) e se há templates aprovados na Meta.</p>' : ''}
+          </div>
+          <div class="modal-erro" id="au-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="au-cancelar">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="au-salvar">Salvar</button>
+          </div>
         </div>
       `, 'modal-card-larga');
 
       function sincronizarVisibilidadeEtapa() {
         const gatilho = document.getElementById('au-gatilho').value;
         const precisaEtapa = GATILHOS_COM_ETAPA.includes(gatilho);
-        document.getElementById('au-etapa-wrap').hidden = !precisaEtapa;
+        // `.ds-campo` tem `display:flex` próprio — `hidden` sozinho perde
+        // esse empate de especificidade (mesmo problema já documentado em
+        // notificacoes.html com `.ds-abas-painel`/`.notificacoes-destino`),
+        // por isso troca o `display` direto em vez de usar o atributo.
+        document.getElementById('au-etapa-wrap').style.display = precisaEtapa ? '' : 'none';
         document.getElementById('au-etapa-ajuda').textContent = gatilho === 'pedido_parado'
           ? 'Usa o "prazo de alerta" já configurado nessa etapa (mesmo do card de orçamentos parados no Painel Hoje).'
           : '';
