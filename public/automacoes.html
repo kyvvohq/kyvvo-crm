@@ -184,8 +184,8 @@
       abrirModal('<h3>Remover automação?</h3>', `
         <p class="modal-texto">"${escapeHtml(automacao ? automacao.nome : '')}" para de disparar imediatamente. Essa ação não pode ser desfeita.</p>
         <div class="modal-acoes">
-          <button type="button" class="btn-secundario" id="remover-automacao-voltar">Voltar</button>
-          <button type="button" class="btn-perigo" id="remover-automacao-confirmar">Remover</button>
+          <button type="button" class="ds-btn ds-btn-secundario" id="remover-automacao-voltar">Voltar</button>
+          <button type="button" class="ds-btn ds-btn-perigo" id="remover-automacao-confirmar">Remover</button>
         </div>
       `);
       document.getElementById('remover-automacao-voltar').addEventListener('click', fecharModal);

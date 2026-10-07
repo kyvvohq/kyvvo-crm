@@ -179,9 +179,9 @@
             <h1 style="margin:0 0 4px">${escapeHtml(c.nome)} ${c.bloqueado ? '<span class="badge badge-bloqueado">Bloqueado</span>' : ''}</h1>
           </div>
           <div class="acoes">
-            ${c.telefone ? `<a class="btn" style="background:#25D366" href="${linkWhatsapp(c.telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} Atendimento</a>` : ''}
-            <a class="btn btn-secundario" href="/crm/pedidos.html?cliente_id=${c.id}">Ver pedidos</a>
-            <button type="button" class="btn-secundario" id="btn-bloquear">${c.bloqueado ? 'Desbloquear' : 'Bloquear'}</button>
+            ${c.telefone ? `<a class="ds-btn ds-btn-primario" style="background:#25D366" href="${linkWhatsapp(c.telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} Atendimento</a>` : ''}
+            <a class="ds-btn ds-btn-secundario" href="/crm/pedidos.html?cliente_id=${c.id}">Ver pedidos</a>
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-bloquear">${c.bloqueado ? 'Desbloquear' : 'Bloquear'}</button>
           </div>
         </div>
 
@@ -283,9 +283,9 @@
         </table>
         ${totalPaginas > 1 ? `
           <div class="paginacao-pedidos">
-            <button type="button" class="btn-secundario" id="btn-pedidos-anterior" ${paginaPedidos === 0 ? 'disabled' : ''}>Anterior</button>
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-pedidos-anterior" ${paginaPedidos === 0 ? 'disabled' : ''}>Anterior</button>
             <span>Página ${paginaPedidos + 1} de ${totalPaginas}</span>
-            <button type="button" class="btn-secundario" id="btn-pedidos-proximo" ${paginaPedidos >= totalPaginas - 1 ? 'disabled' : ''}>Próxima</button>
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-pedidos-proximo" ${paginaPedidos >= totalPaginas - 1 ? 'disabled' : ''}>Próxima</button>
           </div>
         ` : ''}
       `;
@@ -309,7 +309,7 @@
             <span style="color:var(--muted);font-size:11.5px">${formatarDataHora(e.criado_em)}</span>
           </div>
         `).join('')}
-        ${eventosVisiveis < c.eventos.length ? `<button type="button" class="btn-secundario" id="btn-mais-eventos" style="margin-top:10px">Mostrar mais</button>` : ''}
+        ${eventosVisiveis < c.eventos.length ? `<button type="button" class="ds-btn ds-btn-secundario" id="btn-mais-eventos" style="margin-top:10px">Mostrar mais</button>` : ''}
       `;
       const btnMais = document.getElementById('btn-mais-eventos');
       if (btnMais) btnMais.addEventListener('click', () => { eventosVisiveis += 2; renderizarLinhaDoTempo(); });
