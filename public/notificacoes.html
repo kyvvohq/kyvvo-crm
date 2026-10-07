@@ -13,14 +13,7 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .notificacoes-destino { display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
-  .notificacoes-destino .campo { flex:0 1 220px; min-width:180px; }
-  .notificacoes-destino label { display:block; font-size:12.5px; font-weight:600; color:var(--muted-strong); margin-bottom:4px; }
-  /* Input um pouco menor que o padrão (44px) do resto do app — nesse card
-     compacto o padrão deixava o input bem mais alto que os botões ao lado,
-     o que parecia "desalinhado" mesmo com os dois no mesmo flex-row. Deixa
-     os botões na mesma altura, pra tudo bater certinho na mesma linha. */
-  .notificacoes-destino input { height:38px; }
+  .notificacoes-destino { display:flex; flex-direction:column; gap:20px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
   .notificacao-historico-detalhe { margin-top:2px; font-size:12.5px; color:var(--muted-strong); }
   /* Mesmo padrão do design system (ver .ds-abas-painel[hidden] etc. em
      components.css): qualquer classe com `display` próprio precisa da sua
@@ -139,16 +132,11 @@
             </div>
           </div>
           <div class="notificacoes-destino" id="form-destino">
-            <div class="campo">
-              <label for="notificacao-email">E-mail pra receber notificações</label>
-              <input type="email" id="notificacao-email" data-ds-mascara="email" placeholder="seuemail@exemplo.com">
+            <div class="ds-form-grade">
+              <div class="ds-campo"><label class="ds-rotulo" for="notificacao-email">E-mail pra receber notificações</label><input class="ds-input" type="email" id="notificacao-email" data-ds-mascara="email" placeholder="seuemail@exemplo.com"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="notificacao-whatsapp">WhatsApp pra receber notificações</label><input class="ds-input" type="text" id="notificacao-whatsapp" data-ds-mascara="telefone" placeholder="(34) 99999-9999"></div>
             </div>
-            <div class="campo">
-              <label for="notificacao-whatsapp">WhatsApp pra receber notificações</label>
-              <input type="text" id="notificacao-whatsapp" data-ds-mascara="telefone" placeholder="(34) 99999-9999">
-            </div>
-            <div class="campo" style="flex:none">
-              <label aria-hidden="true">&nbsp;</label>
+            <div class="ds-form-acoes">
               <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-destino" disabled>Salvar</button>
               <button type="button" class="ds-btn ds-btn-secundario" id="btn-cancelar-destino" hidden>Cancelar</button>
             </div>

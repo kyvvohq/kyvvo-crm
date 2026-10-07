@@ -241,15 +241,19 @@
       abrirModal('<h3>Formulários de captação</h3>', `
         <p class="modal-texto">Link público pra pessoa se cadastrar sozinha (ex.: grupo VIP) — substitui Google Forms e já cai na sua base.</p>
         <div id="lista-formularios"></div>
-        <label for="fm-nome">Novo formulário</label>
-        <input type="text" id="fm-nome" placeholder="ex.: Sorteio VIP 200">
-        <label for="fm-tag">Aplica a tag (opcional)</label>
-        <select id="fm-tag"><option value="">Nenhuma</option>${opcoesTag}</select>
-        <label for="fm-perguntas">Perguntas extras (uma por linha, além de nome/WhatsApp/e-mail)</label>
-        <textarea id="fm-perguntas" placeholder="ex.: Quantas peças por mês você revende?"></textarea>
-        <div class="modal-erro" id="fm-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" class="ds-btn ds-btn-primario" id="fm-adicionar">Criar formulário</button>
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo"><label class="ds-rotulo" for="fm-nome">Novo formulário</label><input class="ds-input" type="text" id="fm-nome" placeholder="ex.: Sorteio VIP 200"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="fm-tag">Aplica a tag <span class="ds-rotulo-opcional">(opcional)</span></label>
+              <div class="ds-select"><select id="fm-tag"><option value="">Nenhuma</option>${opcoesTag}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="fm-perguntas">Perguntas extras (uma por linha, além de nome/WhatsApp/e-mail)</label><textarea class="ds-textarea" id="fm-perguntas" placeholder="ex.: Quantas peças por mês você revende?"></textarea></div>
+          </div>
+          <div class="modal-erro" id="fm-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="fm-adicionar">Criar formulário</button>
+          </div>
         </div>
       `, 'modal-card-larga');
       renderizarListaFormularios();
@@ -341,7 +345,7 @@
         <div class="linha-recurso" style="flex-direction:column;align-items:flex-start;gap:8px">
           <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">${ROTULO_MOTIVO[g.motivo] || g.motivo}</div>
           ${g.clientes.map((c, j) => `
-            <label style="display:flex;align-items:center;gap:8px;width:100%;font-size:13.5px">
+            <label class="ds-check" style="width:100%">
               <input type="radio" name="grupo-dup-${i}" value="${c.id}" ${j === 0 ? 'checked' : ''}>
               <span>${escapeHtml(c.nome)}${c.telefone ? ' · ' + escapeHtml(c.telefone) : ''}${c.quantidade_pedidos ? ' · ' + c.quantidade_pedidos + ' pedido(s)' : ''}</span>
             </label>
