@@ -552,6 +552,11 @@ async function build() {
   });
 
   // --- Clientes --------------------------------------------------------------
+  // Paginação é opt-in (só ativa com `pagina` na query) — quadro.html e
+  // campanhas.html chamam esta mesma rota esperando um array simples (picker
+  // de cliente), sem página nem total; mudar a forma da resposta pra eles
+  // quebraria os dois. A tela de Clientes (padrão de listagem do DS, Fase
+  // 2 da padronização) é quem manda `pagina`/`tamanho` e recebe o formato novo.
   fastify.get('/crm/api/clientes', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
     const busca = (request.query.busca || '').trim();
@@ -561,13 +566,29 @@ async function build() {
       params.push(`%${busca.toLowerCase()}%`);
       filtro = `and (lower(nome) like $2 or telefone like $2 or cpf like $2)`;
     }
+
+    const pagina = Number.parseInt(request.query.pagina, 10);
+    if (!pagina || pagina < 1) {
+      const { rows } = await pool.query(
+        `select id, nome, telefone, email, cidade, uf, origem, segmento, bloqueado, criado_em, data_nascimento
+         from crm_clientes where tenant_id = $1 ${filtro}
+         order by nome limit 200`,
+        params
+      );
+      return rows;
+    }
+
+    const tamanho = Math.min(Math.max(Number.parseInt(request.query.tamanho, 10) || 25, 1), 100);
+    params.push(tamanho, (pagina - 1) * tamanho);
     const { rows } = await pool.query(
-      `select id, nome, telefone, email, cidade, uf, origem, segmento, bloqueado, criado_em, data_nascimento
+      `select id, nome, telefone, email, cidade, uf, origem, segmento, bloqueado, criado_em, data_nascimento,
+              count(*) over()::int as total_geral
        from crm_clientes where tenant_id = $1 ${filtro}
-       order by nome limit 200`,
+       order by nome limit $${params.length - 1} offset $${params.length}`,
       params
     );
-    return rows;
+    const total = rows[0] ? rows[0].total_geral : 0;
+    return { dados: rows.map(({ total_geral, ...resto }) => resto), total };
   });
 
   fastify.post('/crm/api/clientes', { preHandler: fastify.authenticate }, async (request, reply) => {
