@@ -36,7 +36,8 @@
      fazer", a coluna vizinha. "Avatar" com iniciais no lugar do nome
      completo em cada raia (ver iniciaisRecurso() e --largura-raia, setada em
      renderizar()). */
-  .cabecalho-recursos { position:sticky; left:0; z-index:4; display:flex; align-items:center; gap:4px; height:100%; min-height:38px; }
+  .cabecalho-recursos { position:sticky; left:0; z-index:4; display:flex; flex-direction:column; justify-content:center; gap:4px; height:100%; min-height:38px; }
+  .cabecalho-recursos-topo { display:flex; align-items:center; gap:4px; }
   .btn-recolher-recursos { flex-shrink:0; width:28px; height:28px; display:flex; align-items:center; justify-content:center;
     background:var(--card); border:1px solid var(--border); border-radius:50%; color:var(--muted-strong); padding:0; }
   .btn-recolher-recursos:hover { background:var(--surface-hover); color:var(--text); }
@@ -86,24 +87,21 @@
   .coluna-header .btn-pronto:hover { color:var(--accent); }
   .coluna-header .btn-pronto.ativo { color:var(--accent-strong); }
 
-  /* "+ Recurso" — fica no cabeçalho da coluna de recursos, junto do botão de
-     recolher (pedido do Bruno, 2026-10-03: antes ficava dentro do cabeçalho
-     da coluna fixa "A fazer", a coluna vizinha). Cor de destaque própria —
-     sem isso herdaria o estilo genérico dos botões de ação de coluna. Some o
-     rótulo (só ícone) com a coluna de recursos recolhida, mesmo princípio do
-     "avatar" de iniciais nas raias. */
+  /* "+ Recurso" e "+ Etapa" — ficam no cabeçalho da coluna de recursos, um
+     embaixo do outro, junto do botão de recolher (pedido do Bruno,
+     2026-10-03: antes "+ Recurso" ficava dentro do cabeçalho da coluna fixa
+     "A fazer"; "+ Etapa" pedido 2026-10-07, antes era o "+" isolado no canto
+     direito do quadro — mesmo botão, só mudou de lugar e ganhou rótulo).
+     Cor de destaque própria — sem isso herdaria o estilo genérico dos
+     botões de ação de coluna. Some o rótulo (só ícone) com a coluna de
+     recursos recolhida, mesmo princípio do "avatar" de iniciais nas raias. */
   .btn-novo-recurso-coluna { display:flex; align-items:center; gap:4px; height:28px; padding:0 8px; border-radius:var(--radius-md);
     background:var(--card); border:1px solid var(--border); color:var(--accent-strong); font-weight:600; font-size:12px; }
   .btn-novo-recurso-coluna:hover { background:var(--accent-tint); color:var(--accent-strong); }
-  /* Recolhido (56px de largura) não cabe os 2 botões lado a lado — some o
-     "+ Recurso" e deixa só o chevron de expandir, mesma lógica de esconder
-     ação secundária já usada no botão de apagar recurso (opacity:0 acima). */
+  /* Recolhido (56px de largura) não cabe os botões com rótulo — some os
+     dois e deixa só o chevron de expandir, mesma lógica de esconder ação
+     secundária já usada no botão de apagar recurso (opacity:0 acima). */
   .quadro-grid.recursos-recolhido .btn-novo-recurso-coluna { display:none; }
-
-  .coluna-add { display:flex; align-items:center; justify-content:center; min-width:60px; }
-  .coluna-add button { width:36px; height:36px; border-radius:50%; font-size:18px; line-height:1; padding:0;
-    background:var(--surface-muted); color:var(--text); }
-  .coluna-add button:hover { background:var(--accent-tint); color:var(--accent-strong); }
 
   .celula { background:var(--bg); border:1px dashed var(--border-strong); border-radius:var(--radius-md); padding:8px;
     min-width:220px; min-height:60px; display:flex; flex-direction:column; gap:6px; }
@@ -359,18 +357,21 @@
       const linhas = raias();
       const grid = document.getElementById('quadro-grid');
       const larguraRaia = recursosRecolhido ? LARGURA_RAIA_RECOLHIDA : LARGURA_RAIA_EXPANDIDA;
-      grid.style.gridTemplateColumns = `${larguraRaia}px repeat(${etapas.length}, minmax(230px, 1fr)) 190px`;
+      grid.style.gridTemplateColumns = `${larguraRaia}px repeat(${etapas.length}, minmax(230px, 1fr))`;
       grid.style.setProperty('--largura-raia', `${larguraRaia}px`);
       grid.classList.toggle('recursos-recolhido', recursosRecolhido);
 
       let html = `
         <div class="cabecalho-recursos">
-          <button type="button" id="btn-recolher-recursos" class="btn-recolher-recursos"
-            title="${recursosRecolhido ? 'Expandir coluna de recursos' : 'Recolher coluna de recursos'}"
-            aria-label="${recursosRecolhido ? 'Expandir' : 'Recolher'} coluna de recursos">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <button type="button" id="btn-novo-recurso" class="btn-novo-recurso-coluna" title="Novo recurso">${icon('plus', 14)}<span class="rotulo-recurso">Recurso</span></button>
+          <div class="cabecalho-recursos-topo">
+            <button type="button" id="btn-recolher-recursos" class="btn-recolher-recursos"
+              title="${recursosRecolhido ? 'Expandir coluna de recursos' : 'Recolher coluna de recursos'}"
+              aria-label="${recursosRecolhido ? 'Expandir' : 'Recolher'} coluna de recursos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button type="button" id="btn-novo-recurso" class="btn-novo-recurso-coluna" title="Novo recurso">${icon('plus', 14)}<span class="rotulo-recurso">Recurso</span></button>
+          </div>
+          <button type="button" id="btn-nova-etapa" class="btn-novo-recurso-coluna" title="Nova etapa">${icon('plus', 14)}<span class="rotulo-recurso">Etapa</span></button>
         </div>
       `;
       etapas.forEach((et) => {
@@ -384,7 +385,6 @@
           </div>
         `;
       });
-      html += `<div class="coluna-add"><button type="button" id="btn-nova-etapa" aria-label="Nova etapa" title="Nova etapa">+</button></div>`;
 
       linhas.forEach((raia) => {
         // "Sem recurso"/"Prioridade Altíssima" são raias virtuais, sem CRUD —
@@ -405,7 +405,6 @@
             </div>
           `;
         });
-        html += '<div></div>';
       });
 
       grid.innerHTML = html;
