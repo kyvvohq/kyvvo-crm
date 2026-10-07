@@ -156,14 +156,16 @@
     document.getElementById('btn-importar-csv').addEventListener('click', () => {
       abrirModal('<h3>Importar clientes (CSV)</h3>', `
         <p class="modal-texto">Planilha antiga, exportação do Google Forms etc. Escolha o arquivo e diga qual coluna é qual.</p>
-        <input type="file" id="csv-arquivo" accept=".csv,text/csv">
-        <div id="csv-mapeamento" hidden>
-          <div id="csv-campos-mapeamento" style="margin-top:14px"></div>
-          <div id="csv-preview" style="margin-top:12px"></div>
-        </div>
-        <div class="modal-erro" id="csv-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="csv-importar" disabled>Importar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="csv-arquivo">Arquivo</label><input type="file" id="csv-arquivo" accept=".csv,text/csv"></div>
+          <div id="csv-mapeamento" hidden>
+            <div id="csv-campos-mapeamento" style="margin-top:14px"></div>
+            <div id="csv-preview" style="margin-top:12px"></div>
+          </div>
+          <div class="modal-erro" id="csv-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="csv-importar" disabled>Importar</button>
+          </div>
         </div>
       `, 'modal-card-larga');
 
@@ -182,8 +184,8 @@
         const opcoes = ['<option value="">Não importar</option>', ...csvCabecalho.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)].join('');
         document.getElementById('csv-campos-mapeamento').innerHTML = CAMPOS_IMPORTACAO.map((c) => `
           <div class="grid2" style="align-items:center;margin-bottom:6px">
-            <label style="margin:0">${c.label}${c.obrigatorio ? '<span class="obrigatorio">*</span>' : ''}</label>
-            <select data-campo-mapeado="${c.campo}">${opcoes}</select>
+            <label class="ds-rotulo" style="margin:0">${c.label}${c.obrigatorio ? '<span class="obrigatorio">*</span>' : ''}</label>
+            <div class="ds-select"><select data-campo-mapeado="${c.campo}">${opcoes}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
           </div>
         `).join('');
         // Tenta casar automaticamente por nome parecido da coluna.
@@ -240,12 +242,14 @@
     document.getElementById('btn-importar-nfe').addEventListener('click', () => {
       abrirModal('<h3>Importar NF-e (XML)</h3>', `
         <p class="modal-texto">Selecione quantos arquivos XML de NF-e quiser. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada. Pode fechar esta janela a qualquer momento — avisamos no sininho quando terminar.</p>
-        <input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple>
-        <div id="nfe-progresso" style="margin-top:12px"></div>
-        <div id="nfe-resultado" style="margin-top:12px"></div>
-        <div class="modal-erro" id="nfe-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="nfe-importar" disabled>Importar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="nfe-arquivos">Arquivos</label><input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple></div>
+          <div id="nfe-progresso" style="margin-top:12px"></div>
+          <div id="nfe-resultado" style="margin-top:12px"></div>
+          <div class="modal-erro" id="nfe-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="nfe-importar" disabled>Importar</button>
+          </div>
         </div>
       `, 'modal-card-larga');
 
@@ -313,11 +317,13 @@
     document.getElementById('btn-importar-upseller').addEventListener('click', () => {
       abrirModal('<h3>Importar pedidos (UpSeller)</h3>', `
         <p class="modal-texto">Selecione o relatório de NF-e exportado do UpSeller (.xlsx). Cria um pedido por nota — devolução de mercadoria é ignorada. Reimportar o mesmo arquivo não duplica.</p>
-        <input type="file" id="up-arquivo" accept=".xlsx">
-        <div id="up-resultado" style="margin-top:12px"></div>
-        <div class="modal-erro" id="up-erro"></div>
-        <div class="modal-acoes">
-          <button type="button" id="up-importar" disabled>Importar</button>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="up-arquivo">Arquivo</label><input type="file" id="up-arquivo" accept=".xlsx"></div>
+          <div id="up-resultado" style="margin-top:12px"></div>
+          <div class="modal-erro" id="up-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="up-importar" disabled>Importar</button>
+          </div>
         </div>
       `, 'modal-card-larga');
 
