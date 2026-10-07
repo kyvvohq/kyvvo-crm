@@ -13,19 +13,7 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .busca { max-width:360px; }
-  tr.linha-produto-item { cursor:pointer; }
-  tr.linha-produto-item:hover td { background:var(--surface-hover); }
-  tr.linha-produto-item td { position:relative; }
-  .menu-acoes-wrap { position:relative; display:inline-block; }
-  .btn-acoes { background:transparent; color:var(--muted); width:32px; height:32px; padding:0; border-radius:6px; }
-  .btn-acoes:hover { background:var(--surface-muted); color:var(--text); }
-  .menu-acoes { position:absolute; right:0; top:36px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md);
-    box-shadow:var(--shadow-md); min-width:150px; z-index:20; padding:6px; }
-  .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
-  .menu-acoes button:hover { background:var(--surface-muted); }
-  .menu-acoes button.perigo { color:var(--danger); }
-  td.col-observacao { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ds-tabela-coluna-observacao { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -104,26 +92,27 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>Estoque</h1></div>
+      <header class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">Estoque</h1></div>
+        <div class="ds-pagina-cab-acoes">
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-novo-produto"><span data-icon="plus" data-size="16"></span>Novo produto</button>
         </div>
-        <div class="acoes">
-          <button type="button" id="btn-novo-produto"><span data-icon="plus" data-size="16"></span>Novo produto</button>
+      </header>
+
+      <div class="ds-tabela" role="table" aria-label="Estoque"
+           style="--ds-colunas: minmax(0,1.4fr) minmax(0,0.8fr) 110px minmax(0,0.8fr) minmax(0,1.2fr) 48px">
+        <div class="ds-filtros">
+          <div class="ds-pesquisa">
+            <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="ds-pesquisa-input" type="search" id="input-busca-produto" placeholder="Buscar por nome, ID ou observação…" aria-label="Buscar por nome, ID ou observação">
+          </div>
         </div>
-      </div>
-
-      <div class="busca">
-        <input type="search" id="input-busca-produto" placeholder="Buscar por nome, ID, valor ou observação…">
-      </div>
-
-      <div class="card" style="padding:0">
-        <table>
-          <thead>
-            <tr><th>Nome</th><th>ID</th><th>Quantidade</th><th>Valor</th><th>Observação</th><th></th></tr>
-          </thead>
-          <tbody id="tbody-produtos"><tr><td colspan="6"><div class="vazio">Carregando…</div></td></tr></tbody>
-        </table>
+        <div class="ds-tabela-cabecalho" role="row">
+          <span role="columnheader">Nome</span><span role="columnheader">ID</span><span role="columnheader">Quantidade</span>
+          <span role="columnheader">Valor</span><span role="columnheader">Observação</span><span role="columnheader"></span>
+        </div>
+        <div id="linhas-produtos"></div>
+        <div class="ds-tabela-rodape"><nav data-ds-paginacao id="paginacao-produtos" data-ds-total="0" data-ds-tamanho="25" data-ds-tamanhos="25,50,100"></nav></div>
       </div>
     </div>
   </div>
@@ -134,110 +123,81 @@
   <script src="/crm/shell.js"></script>
   <script>
     let produtos = [];
-    let termoBusca = '';
+    let totalProdutos = 0;
+    const estadoProdutos = { pagina: 1, tamanho: 25, busca: '' };
 
     async function carregar() {
-      const res = await apiFetch('/crm/api/produtos');
-      produtos = await res.json();
+      const qs = new URLSearchParams({ pagina: estadoProdutos.pagina, tamanho: estadoProdutos.tamanho });
+      if (estadoProdutos.busca) qs.set('busca', estadoProdutos.busca);
+      const res = await apiFetch(`/crm/api/produtos?${qs}`);
+      const corpo = await res.json();
+      produtos = corpo.dados;
+      totalProdutos = corpo.total;
       renderizar();
     }
 
-    function produtoBateNaBusca(p, termo) {
-      const alvo = [p.nome, p.identificador_externo, p.observacao, p.preco_referencia != null ? formatarMoeda(p.preco_referencia) : '']
-        .filter(Boolean).join(' ').toLowerCase();
-      return alvo.includes(termo);
-    }
-
     function renderizar() {
-      const tbody = document.getElementById('tbody-produtos');
-      const termo = termoBusca.trim().toLowerCase();
-      const lista = termo ? produtos.filter((p) => produtoBateNaBusca(p, termo)) : produtos;
-
-      if (!lista.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="vazio">${produtos.length ? 'Nenhum produto bate com essa busca.' : 'Nenhum produto cadastrado ainda.'}</div></td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = lista.map((p) => `
-        <tr class="linha-produto-item" data-id="${p.id}">
-          <td>${escapeHtml(p.nome)} ${p.ativo === false ? '<span class="badge neutro">Desativado</span>' : ''}</td>
-          <td>${p.identificador_externo ? escapeHtml(p.identificador_externo) : '—'}</td>
-          <td>${p.quantidade ?? 0}</td>
-          <td>${p.preco_referencia ? formatarMoeda(p.preco_referencia) : '—'}</td>
-          <td class="col-observacao" title="${p.observacao ? escapeHtml(p.observacao) : ''}">${p.observacao ? escapeHtml(p.observacao) : '—'}</td>
-          <td>
-            <div class="menu-acoes-wrap">
-              <button type="button" class="btn-acoes" data-abrir-menu="${p.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="menu-acoes" data-menu="${p.id}" hidden>
-                <button type="button" data-editar-produto="${p.id}">Editar</button>
-                <button type="button" data-alternar-produto="${p.id}" data-ativo="${p.ativo === false}">${p.ativo === false ? 'Ativar' : 'Desativar'}</button>
-                <button type="button" class="perigo" data-apagar-produto="${p.id}">Excluir</button>
+      const container = document.getElementById('linhas-produtos');
+      container.innerHTML = produtos.length ? produtos.map((p) => `
+        <div class="ds-tabela-linha ds-tabela-linha-clicavel" role="row" tabindex="0" data-id="${p.id}">
+          <span role="cell" data-rotulo="Nome"><span class="ds-tabela-primario">${escapeHtml(p.nome)}</span>${p.ativo === false ? ' <span class="ds-badge ds-badge-sm">Desativado</span>' : ''}</span>
+          <span role="cell" data-rotulo="ID">${p.identificador_externo ? escapeHtml(p.identificador_externo) : '—'}</span>
+          <span role="cell" data-rotulo="Quantidade">${p.quantidade ?? 0}</span>
+          <span role="cell" data-rotulo="Valor">${p.preco_referencia ? formatarMoeda(p.preco_referencia) : '—'}</span>
+          <span role="cell" data-rotulo="Observação" class="ds-tabela-coluna-observacao" title="${p.observacao ? escapeHtml(p.observacao) : ''}">${p.observacao ? escapeHtml(p.observacao) : '—'}</span>
+          <span role="cell">
+            <div class="ds-acoes" data-id="${p.id}">
+              <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações de ${escapeHtml(p.nome)}">⋯</button>
+              <div class="ds-acoes-menu" role="menu" hidden>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="editar">Editar</button>
+                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="alternar">${p.ativo === false ? 'Ativar' : 'Desativar'}</button>
+                <button type="button" class="ds-acoes-item ds-acoes-item-perigo" role="menuitem" data-acao="excluir">Excluir</button>
               </div>
             </div>
-          </td>
-        </tr>
-      `).join('');
+          </span>
+        </div>
+      `).join('') : `<div class="ds-vazio"><p class="ds-vazio-titulo">${estadoProdutos.busca ? 'Nenhum produto bate com essa busca' : 'Nenhum produto cadastrado ainda'}</p></div>`;
 
-      tbody.querySelectorAll('.linha-produto-item').forEach((tr) => {
-        tr.addEventListener('click', (e) => {
-          if (e.target.closest('.menu-acoes-wrap')) return;
-          abrirModalProduto(produtos.find((p) => p.id === tr.dataset.id));
+      container.querySelectorAll('.ds-tabela-linha-clicavel').forEach((linha) => {
+        linha.addEventListener('click', (e) => {
+          if (e.target.closest('.ds-acoes')) return;
+          abrirModalProduto(produtos.find((p) => p.id === linha.dataset.id));
         });
       });
-      ligarEventosLinhasProdutos();
+
+      KyvvoDS.paginacaoAtualizar(document.getElementById('paginacao-produtos'), { total: totalProdutos, pagina: estadoProdutos.pagina, tamanho: estadoProdutos.tamanho });
     }
 
-    function fecharMenusAbertosProdutos() {
-      document.querySelectorAll('.menu-acoes').forEach((m) => { m.hidden = true; });
-    }
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.menu-acoes-wrap')) fecharMenusAbertosProdutos();
+    document.getElementById('linhas-produtos').addEventListener('ds-acoes-escolher', async (e) => {
+      const id = e.target.closest('[data-id]').dataset.id;
+      const produto = produtos.find((p) => p.id === id);
+      if (e.detail.acao === 'editar') {
+        abrirModalProduto(produto);
+      } else if (e.detail.acao === 'alternar') {
+        await apiFetch(`/crm/api/produtos/${id}`, { method: 'PATCH', body: JSON.stringify({ ativo: produto.ativo === false }) });
+        carregar();
+      } else if (e.detail.acao === 'excluir') {
+        confirmarAcao('Excluir produto?', 'Deseja excluir o produto?', async () => {
+          await apiFetch(`/crm/api/produtos/${id}`, { method: 'DELETE' });
+          carregar();
+        }, { textoConfirmar: 'Confirmar', textoCancelar: 'Sair' });
+      }
     });
 
-    function ligarEventosLinhasProdutos() {
-      document.querySelectorAll('[data-editar-produto]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          fecharMenusAbertosProdutos();
-          abrirModalProduto(produtos.find((p) => p.id === btn.dataset.editarProduto));
-        });
-      });
-      document.querySelectorAll('[data-abrir-menu]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const menu = document.querySelector(`[data-menu="${btn.dataset.abrirMenu}"]`);
-          const jaAberto = !menu.hidden;
-          fecharMenusAbertosProdutos();
-          menu.hidden = jaAberto;
-        });
-      });
-      document.querySelectorAll('[data-alternar-produto]').forEach((btn) => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          fecharMenusAbertosProdutos();
-          await apiFetch(`/crm/api/produtos/${btn.dataset.alternarProduto}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ ativo: btn.dataset.ativo === 'true' }),
-          });
-          carregar();
-        });
-      });
-      document.querySelectorAll('[data-apagar-produto]').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          fecharMenusAbertosProdutos();
-          confirmarAcao('Excluir produto?', 'Deseja excluir o produto?', async () => {
-            await apiFetch(`/crm/api/produtos/${btn.dataset.apagarProduto}`, { method: 'DELETE' });
-            carregar();
-          }, { textoConfirmar: 'Confirmar', textoCancelar: 'Sair' });
-        });
-      });
-    }
+    document.getElementById('paginacao-produtos').addEventListener('ds-paginacao-alterar', (e) => {
+      estadoProdutos.pagina = e.detail.pagina;
+      estadoProdutos.tamanho = e.detail.tamanho;
+      carregar();
+    });
 
     let debounceBuscaProduto;
     document.getElementById('input-busca-produto').addEventListener('input', (e) => {
       clearTimeout(debounceBuscaProduto);
-      debounceBuscaProduto = setTimeout(() => { termoBusca = e.target.value; renderizar(); }, 200);
+      debounceBuscaProduto = setTimeout(() => {
+        estadoProdutos.busca = e.target.value.trim();
+        estadoProdutos.pagina = 1;
+        carregar();
+      }, 300);
     });
 
     function abrirModalProduto(produto) {
