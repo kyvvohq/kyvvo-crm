@@ -2047,8 +2047,7 @@ async function build() {
   });
 
   fastify.get('/crm/api/notificacoes/historico', { preHandler: fastify.authenticate }, async (request) => {
-    const historico = await listarHistoricoNotificacoes(pool, request.user.tenantId);
-    return { historico };
+    return listarHistoricoNotificacoes(pool, request.user.tenantId, request.query || {});
   });
 
   return fastify;
