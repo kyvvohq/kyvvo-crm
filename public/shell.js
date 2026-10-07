@@ -187,32 +187,22 @@ document.querySelectorAll('.btn-sair').forEach((btn) => {
   });
 });
 
-// --- Modal genérico (mesmo padrão do kyvvo-people) ---
+// --- Modal genérico — usa o componente do DS (KyvvoDS.modalAbrir/modalFechar,
+// v2.9.0+) por baixo, mantendo a mesma assinatura de sempre (tituloHtml como
+// string "<h3>texto</h3>", classeExtra, retorna o overlay) pra nenhuma das
+// ~25 chamadas espalhadas pelas telas precisar mudar (migração 2026-10-07).
+// `tituloHtml` normalmente é só um `<h3>`, mas abrirModalDisparoIndividual
+// (mais abaixo) passa um `<h3>` seguido de conteúdo extra (`<p>`) — esse
+// resto vai pro corpo, antes do conteúdo próprio, em vez de ficar preso
+// dentro da tag de título que o DS já desenha.
 function fecharModal() {
-  const overlay = document.getElementById('modal-overlay');
-  if (overlay) overlay.remove();
-  document.removeEventListener('keydown', escFecharModal);
-}
-function escFecharModal(e) {
-  if (e.key === 'Escape') fecharModal();
+  KyvvoDS.modalFechar();
 }
 function abrirModal(tituloHtml, conteudoHtml, classeExtra) {
-  fecharModal();
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.id = 'modal-overlay';
-  overlay.innerHTML = `
-    <div class="modal-card${classeExtra ? ` ${classeExtra}` : ''}">
-      <button class="modal-close" id="modal-close" aria-label="Fechar" type="button">${icon('x', 15)}</button>
-      ${tituloHtml}
-      ${conteudoHtml}
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  document.getElementById('modal-close').addEventListener('click', fecharModal);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) fecharModal(); });
-  document.addEventListener('keydown', escFecharModal);
-  return overlay;
+  const match = /^<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>([\s\S]*)$/.exec((tituloHtml || '').trim());
+  const titulo = match ? match[1] : tituloHtml;
+  const corpoExtra = match ? match[2] : '';
+  return KyvvoDS.modalAbrir(corpoExtra + conteudoHtml, { titulo, classeExtra });
 }
 function avisar(titulo, mensagem) {
   abrirModal(
@@ -367,7 +357,16 @@ if (document.getElementById('notificacoes-sino')) {
 // Resolve com o texto digitado, ou null se cancelado/fechado.
 function pedirTexto(titulo, label, placeholder, textoBotaoConfirmar) {
   return new Promise((resolve) => {
-    const overlay = abrirModal(`<h3>${titulo}</h3>`, `
+    let resolvido = false;
+    const finalizar = (valor) => {
+      if (resolvido) return;
+      resolvido = true;
+      resolve(valor);
+    };
+    // `aoFechar` do DS cobre X, clique fora e Esc num só callback — os 3
+    // contam como cancelar. Guard de `resolvido` evita resolver de novo
+    // quando o fechamento é consequência do próprio "Confirmar" (abaixo).
+    KyvvoDS.modalAbrir(`
       <label for="pedir-texto-campo">${label}</label>
       <textarea id="pedir-texto-campo" placeholder="${escapeHtml(placeholder || '')}"></textarea>
       <div class="modal-erro" id="pedir-texto-erro"></div>
@@ -375,27 +374,13 @@ function pedirTexto(titulo, label, placeholder, textoBotaoConfirmar) {
         <button type="button" class="btn-secundario" id="pedir-texto-cancelar">Cancelar</button>
         <button type="button" class="btn-perigo" id="pedir-texto-confirmar">${textoBotaoConfirmar}</button>
       </div>
-    `);
-    let resolvido = false;
-    const finalizar = (valor) => {
-      if (resolvido) return;
-      resolvido = true;
-      resolve(valor);
-    };
-    document.getElementById('pedir-texto-cancelar').addEventListener('click', () => { finalizar(null); fecharModal(); });
+    `, { titulo, aoFechar: () => finalizar(null) });
+    document.getElementById('pedir-texto-cancelar').addEventListener('click', fecharModal);
     document.getElementById('pedir-texto-confirmar').addEventListener('click', () => {
       const texto = document.getElementById('pedir-texto-campo').value.trim();
       if (!texto) { document.getElementById('pedir-texto-erro').textContent = 'Motivo é obrigatório'; return; }
       finalizar(texto);
       fecharModal();
-    });
-    // Fechar pelo X, clique fora ou Esc conta como cancelar.
-    overlay.querySelector('#modal-close').addEventListener('click', () => finalizar(null));
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) finalizar(null); });
-    document.addEventListener('keydown', function escHandler(e) {
-      if (e.key !== 'Escape') return;
-      finalizar(null);
-      document.removeEventListener('keydown', escHandler);
     });
   });
 }
