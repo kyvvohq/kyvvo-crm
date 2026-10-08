@@ -551,6 +551,63 @@ async function build() {
     return reply.code(201).send({ token, nome: dados.nome, onboarding_pendente: onboardingPendente });
   });
 
+  // --- Plano e cobrança --------------------------------------------------------
+  // O CRM não guarda o token RS256 do platform além do login (ver handoff
+  // acima) — essas rotas são um proxy servidor-a-servidor pro
+  // kyvvo-platform (routes/pagamentos-crm.js), autenticado por segredo
+  // compartilhado (X-Internal-Token), mesmo padrão de lib/email.js. O CRM
+  // já provou a identidade do usuário com a própria sessão (fastify.authenticate,
+  // local); só repassa o tenantId.
+  async function chamarPlatformInterno(path, { method = 'GET', body, reply } = {}) {
+    let res;
+    try {
+      res = await fetch(`${PLATFORM_URL}${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.PLATFORM_PAGAMENTOS_TOKEN },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch (err) {
+      reply.log.error(`Falha ao chamar o platform em ${path}: ${err.message}`);
+      reply.code(502).send({ error: 'Não foi possível falar com o serviço de cobrança agora. Tente novamente em instantes.' });
+      return null;
+    }
+    const dados = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      reply.code(res.status).send(dados);
+      return null;
+    }
+    return dados;
+  }
+
+  fastify.get('/crm/api/pagamentos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${request.user.tenantId}`, { reply });
+    if (dados) return dados;
+  });
+
+  fastify.get('/crm/api/pagamentos/planos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = await chamarPlatformInterno('/internal/planos-crm', { reply });
+    if (dados) return dados;
+  });
+
+  fastify.post('/crm/api/pagamentos/cadastrar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, email, nome } = request.user;
+    const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${tenantId}/cadastrar`, {
+      method: 'POST', body: { ...request.body, email, nome }, reply,
+    });
+    if (dados) return dados;
+  });
+
+  fastify.patch('/crm/api/pagamentos/plano', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${request.user.tenantId}/plano`, { method: 'PATCH', body: request.body, reply });
+    if (dados) return dados;
+  });
+
+  fastify.delete('/crm/api/pagamentos/assinatura', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${request.user.tenantId}/assinatura`, { method: 'DELETE', reply });
+    if (dados) return dados;
+  });
+
   // --- Clientes --------------------------------------------------------------
   // Paginação é opt-in (só ativa com `pagina` na query) — quadro.html e
   // campanhas.html chamam esta mesma rota esperando um array simples (picker

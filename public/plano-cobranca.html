@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Plano e cobrança</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .planos-grade { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; }
+  .plano-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; display:flex; flex-direction:column; gap:10px; }
+  .plano-card.atual { border-color:var(--accent); background:var(--accent-tint); }
+  .plano-card .nome { font-weight:700; font-size:14px; color:var(--text); }
+  .plano-card .preco { font-family:var(--font-display); font-size:22px; color:var(--text); }
+  .plano-card .preco span { font-size:12px; color:var(--muted); font-weight:400; }
+  .plano-card .descricao { font-size:12.5px; color:var(--muted); line-height:1.5; flex:1; }
+  .cobranca-resumo { display:flex; flex-direction:column; gap:10px; }
+  .cobranca-resumo .linha { display:flex; justify-content:space-between; gap:12px; font-size:13.5px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .cobranca-resumo .linha:last-child { border-bottom:none; }
+  .cobranca-resumo .rotulo { color:var(--muted); }
+</style>
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="ds-topbar-acoes">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/relatorios.html"><span class="ds-menu-icone" data-icon="chart-column"></span><span class="ds-menu-rotulo">Relatórios</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/plano-cobranca.html">Plano e cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <header class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">Plano e cobrança</h1></div>
+      </header>
+
+      <div class="ds-abas" data-ds-abas>
+        <div class="ds-abas-lista">
+          <button type="button" class="ds-aba" id="aba-pc-planos" aria-controls="painel-pc-planos" aria-selected="true">Planos</button>
+          <button type="button" class="ds-aba" id="aba-pc-cobranca" aria-controls="painel-pc-cobranca" aria-selected="false">Cobrança</button>
+          <button type="button" class="ds-aba" id="aba-pc-historico" aria-controls="painel-pc-historico" aria-selected="false">Histórico</button>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-pc-planos" aria-labelledby="aba-pc-planos">
+          <div class="card" id="planos-conteudo">Carregando...</div>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-pc-cobranca" aria-labelledby="aba-pc-cobranca" hidden>
+          <div class="card" id="cobranca-conteudo">Carregando...</div>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-pc-historico" aria-labelledby="aba-pc-historico" hidden>
+          <div class="ds-tabela" role="table" aria-label="Histórico de cobranças" style="--ds-colunas: 110px minmax(0,1fr) 100px 90px 120px">
+            <div class="ds-tabela-cabecalho" role="row"><span role="columnheader">Data</span><span role="columnheader">Plano</span><span role="columnheader">Valor</span><span role="columnheader">Meio</span><span role="columnheader">Status</span></div>
+            <div id="historico-linhas"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="CRM"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    const STATUS_LABEL = { trial: 'Trial', pendente: 'Aguardando confirmação', ativo: 'Ativa', inadimplente: 'Pagamento em atraso', suspenso: 'Suspensa', cancelado: 'Cancelada' };
+    const STATUS_TONE = { trial: 'info', pendente: 'aviso', ativo: 'sucesso', inadimplente: 'aviso', suspenso: 'erro', cancelado: '' };
+    const HIST_STATUS_LABEL = { CONFIRMED: 'Confirmado', RECEIVED: 'Recebido', PENDING: 'Pendente', OVERDUE: 'Atrasado', REFUNDED: 'Estornado', CANCELLED: 'Cancelado' };
+    const HIST_MEIO_LABEL = { PIX: 'Pix', CREDIT_CARD: 'Cartão de crédito', BOLETO: 'Boleto' };
+    const UF_LISTA = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+
+    function formatarMoeda(v) { return `R$ ${Number(v).toFixed(2).replace('.', ',')}`; }
+    function formatarData(iso) {
+      if (!iso) return '—';
+      return new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR');
+    }
+
+    let pagamento = null;
+    let planos = [];
+
+    async function carregar() {
+      const [resPagamento, resPlanos] = await Promise.all([
+        apiFetch('/crm/api/pagamentos'),
+        apiFetch('/crm/api/pagamentos/planos'),
+      ]);
+      if (!resPagamento.ok) {
+        document.getElementById('planos-conteudo').textContent = 'Não foi possível carregar sua assinatura agora.';
+        document.getElementById('cobranca-conteudo').textContent = 'Não foi possível carregar sua assinatura agora.';
+        return;
+      }
+      pagamento = await resPagamento.json();
+      planos = resPlanos.ok ? await resPlanos.json() : [];
+      renderizarPlanos();
+      renderizarCobranca();
+      renderizarHistorico();
+    }
+
+    function renderizarPlanos() {
+      const container = document.getElementById('planos-conteudo');
+      container.innerHTML = `
+        <div class="planos-grade">
+          ${planos.map(renderizarPlanoCard).join('')}
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:14px 0 0">Cartão ou Pix. Cobrança mensal.</p>
+      `;
+      container.querySelectorAll('[data-assinar]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const chave = btn.dataset.assinar;
+          if (pagamento.plano) confirmarTrocaPlano(chave);
+          else abrirModalPagamento(chave);
+        });
+      });
+    }
+
+    function renderizarPlanoCard(p) {
+      const atual = p.chave === pagamento.plano;
+      let rotulo = 'Assinar';
+      if (atual) rotulo = 'Plano atual';
+      else if (pagamento.plano) rotulo = 'Trocar pra este';
+      return `
+        <div class="plano-card${atual ? ' atual' : ''}">
+          <div class="nome">${escapeHtml(p.nome)}</div>
+          <div class="preco">${formatarMoeda(p.preco_mensal)}<span>/mês</span></div>
+          <div class="descricao">${escapeHtml(p.descricao || '')}</div>
+          <button type="button" class="ds-btn${atual ? ' ds-btn-secundario' : ' ds-btn-primario'}" data-assinar="${p.chave}" ${atual ? 'disabled' : ''}>${rotulo}</button>
+        </div>
+      `;
+    }
+
+    function renderizarCobranca() {
+      const container = document.getElementById('cobranca-conteudo');
+      const planoAtual = planos.find((p) => p.chave === pagamento.plano);
+      container.innerHTML = `
+        <div class="cobranca-resumo">
+          <div class="linha"><span class="rotulo">Status</span><span class="ds-badge${STATUS_TONE[pagamento.status] ? ' ds-badge-' + STATUS_TONE[pagamento.status] : ''}">${STATUS_LABEL[pagamento.status] || pagamento.status}</span></div>
+          <div class="linha"><span class="rotulo">Plano atual</span><span>${planoAtual ? escapeHtml(planoAtual.nome) : 'Nenhum ainda'}</span></div>
+          ${pagamento.asaas_meio_pagamento ? `<div class="linha"><span class="rotulo">Forma de pagamento</span><span>${pagamento.asaas_meio_pagamento === 'cartao' ? `Cartão final ${escapeHtml(pagamento.asaas_cartao_final || '')}` : 'Pix'}</span></div>` : ''}
+          ${pagamento.cancelado_em && pagamento.acesso_ate ? `<div class="linha"><span class="rotulo">Cancelada</span><span>acesso continua até ${formatarData(pagamento.acesso_ate)}</span></div>` : ''}
+        </div>
+        ${pagamento.status === 'pendente' ? `
+          <div class="modal-erro" style="margin-top:14px;display:block;background:var(--accent-tint);color:var(--text);border-radius:var(--radius-md);padding:10px 12px">
+            ${pagamento.asaas_meio_pagamento === 'cartao'
+              ? 'Cartão em processamento — assim que a cobrança for confirmada, o plano vira ativo automaticamente.'
+              : 'Falta pagar o Pix pra ativar o plano — confira o e-mail que foi enviado com o QR code/código copia-e-cola.'}
+          </div>
+        ` : ''}
+        ${pagamento.status === 'ativo' ? `
+          <div class="ds-form-acoes" style="margin-top:16px">
+            <button type="button" class="ds-btn ds-btn-perigo" id="btn-cancelar-assinatura">Cancelar assinatura</button>
+          </div>
+        ` : ''}
+        ${!pagamento.plano ? `<p style="font-size:13px;color:var(--muted);margin-top:12px">Escolha um plano na aba Planos pra começar.</p>` : ''}
+      `;
+      const btnCancelar = document.getElementById('btn-cancelar-assinatura');
+      if (btnCancelar) btnCancelar.addEventListener('click', confirmarCancelarAssinatura);
+    }
+
+    function renderizarHistorico() {
+      const el = document.getElementById('historico-linhas');
+      const historico = pagamento.historico || [];
+      if (!historico.length) {
+        el.innerHTML = '<div class="ds-vazio"><p>Nenhuma cobrança registrada ainda.</p></div>';
+        return;
+      }
+      el.innerHTML = historico.map((h) => `
+        <div class="ds-tabela-linha" role="row">
+          <span role="cell" data-rotulo="Data">${formatarData(h.data)}</span>
+          <span role="cell" data-rotulo="Plano">${escapeHtml(h.plano_nome || '—')}</span>
+          <span role="cell" data-rotulo="Valor">${formatarMoeda(h.valor)}</span>
+          <span role="cell" data-rotulo="Meio">${HIST_MEIO_LABEL[h.meio] || h.meio || '—'}</span>
+          <span role="cell" data-rotulo="Status">${HIST_STATUS_LABEL[h.status] || h.status}</span>
+        </div>
+      `).join('');
+    }
+
+    function confirmarTrocaPlano(chave) {
+      const plano = planos.find((p) => p.chave === chave);
+      abrirModal('<h3>Trocar de plano?</h3>', `
+        <p class="modal-texto">Muda pra "${escapeHtml(plano.nome)}" (${formatarMoeda(plano.preco_mensal)}/mês). O novo valor só vale a partir da próxima cobrança — sem cálculo proporcional.</p>
+        <div class="ds-form-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="cancelar-troca-plano">Cancelar</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="confirmar-troca-plano">Trocar</button>
+        </div>
+      `);
+      document.getElementById('cancelar-troca-plano').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-troca-plano').addEventListener('click', async () => {
+        const res = await apiFetch('/crm/api/pagamentos/plano', { method: 'PATCH', body: JSON.stringify({ plano: chave }) });
+        const dados = await res.json();
+        fecharModal();
+        if (!res.ok) { avisar('Erro', dados.error || 'Falha ao trocar de plano'); return; }
+        pagamento = dados;
+        renderizarPlanos();
+        renderizarCobranca();
+        avisar('Plano alterado', `Agora você está no plano ${escapeHtml(plano.nome)}.`);
+      });
+    }
+
+    function confirmarCancelarAssinatura() {
+      abrirModal('<h3>Cancelar assinatura?</h3>', `
+        <p class="modal-texto">A cobrança recorrente é encerrada, mas o acesso ao plano pago continua até o fim do período já pago. Essa ação não pode ser desfeita.</p>
+        <div class="ds-form-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="voltar-cancelar-assinatura">Voltar</button>
+          <button type="button" class="ds-btn ds-btn-perigo" id="confirmar-cancelar-assinatura">Cancelar assinatura</button>
+        </div>
+      `);
+      document.getElementById('voltar-cancelar-assinatura').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-cancelar-assinatura').addEventListener('click', async () => {
+        const res = await apiFetch('/crm/api/pagamentos/assinatura', { method: 'DELETE' });
+        const dados = await res.json();
+        fecharModal();
+        if (!res.ok) { avisar('Erro', dados.error || 'Falha ao cancelar assinatura'); return; }
+        await carregar();
+        avisar('Assinatura cancelada', dados.acesso_ate ? `Seu acesso ao plano pago continua até ${formatarData(dados.acesso_ate)}.` : 'Sua assinatura foi cancelada.');
+      });
+    }
+
+    function abrirModalPagamento(planoChave) {
+      const plano = planos.find((p) => p.chave === planoChave);
+      let meioSelecionado = 'pix';
+      abrirModal(`<h3>Assinar ${escapeHtml(plano.nome)}</h3>`, `
+        <div class="ds-form">
+          <p class="modal-texto">${formatarMoeda(plano.preco_mensal)}/mês. Cobrado a partir de hoje.</p>
+          <div class="modal-erro" id="msg-pagamento"></div>
+          <div class="ds-form-grade">
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="pg-meio">Forma de pagamento</label>
+              <div class="ds-select"><select id="pg-meio"><option value="pix">Pix</option><option value="cartao">Cartão de crédito</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo"><label class="ds-rotulo" for="pg-cpf-cnpj">CPF ou CNPJ</label><input class="ds-input" id="pg-cpf-cnpj" placeholder="Só números"></div>
+          </div>
+          <div id="campos-cartao" hidden>
+            <div class="ds-form-grade">
+              <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="pg-cartao-numero">Número do cartão</label><input class="ds-input" id="pg-cartao-numero" placeholder="0000 0000 0000 0000"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-cartao-nome">Nome impresso no cartão</label><input class="ds-input" id="pg-cartao-nome"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-cartao-cvv">CVV</label><input class="ds-input" id="pg-cartao-cvv"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-cartao-mes">Validade — mês</label><input class="ds-input" id="pg-cartao-mes" placeholder="MM"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-cartao-ano">Validade — ano</label><input class="ds-input" id="pg-cartao-ano" placeholder="AAAA"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-telefone">Telefone do titular (com DDD)</label><input class="ds-input" id="pg-telefone" placeholder="Só números"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-cep">CEP</label><input class="ds-input" id="pg-cep"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-numero">Número</label><input class="ds-input" id="pg-numero"></div>
+              <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="pg-logradouro">Logradouro</label><input class="ds-input" id="pg-logradouro"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-bairro">Bairro</label><input class="ds-input" id="pg-bairro"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-complemento">Complemento (opcional)</label><input class="ds-input" id="pg-complemento"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="pg-cidade">Cidade</label><input class="ds-input" id="pg-cidade"></div>
+              <div class="ds-campo">
+                <label class="ds-rotulo" for="pg-uf">UF</label>
+                <div class="ds-select"><select id="pg-uf"><option value="">—</option>${UF_LISTA.map((uf) => `<option value="${uf}">${uf}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+              </div>
+            </div>
+          </div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="cancelar-pagamento">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="confirmar-pagamento">Confirmar</button>
+          </div>
+        </div>
+      `, 'modal-card-larga');
+
+      const camposCartao = document.getElementById('campos-cartao');
+      document.getElementById('pg-meio').addEventListener('change', (e) => {
+        meioSelecionado = e.target.value;
+        camposCartao.hidden = meioSelecionado !== 'cartao';
+      });
+
+      document.getElementById('cancelar-pagamento').addEventListener('click', fecharModal);
+      document.getElementById('confirmar-pagamento').addEventListener('click', async () => {
+        const msg = document.getElementById('msg-pagamento');
+        msg.textContent = '';
+        const meio = meioSelecionado;
+
+        const corpo = { plano: planoChave, meio, cpf_cnpj: document.getElementById('pg-cpf-cnpj').value.trim() };
+        if (meio === 'cartao') {
+          corpo.cartao_numero = document.getElementById('pg-cartao-numero').value.trim();
+          corpo.cartao_nome = document.getElementById('pg-cartao-nome').value.trim();
+          corpo.cartao_cvv = document.getElementById('pg-cartao-cvv').value.trim();
+          corpo.cartao_validade_mes = document.getElementById('pg-cartao-mes').value.trim();
+          corpo.cartao_validade_ano = document.getElementById('pg-cartao-ano').value.trim();
+          corpo.telefone = document.getElementById('pg-telefone').value.trim();
+          corpo.endereco = {
+            cep: document.getElementById('pg-cep').value.trim(),
+            numero: document.getElementById('pg-numero').value.trim(),
+            logradouro: document.getElementById('pg-logradouro').value.trim(),
+            complemento: document.getElementById('pg-complemento').value.trim(),
+            bairro: document.getElementById('pg-bairro').value.trim(),
+            cidade: document.getElementById('pg-cidade').value.trim(),
+            uf: document.getElementById('pg-uf').value.trim(),
+          };
+        }
+
+        const btn = document.getElementById('confirmar-pagamento');
+        btn.disabled = true;
+        const res = await apiFetch('/crm/api/pagamentos/cadastrar', { method: 'POST', body: JSON.stringify(corpo) });
+        const dados = await res.json();
+        if (!res.ok) { msg.textContent = dados.error || 'Falha ao processar pagamento'; btn.disabled = false; return; }
+        fecharModal();
+        pagamento = dados;
+        renderizarPlanos();
+        renderizarCobranca();
+        renderizarHistorico();
+        avisar('Assinatura confirmada', `Você está no plano ${escapeHtml(plano.nome)}.`);
+      });
+    }
+
+    carregar();
+  </script>
+</body>
+</html>
