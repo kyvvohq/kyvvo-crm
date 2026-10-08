@@ -107,12 +107,6 @@
       </div>
 
       <div class="card card-importacao">
-        <h2>Pedidos (UpSeller)</h2>
-        <p class="modal-texto">Relatório de NF-e exportado do UpSeller (.xlsx).</p>
-        <button type="button" class="ds-btn ds-btn-primario" id="btn-importar-upseller">Importar UpSeller</button>
-      </div>
-
-      <div class="card card-importacao">
         <h2>Pedidos (NF-e)</h2>
         <p class="modal-texto">Um ou mais arquivos XML de NF-e — concilia com pedido existente pelo número, ou cria um novo.</p>
         <button type="button" class="ds-btn ds-btn-primario" id="btn-importar-nfe">Importar NF-e</button>
@@ -131,6 +125,7 @@
       { campo: 'telefone', label: 'Telefone (WhatsApp)' },
       { campo: 'email', label: 'E-mail' },
       { campo: 'cpf', label: 'CPF' },
+      { campo: 'data_nascimento', label: 'Data de nascimento' },
       { campo: 'cidade', label: 'Cidade' },
       { campo: 'uf', label: 'UF' },
       { campo: 'segmento', label: 'Segmento' },
@@ -311,48 +306,6 @@
         }
         btn.disabled = false;
         btn.textContent = 'Importar';
-      });
-    });
-
-    // --- Importar relatório de pedidos da UpSeller (movida de Pedidos) ------
-    document.getElementById('btn-importar-upseller').addEventListener('click', () => {
-      abrirModal('<h3>Importar pedidos (UpSeller)</h3>', `
-        <p class="modal-texto">Selecione o relatório de NF-e exportado do UpSeller (.xlsx). Cria um pedido por nota — devolução de mercadoria é ignorada. Reimportar o mesmo arquivo não duplica.</p>
-        <div class="ds-form">
-          <div class="ds-campo"><label class="ds-rotulo" for="up-arquivo">Arquivo</label><input type="file" id="up-arquivo" accept=".xlsx"></div>
-          <div id="up-resultado" style="margin-top:12px"></div>
-          <div class="modal-erro" id="up-erro"></div>
-          <div class="ds-form-acoes">
-            <button type="button" class="ds-btn ds-btn-primario" id="up-importar" disabled>Importar</button>
-          </div>
-        </div>
-      `, 'modal-card-larga');
-
-      document.getElementById('up-arquivo').addEventListener('change', (e) => {
-        document.getElementById('up-importar').disabled = !e.target.files.length;
-      });
-
-      document.getElementById('up-importar').addEventListener('click', async () => {
-        const arquivo = document.getElementById('up-arquivo').files[0];
-        if (!arquivo) return;
-        const btn = document.getElementById('up-importar');
-        btn.disabled = true;
-        btn.textContent = 'Importando…';
-        const formData = new FormData();
-        formData.append('arquivo', arquivo);
-        const res = await apiFetch('/crm/api/importacoes/upseller', { method: 'POST', body: formData });
-        const dados = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          document.getElementById('up-erro').textContent = dados.error || 'Falha ao importar';
-          btn.disabled = false;
-          btn.textContent = 'Importar';
-          return;
-        }
-        document.getElementById('up-resultado').innerHTML = `
-          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> já existente(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
-          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
-        `;
-        btn.hidden = true;
       });
     });
   </script>

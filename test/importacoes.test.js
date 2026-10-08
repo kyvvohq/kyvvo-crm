@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCsv, parseNfeXml, importarNfe, mapearLinhasUpseller } = require('../lib/importacoes');
+const { parseCsv, parseNfeXml, importarNfe } = require('../lib/importacoes');
 
 // Pool falso: decide a resposta pelo texto da query, o bastante pra exercitar
 // os três caminhos de importarNfe sem precisar de Postgres de verdade.
@@ -85,25 +85,6 @@ test('importarNfe: devolução de mercadoria é ignorada sem tocar no banco', as
   const resultado = await importarNfe(pool, 'tenant-1', { eh_devolucao: true }, 'nota.xml');
   assert.deepEqual(resultado, { status: 'devolucao_ignorada' });
   assert.equal(chamado.valor, false, 'não deveria conectar no banco pra uma devolução');
-});
-
-test('mapearLinhasUpseller: mapeia colunas reais do relatório e ignora devolução na contagem de tipo', () => {
-  const linhas = [
-    ['Conta da Nota Fiscal', 'Nº de Série', 'Nº da NF-e', 'Nº de Pedido', 'Chave', 'Tipo', 'Cliente', 'Destinatário', 'CEP', 'Valor da Nota Fiscal', 'Data'],
-    ['BASIC 3D PRINT LTDA', '3', '4883', 'UP2RL6028245', '3126...661', 'normal', 'Joselito Henfrsin', 'SC', '88837000', '16.87', '2026-08-01 00:08:46'],
-    ['BASIC 3D PRINT LTDA', '3', '5043', 'UP2RL6027838', '3126...931', 'return', 'Lucas Martinez', 'SP', '15503019', '-42.85', '2026-08-06 13:15:32'],
-  ];
-  const mapeadas = mapearLinhasUpseller(linhas);
-  assert.equal(mapeadas.length, 2);
-  assert.deepEqual(mapeadas[0], {
-    tipo: 'normal', identificador_externo: 'UP2RL6028245', chave_nfe: '3126...661',
-    cliente: 'Joselito Henfrsin', uf: 'SC', cep: '88837000', valor_total: 16.87, data: '2026-08-01 00:08:46',
-  });
-  assert.equal(mapeadas[1].tipo, 'return');
-});
-
-test('mapearLinhasUpseller: colunas erradas lançam erro claro', () => {
-  assert.throws(() => mapearLinhasUpseller([['Coluna A', 'Coluna B']]), /não parece ser o relatório/);
 });
 
 test('importarNfe: concilia com pedido existente pelo número do pedido, não cria cliente novo', async () => {

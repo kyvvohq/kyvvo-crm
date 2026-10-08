@@ -14,7 +14,7 @@ const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
-const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano, importarRelatorioUpseller } = require('./lib/importacoes');
+const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, checarConversasParaRetomar } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
@@ -922,28 +922,6 @@ async function build() {
     const { rows } = await pool.query('select * from crm_importacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     if (!rows[0]) return reply.code(404).send({ error: 'Importação não encontrada' });
     return rows[0];
-  });
-
-  // Relatório de pedidos da UpSeller (Excel) — colunas fixas, sem tela de
-  // mapeamento (schema confirmado com arquivo real, ver lib/importacoes.js).
-  fastify.post('/crm/api/importacoes/upseller', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { tenantId } = request.user;
-    let arquivoBuffer = null, nomeArquivo = null;
-    for await (const part of request.parts()) {
-      if (part.type === 'file') {
-        arquivoBuffer = await part.toBuffer();
-        nomeArquivo = part.filename;
-      }
-    }
-    if (!arquivoBuffer) return reply.code(400).send({ error: 'Arquivo é obrigatório' });
-
-    let resultado;
-    try {
-      resultado = await importarRelatorioUpseller(pool, tenantId, arquivoBuffer, nomeArquivo || 'relatorio.xlsx');
-    } catch (erro) {
-      return reply.code(400).send({ error: erro.message });
-    }
-    return reply.code(201).send(resultado);
   });
 
   // --- Etapas (config do funil, editável direto no quadro — mesmo padrão do
