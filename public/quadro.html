@@ -763,8 +763,18 @@
         <p class="modal-texto">${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
 
         ${ehOrigemPropria(p.origem) ? `
-        <div class="banner-assinatura" style="margin-top:12px">
+        <div class="banner-assinatura" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" id="banner-recompra-pedido">
           <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
+          <button type="button" id="btn-fechar-banner-recompra" aria-label="Fechar aviso" style="background:none;border:none;cursor:pointer;flex-shrink:0;display:flex;color:inherit;opacity:.7">${icon('x', 16)}</button>
+        </div>` : ''}
+
+        ${Array.isArray(p.itens) && p.itens.length ? `
+        <div class="card" style="padding:10px 14px;margin-top:12px">
+          ${p.itens.map((it) => {
+            const q = Number(it.quantidade) || 1;
+            const qtdTexto = Number.isInteger(q) ? q : q.toLocaleString('pt-BR');
+            return `<p class="modal-texto" style="margin:0 0 4px">${qtdTexto}× ${escapeHtml(it.descricao || 'Item')}</p>`;
+          }).join('')}
         </div>` : ''}
 
         <div class="ds-form">
@@ -801,7 +811,7 @@
             </div>
             <div class="ds-campo"><label class="ds-rotulo" for="d-recebido">Valor recebido</label><input class="ds-input" id="d-recebido" inputmode="decimal"></div>
           </div>
-          <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
+          <p class="modal-texto">Frete: ${formatarMoeda(p.frete)}${p.frete_pago ? ' <span class="badge sucesso">pago</span>' : ''} · Valor total: ${formatarMoeda(p.valor_total)}</p>
 
           <div class="modal-erro" id="d-erro"></div>
           <div class="ds-form-acoes">
@@ -814,6 +824,13 @@
       const campoRecebido = document.getElementById('d-recebido');
       campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       aplicarMascaraMoeda(campoRecebido);
+
+      const btnFecharBannerRecompra = document.getElementById('btn-fechar-banner-recompra');
+      if (btnFecharBannerRecompra) {
+        btnFecharBannerRecompra.addEventListener('click', () => {
+          document.getElementById('banner-recompra-pedido').remove();
+        });
+      }
 
       document.getElementById('btn-salvar-detalhe').addEventListener('click', async () => {
         const novoNome = document.getElementById('d-cliente-nome').value.trim();
