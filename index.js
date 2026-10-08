@@ -1362,7 +1362,7 @@ async function build() {
   // informativo.
   fastify.patch('/crm/api/pedidos/:id/entrega', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['data_entrega', 'tipo_entrega', 'frete', 'frete_pago', 'observacoes'];
+    const campos = ['data_entrega', 'data_emissao_nf', 'tipo_entrega', 'frete', 'frete_pago', 'observacoes'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
