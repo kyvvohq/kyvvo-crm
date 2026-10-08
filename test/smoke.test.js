@@ -4,8 +4,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-process.env.CRM_JWT_SECRET = process.env.CRM_JWT_SECRET || 'segredo-de-teste';
-
 const { build } = require('../index');
 
 test('GET /crm/api/saude responde ok', async () => {

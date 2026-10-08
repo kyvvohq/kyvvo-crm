@@ -165,6 +165,7 @@
         if (!res.ok) { erroGeral.textContent = data.error || 'Erro ao criar conta. Tente novamente.'; return; }
         localStorage.setItem('crm_token', data.token);
         localStorage.setItem('crm_nome', data.nome || '');
+        localStorage.setItem('crm_outros_produtos', JSON.stringify(data.outros_produtos || []));
         window.location.href = data.onboarding_pendente ? '/crm/onboarding.html' : '/crm/painel.html';
       } catch (err) {
         erroGeral.textContent = 'Erro ao processar. Tente novamente.';

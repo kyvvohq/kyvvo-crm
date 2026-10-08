@@ -3,7 +3,6 @@ require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const Fastify = require('fastify');
-const fastifyJwt = require('@fastify/jwt');
 const fastifyStatic = require('@fastify/static');
 const fastifyMultipart = require('@fastify/multipart');
 
@@ -29,20 +28,22 @@ const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
 } = require('./lib/notificacoes');
+const platform = require('./lib/platform');
+const { resolverClaims } = require('./lib/resolver-sessao');
 
 const PORT = process.env.PORT || 3005;
 
 // Identidade/sessão: kyvvo-platform, mesmo serviço que Studio e People usam
-// (endereço interno na rede do compose). Ver kyvvo-people/index.js — mesmo
-// padrão: o CRM nunca vê/toca usuarios/tenants diretamente, só confia numa
-// checagem servidor-a-servidor e emite seu próprio JWT interno depois.
+// (endereço interno na rede do compose). O token RS256 do platform é a
+// própria sessão (corte unificado) — o CRM não assina mais JWT nenhum.
 const PLATFORM_URL = process.env.PLATFORM_URL || 'http://platform:3003';
 
 // "Trocar de produto" no menu de perfil: outros produtos Kyvvo que o mesmo
 // tenant também tem ativo (ex.: um salão que também usa o CRM). Resolvido
 // uma vez no login (não a cada request) usando o token RS256 do kyvvo-
-// platform que já temos em mãos naquele momento — o CRM nunca guarda esse
-// token, só o resultado já filtrado, embutido no próprio JWT do CRM.
+// platform que já temos em mãos naquele momento — o resultado já filtrado
+// vai pro front, que cacheia em localStorage (o token RS256 do platform em
+// si não carrega mais essa lista).
 const PRODUTOS_CRUZADOS_CRM = {
   agenda_inteligente: { chave: 'studio', nome: 'Studio', url: 'https://studio.kyvvo.com.br' },
   people: { chave: 'people', nome: 'People', url: 'https://people.kyvvo.com.br' },
@@ -61,14 +62,21 @@ const PRODUTOS_HANDOFF_DESTINO = {
 async function build() {
   const fastify = Fastify({ logger: true });
 
-  fastify.register(fastifyJwt, { secret: process.env.CRM_JWT_SECRET });
-
+  // Sessão não é mais JWT local assinado pelo CRM: o kyvvo-platform é a
+  // única autoridade de auth (mesmo corte já feito no Studio/People) —
+  // token RS256 verificado local via @kyvvohq/platform-client (JWKS, sem
+  // round-trip). CRM não tem token_version/role nem bloqueio por
+  // assinatura local (não é regressão — o JWT de 12h anterior também não
+  // tinha revogação nenhuma).
   fastify.decorate('authenticate', async (request, reply) => {
-    try {
-      await request.jwtVerify();
-    } catch {
+    const claims = await resolverClaims({
+      authorizationHeader: request.headers.authorization,
+      verificarRs256: (token) => platform.verifyToken(token),
+    });
+    if (!claims) {
       return reply.code(401).send({ error: 'Não autenticado' });
     }
+    request.user = claims;
   });
 
   fastify.register(fastifyStatic, {
@@ -389,12 +397,12 @@ async function build() {
       const dados = await loginRes.json().catch(() => ({}));
       return reply.code(401).send({ error: dados.error || 'E-mail ou senha inválidos' });
     }
-    const { token: kyvvoToken, nome } = await loginRes.json();
+    const { token, nome } = await loginRes.json();
 
     let acessoRes;
     try {
       acessoRes = await fetch(`${PLATFORM_URL}/api/auth/crm/acesso`, {
-        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
@@ -406,17 +414,6 @@ async function build() {
     }
     const { tenantId } = await acessoRes.json();
 
-    // userId vem do payload do token do platform (RS256, confiamos na
-    // resposta HTTPS do próprio serviço que acabamos de chamar — mesmo
-    // princípio do register mais abaixo) — precisa dele pra registrar quem
-    // fez uma ação sensível (ex.: ator do sorteio, seção 7.5 do doc).
-    let userId;
-    try {
-      userId = JSON.parse(Buffer.from(kyvvoToken.split('.')[1], 'base64url').toString('utf8')).userId;
-    } catch {
-      userId = null;
-    }
-
     await inicializarEtapasPadrao(pool, tenantId);
     await inicializarModelosPadrao(pool, tenantId);
     const onboardingPendente = await tenantPrecisaOnboarding(pool, tenantId);
@@ -426,7 +423,7 @@ async function build() {
     let outrosProdutos = [];
     try {
       const entRes = await fetch(`${PLATFORM_URL}/entitlements/${tenantId}`, {
-        headers: { Authorization: `Bearer ${kyvvoToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(8000),
       });
       if (entRes.ok) {
@@ -437,8 +434,7 @@ async function build() {
       request.log.warn(`Falha ao buscar outros produtos do tenant: ${err.message}`);
     }
 
-    const token = fastify.jwt.sign({ tenantId, userId, email, nome, outrosProdutos }, { expiresIn: '12h' });
-    return { token, nome, onboarding_pendente: onboardingPendente };
+    return { token, nome, outros_produtos: outrosProdutos, onboarding_pendente: onboardingPendente };
   });
 
   // "Trocar de produto" (menu de perfil) — gera um código de handoff de
@@ -446,21 +442,21 @@ async function build() {
   // sessão já autenticada (ver GET /crm/sso abaixo e o par simétrico em
   // kyvvo-studio/kyvvo-people).
   fastify.post('/crm/api/meus-produtos/handoff', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const produtoDestino = (request.body || {}).produto;
+    const { produto: produtoDestino, nome: nomeBody, outrosProdutos: outrosProdutosBody } = request.body || {};
     const destino = PRODUTOS_HANDOFF_DESTINO[produtoDestino];
     if (!destino) {
       return reply.code(400).send({ error: 'Produto inválido' });
     }
-    const { tenantId, userId, email, nome } = request.user;
-    // outrosProdutos do PONTO DE VISTA DO DESTINO (bug real em produção,
-    // 2026-09-30) — o CRM não tem como consultar /entitlements aqui (o token
-    // RS256 do platform só existe no momento do login, já descartado), mas
-    // já tem a resposta de quando logou, embutida no próprio JWT
-    // (request.user.outrosProdutos) — só repassa, tirando o destino da
-    // lista (ele não precisa linkar pra si mesmo). Pode estar levemente
-    // desatualizado (até 12h, mesma janela do token) — aceitável, mesmo
+    const { tenantId, userId, email } = request.user;
+    // nome e outrosProdutos do PONTO DE VISTA DO DESTINO (bug real em
+    // produção, 2026-09-30) — o token RS256 do platform não carrega mais
+    // esses campos (corte de sessão unificado), então o front manda o que
+    // já tem cacheado em localStorage desde o login (ver public/shell.js) —
+    // tira o destino da lista de outros produtos (ele não precisa linkar
+    // pra si mesmo). Pode estar levemente desatualizado — aceitável, mesmo
     // trade-off já feito pro resto do "trocar de produto".
-    const outrosProdutos = (request.user.outrosProdutos || []).filter((p) => p.chave !== produtoDestino);
+    const nome = nomeBody || '';
+    const outrosProdutos = (outrosProdutosBody || []).filter((p) => p.chave !== produtoDestino);
     try {
       const res = await fetch(`${PLATFORM_URL}/internal/handoff`, {
         method: 'POST',
@@ -494,17 +490,17 @@ async function build() {
       const res = await fetch(`${PLATFORM_URL}/internal/handoff/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_HANDOFF_TOKEN },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, emitirToken: true }),
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return reply.redirect('/crm/login.html');
-      const { tenantId, userId, email, nome, outrosProdutos } = await res.json();
+      const { nome, outrosProdutos, token } = await res.json();
 
-      const token = fastify.jwt.sign({ tenantId, userId, email, nome, outrosProdutos: outrosProdutos || [] }, { expiresIn: '12h' });
       reply.type('text/html');
       return `<!doctype html><html><body><script>
         localStorage.setItem('crm_token', ${JSON.stringify(token)});
         localStorage.setItem('crm_nome', ${JSON.stringify(nome || '')});
+        localStorage.setItem('crm_outros_produtos', ${JSON.stringify(JSON.stringify(outrosProdutos || []))});
         location.href = '/crm/painel.html';
       </script></body></html>`;
     } catch (err) {
@@ -534,11 +530,8 @@ async function build() {
     if (!platformRes.ok) return reply.code(platformRes.status).send(dados);
 
     let tenantId;
-    let userId;
     try {
-      const payload = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8'));
-      tenantId = payload.tenantId;
-      userId = payload.userId;
+      tenantId = JSON.parse(Buffer.from(dados.token.split('.')[1], 'base64url').toString('utf8')).tenantId;
     } catch (err) {
       request.log.error(`Conta criada no platform mas não consegui ler o tenantId do token: ${err.message}`);
       return reply.code(502).send({ error: 'Conta criada, mas não foi possível iniciar sua sessão. Faça login manualmente.' });
@@ -547,8 +540,7 @@ async function build() {
     await inicializarEtapasPadrao(pool, tenantId);
     await inicializarModelosPadrao(pool, tenantId);
     const onboardingPendente = await tenantPrecisaOnboarding(pool, tenantId);
-    const token = fastify.jwt.sign({ tenantId, userId, email: dados.email, nome: dados.nome }, { expiresIn: '12h' });
-    return reply.code(201).send({ token, nome: dados.nome, onboarding_pendente: onboardingPendente });
+    return reply.code(201).send({ token: dados.token, nome: dados.nome, outros_produtos: [], onboarding_pendente: onboardingPendente });
   });
 
   // --- Plano e cobrança --------------------------------------------------------
@@ -591,9 +583,12 @@ async function build() {
   });
 
   fastify.post('/crm/api/pagamentos/cadastrar', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { tenantId, email, nome } = request.user;
+    const { tenantId, email } = request.user;
+    // `nome` não vem mais no token RS256 (corte de sessão unificado) — o
+    // front manda, cacheado em localStorage desde o login (ver public/
+    // plano-cobranca.html).
     const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${tenantId}/cadastrar`, {
-      method: 'POST', body: { ...request.body, email, nome }, reply,
+      method: 'POST', body: { ...request.body, email }, reply,
     });
     if (dados) return dados;
   });

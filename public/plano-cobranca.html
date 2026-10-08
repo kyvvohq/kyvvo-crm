@@ -341,7 +341,7 @@
         msg.textContent = '';
         const meio = meioSelecionado;
 
-        const corpo = { plano: planoChave, meio, cpf_cnpj: document.getElementById('pg-cpf-cnpj').value.trim() };
+        const corpo = { plano: planoChave, meio, cpf_cnpj: document.getElementById('pg-cpf-cnpj').value.trim(), nome: localStorage.getItem('crm_nome') || '' };
         if (meio === 'cartao') {
           corpo.cartao_numero = document.getElementById('pg-cartao-numero').value.trim();
           corpo.cartao_nome = document.getElementById('pg-cartao-nome').value.trim();
