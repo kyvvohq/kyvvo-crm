@@ -19,6 +19,7 @@ async function apiFetch(url, opts = {}) {
   if (res.status === 401) {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_nome');
+    localStorage.removeItem('crm_outros_produtos');
     window.location.href = '/crm/login.html';
     throw new Error('Sessão expirada');
   }
@@ -143,19 +144,26 @@ document.querySelectorAll('.js-avatar-usuario').forEach((el) => { el.textContent
 document.querySelectorAll('.js-nome-usuario').forEach((el) => { el.textContent = nomeUsuario; });
 
 let emailUsuario = '';
-let outrosProdutosUsuario = [];
 try {
-  const payloadToken = JSON.parse(atob(token.split('.')[1]));
-  emailUsuario = payloadToken.email || '';
-  outrosProdutosUsuario = payloadToken.outrosProdutos || [];
+  emailUsuario = JSON.parse(atob(token.split('.')[1])).email || '';
 } catch {
   emailUsuario = '';
 }
 document.querySelectorAll('.js-email-usuario').forEach((el) => { el.textContent = emailUsuario; });
 
 // "Trocar de produto" — outros produtos Kyvvo que o mesmo tenant também tem
-// ativo (embutido no token no login, ver kyvvo-crm/index.js). Logo acima de
-// "Sair da conta" (CRM não tem um item "Meu Perfil" pra ancorar embaixo).
+// ativo. Corte de sessão (RS256 unificado): o token agora é emitido pelo
+// platform e não carrega mais isso — vem separado na resposta do login,
+// cacheado em localStorage (mesmo padrão já usado pra crm_nome), não mais
+// decodificado do token (ver kyvvo-crm/index.js, kyvvo-crm/public/
+// login.html). Logo acima de "Sair da conta" (CRM não tem um item "Meu
+// Perfil" pra ancorar embaixo).
+let outrosProdutosUsuario = [];
+try {
+  outrosProdutosUsuario = JSON.parse(localStorage.getItem('crm_outros_produtos') || '[]');
+} catch {
+  outrosProdutosUsuario = [];
+}
 const menuOutrosProdutos = document.getElementById('menu-perfil-outros-produtos');
 if (menuOutrosProdutos) {
   menuOutrosProdutos.innerHTML = outrosProdutosUsuario
@@ -173,7 +181,7 @@ document.addEventListener('click', (e) => {
   if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   e.preventDefault();
   const destinoDireto = link.href;
-  apiFetch('/crm/api/meus-produtos/handoff', { method: 'POST', body: JSON.stringify({ produto: link.dataset.produtoChave }) })
+  apiFetch('/crm/api/meus-produtos/handoff', { method: 'POST', body: JSON.stringify({ produto: link.dataset.produtoChave, nome: localStorage.getItem('crm_nome') || '', outrosProdutos: outrosProdutosUsuario }) })
     .then((res) => res.json())
     .then((dados) => { window.location.href = (dados && dados.url) || destinoDireto; })
     .catch(() => { window.location.href = destinoDireto; });
@@ -183,6 +191,7 @@ document.querySelectorAll('.btn-sair').forEach((btn) => {
   btn.addEventListener('click', () => {
     localStorage.removeItem('crm_token');
     localStorage.removeItem('crm_nome');
+    localStorage.removeItem('crm_outros_produtos');
     window.location.href = '/crm/login.html';
   });
 });

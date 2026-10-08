@@ -2,11 +2,11 @@ const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
-process.env.CRM_JWT_SECRET = process.env.CRM_JWT_SECRET || 'segredo-de-teste';
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/none';
 
 const { pool } = require('../lib/db');
 const { build } = require('../index');
+const platform = require('../lib/platform');
 
 // Mesmo contrato de /crm/api/clientes e /crm/api/produtos: sem `pagina`
 // devolve array simples (quadro.html precisa do board inteiro de uma vez),
@@ -15,8 +15,12 @@ const { build } = require('../index');
 // prioridade/período) continuam funcionando junto com a paginação e a
 // busca nova por nome de cliente.
 
-async function tokenTenant(app) {
-  return app.jwt.sign({ tenantId: 'tenant-1', userId: 'user-1', email: 'a@b.com', nome: 'Ana' });
+// Sessão é RS256 verificado via @kyvvohq/platform-client (JWKS, sem
+// round-trip) — nos testes, substitui verifyToken por um stub síncrono em
+// vez de bater no kyvvo-platform real.
+async function tokenTenant() {
+  platform.verifyToken = async () => ({ tenantId: 'tenant-1', userId: 'user-1', email: 'a@b.com', tokenVersion: 0 });
+  return 'token-fake';
 }
 
 afterEach(() => {

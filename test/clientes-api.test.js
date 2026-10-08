@@ -2,19 +2,23 @@ const { test, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 process.env.NODE_ENV = 'test';
-process.env.CRM_JWT_SECRET = process.env.CRM_JWT_SECRET || 'segredo-de-teste';
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/none';
 
 const { pool } = require('../lib/db');
 const { build } = require('../index');
+const platform = require('../lib/platform');
 
 // GET /crm/api/clientes é consumido por duas formas: sem `pagina` (picker de
 // cliente em quadro.html/campanhas.html, espera array simples — comportamento
 // antigo, não pode quebrar) e com `pagina`/`tamanho` (tela de Clientes, padrão
 // de listagem do DS — Fase 2 da padronização, espera { dados, total }).
 
-async function tokenTenant(app) {
-  return app.jwt.sign({ tenantId: 'tenant-1', userId: 'user-1', email: 'a@b.com', nome: 'Ana' });
+// Sessão é RS256 verificado via @kyvvohq/platform-client (JWKS, sem
+// round-trip) — nos testes, substitui verifyToken por um stub síncrono em
+// vez de bater no kyvvo-platform real.
+async function tokenTenant() {
+  platform.verifyToken = async () => ({ tenantId: 'tenant-1', userId: 'user-1', email: 'a@b.com', tokenVersion: 0 });
+  return 'token-fake';
 }
 
 afterEach(() => {
