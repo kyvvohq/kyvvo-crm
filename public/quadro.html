@@ -767,6 +767,15 @@
           <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
         </div>` : ''}
 
+        ${Array.isArray(p.itens) && p.itens.length ? `
+        <div class="card" style="padding:10px 14px;margin-top:12px">
+          ${p.itens.map((it) => {
+            const q = Number(it.quantidade) || 1;
+            const qtdTexto = Number.isInteger(q) ? q : q.toLocaleString('pt-BR');
+            return `<p class="modal-texto" style="margin:0 0 4px">${qtdTexto}× ${escapeHtml(it.descricao || 'Item')}</p>`;
+          }).join('')}
+        </div>` : ''}
+
         <div class="ds-form">
           <div class="ds-form-grade">
             <div class="ds-campo"><label class="ds-rotulo" for="d-cliente-nome">Nome do cliente</label><input class="ds-input" id="d-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
@@ -801,7 +810,7 @@
             </div>
             <div class="ds-campo"><label class="ds-rotulo" for="d-recebido">Valor recebido</label><input class="ds-input" id="d-recebido" inputmode="decimal"></div>
           </div>
-          <p class="modal-texto">Valor total: ${formatarMoeda(p.valor_total)}</p>
+          <p class="modal-texto">Frete: ${formatarMoeda(p.frete)}${p.frete_pago ? ' <span class="badge sucesso">pago</span>' : ''} · Valor total: ${formatarMoeda(p.valor_total)}</p>
 
           <div class="modal-erro" id="d-erro"></div>
           <div class="ds-form-acoes">
