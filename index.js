@@ -372,9 +372,6 @@ async function build() {
   });
 
   // --- Auth ----------------------------------------------------------------
-  // POST /api/auth/crm/acesso ainda não existe no kyvvo-platform — precisa
-  // do módulo 'crm' cadastrado lá (ver PR companion em kyvvo-platform e
-  // docs/DECISOES-PENDENTES.md #2 deste repo).
   fastify.post('/crm/api/login', async (request, reply) => {
     const { email, senha } = request.body || {};
     if (!email || !senha) {
@@ -386,7 +383,7 @@ async function build() {
       loginRes = await fetch(`${PLATFORM_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, senha }),
+        body: JSON.stringify({ email, senha, produto: 'crm' }),
         signal: AbortSignal.timeout(8000),
       });
     } catch (err) {
@@ -397,7 +394,20 @@ async function build() {
       const dados = await loginRes.json().catch(() => ({}));
       return reply.code(401).send({ error: dados.error || 'E-mail ou senha inválidos' });
     }
-    const { token, nome } = await loginRes.json();
+    const { token, nome, email_verified: emailVerificado } = await loginRes.json();
+
+    // E-mail não verificado é a causa mais comum do 403 de `/crm/acesso`
+    // logo abaixo (o `authenticate` do platform bloqueia qualquer rota não
+    // whitelisted até confirmar) — checa aqui primeiro, direto da resposta
+    // do login, pra mostrar o motivo real em vez do genérico "não tem
+    // acesso ao módulo". O platform já disparou um novo link de confirmação
+    // nesse mesmo login (fire-and-forget, com cooldown) — ver POST
+    // /api/auth/login em kyvvo-platform/routes/auth.js.
+    if (emailVerificado === false) {
+      return reply.code(403).send({
+        error: 'Seu e-mail não foi verificado. Enviamos uma nova confirmação para o e-mail cadastrado — clique no link para confirmar.',
+      });
+    }
 
     let acessoRes;
     try {
