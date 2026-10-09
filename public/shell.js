@@ -420,7 +420,7 @@ function ehOrigemPropria(origem) {
   return !ORIGENS_MARKETPLACE_PEDIDO.some((m) => o.includes(m));
 }
 
-function abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSalvo }) {
+function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
   const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   const itensPedido = Array.isArray(p.itens) ? p.itens : [];
   const avisoAtivo = !!(configGeral && configGeral.mensagem_aviso_pedido_ativo);
@@ -448,11 +448,6 @@ function abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSa
           <label class="ds-rotulo" for="e-etapa">Etapa</label>
           <div class="ds-select"><select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>${CHEVRON}</div>
         </div>
-        ${recursos ? `
-        <div class="ds-campo">
-          <label class="ds-rotulo" for="e-recurso">Recurso</label>
-          <div class="ds-select"><select id="e-recurso"><option value="">Sem recurso</option>${recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('')}</select>${CHEVRON}</div>
-        </div>` : ''}
         <div class="ds-campo">
           <label class="ds-rotulo" for="e-prioridade">Prioridade</label>
           <div class="ds-select"><select id="e-prioridade">
@@ -537,7 +532,6 @@ function abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSa
       nome: document.getElementById('e-cliente-nome').value.trim(),
       telefone: document.getElementById('e-cliente-telefone').value.trim(),
       etapa: document.getElementById('e-etapa').value,
-      recurso: document.getElementById('e-recurso') ? document.getElementById('e-recurso').value : undefined,
       prioridade: document.getElementById('e-prioridade').value,
       status: document.getElementById('e-status').value,
       recebido: campoRecebido.value,
@@ -583,14 +577,6 @@ function abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSa
         const dados = await res.json().catch(() => ({}));
         document.getElementById('e-erro').textContent = dados.error || 'Falha ao mover etapa';
         return;
-      }
-    }
-    const campoRecurso = document.getElementById('e-recurso');
-    if (campoRecurso) {
-      const novoRecursoId = campoRecurso.value || null;
-      if (novoRecursoId !== (p.recurso_id || null)) {
-        const res = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, { method: 'PATCH', body: JSON.stringify({ recurso_id: novoRecursoId }) });
-        if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atribuir recurso'; return; }
       }
     }
     if (novaPrioridade !== (p.prioridade || null)) {

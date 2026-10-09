@@ -101,7 +101,7 @@
       <div class="ds-abas" data-ds-abas>
         <div class="ds-abas-lista">
           <button type="button" class="ds-aba" id="aba-cadastro-segmentos" aria-controls="painel-cadastro-segmentos" aria-selected="true">Segmentos</button>
-          <button type="button" class="ds-aba" id="aba-cadastro-origens" aria-controls="painel-cadastro-origens" aria-selected="false">Origens</button>
+          <button type="button" class="ds-aba" id="aba-cadastro-origens" aria-controls="painel-cadastro-origens" aria-selected="false">Origem</button>
           <button type="button" class="ds-aba" id="aba-cadastro-tipo-entrega" aria-controls="painel-cadastro-tipo-entrega" aria-selected="false">Tipo de frete</button>
         </div>
 
@@ -115,9 +115,12 @@
 
         <div class="ds-abas-painel" id="painel-cadastro-origens" aria-labelledby="aba-cadastro-origens" hidden>
           <div class="cadastro-aba-topo"><button type="button" class="ds-btn ds-btn-primario" data-novo-opcao="origem" data-label-opcao="Origem">+ Novo</button></div>
-          <p class="modal-texto" style="margin:0 0 12px">Série vincula uma série de NF-e a esta origem — a importação de XML usa isso pra classificar o pedido sozinha (ex.: série 0003 = Shopee).</p>
-          <div class="ds-tabela" role="table" aria-label="Origens" style="--ds-colunas: minmax(0,1fr) 110px 160px 48px">
-            <div class="ds-tabela-cabecalho" role="row"><span role="columnheader">Nome</span><span role="columnheader">Série</span><span role="columnheader">Status</span><span role="columnheader"></span></div>
+          <div class="ds-tabela" role="table" aria-label="Origem" style="--ds-colunas: minmax(0,1fr) 110px 160px 48px">
+            <div class="ds-tabela-cabecalho" role="row">
+              <span role="columnheader">Nome</span>
+              <span role="columnheader" style="display:flex;align-items:center;gap:4px;cursor:help" title="Vincula uma série de NF-e a esta origem — a importação de XML usa isso pra classificar o pedido sozinha (ex.: série 0003 = Shopee).">Série<span data-icon="circle-alert" data-size="13"></span></span>
+              <span role="columnheader">Status</span><span role="columnheader"></span>
+            </div>
             <div id="lista-origens"></div>
           </div>
         </div>

@@ -342,7 +342,7 @@
         if (!res.ok) return;
         p = await res.json();
       }
-      abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSalvo: carregar });
+      abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo: carregar });
     }
 
     // --- Novo pedido (US do Bruno: saiu do Quadro, mora só aqui agora) -------

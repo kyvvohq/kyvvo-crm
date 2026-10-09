@@ -755,7 +755,7 @@
     function abrirDetalhe(pedidoId) {
       const p = pedidos.find((x) => x.id === pedidoId);
       if (!p) return;
-      abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSalvo: carregar });
+      abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo: carregar });
     }
 
     // "Vincular a um cliente" — busca entre clientes JÁ cadastrados (reaproveita
