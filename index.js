@@ -747,14 +747,14 @@ async function build() {
 
   fastify.post('/crm/api/opcoes-cadastro', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { tipo, valor } = request.body || {};
+    const { tipo, valor, serie } = request.body || {};
     if (!TIPOS_OPCAO_CADASTRO.includes(tipo)) return reply.code(400).send({ error: `tipo inválido. Válidos: ${TIPOS_OPCAO_CADASTRO.join(', ')}` });
     if (!valor || !valor.trim()) return reply.code(400).send({ error: 'Valor é obrigatório' });
     const { rows } = await pool.query(
-      `insert into crm_opcoes_cadastro (tenant_id, tipo, valor) values ($1, $2, $3)
-       on conflict (tenant_id, tipo, lower(valor)) do update set ativo = true
+      `insert into crm_opcoes_cadastro (tenant_id, tipo, valor, serie) values ($1, $2, $3, $4)
+       on conflict (tenant_id, tipo, lower(valor)) do update set ativo = true, serie = $4
        returning *`,
-      [tenantId, tipo, valor.trim()]
+      [tenantId, tipo, valor.trim(), serie ? serie.trim() : null]
     );
     return reply.code(201).send(rows[0]);
   });
@@ -772,13 +772,13 @@ async function build() {
     if (!atual[0]) return reply.code(404).send({ error: 'Opção não encontrada' });
     if (atual[0].sistema) return reply.code(400).send({ error: 'Esta opção é usada pelo bot e não pode ser alterada.' });
 
-    const campos = ['valor', 'ativo'];
+    const campos = ['valor', 'ativo', 'serie'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
     for (const campo of campos) {
       if (body[campo] === undefined) continue;
-      params.push(body[campo]);
+      params.push(campo === 'serie' ? (body[campo] ? String(body[campo]).trim() || null : null) : body[campo]);
       sets.push(`${campo} = $${params.length}`);
     }
     if (sets.length === 0) return reply.code(400).send({ error: 'Nenhum campo pra atualizar' });
@@ -1362,7 +1362,7 @@ async function build() {
   // informativo.
   fastify.patch('/crm/api/pedidos/:id/entrega', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const campos = ['data_entrega', 'data_emissao_nf', 'tipo_entrega', 'frete', 'frete_pago', 'observacoes'];
+    const campos = ['data_entrega', 'data_emissao_nf', 'tipo_entrega', 'frete', 'frete_pago', 'observacoes', 'aviso_canal_proprio_fechado'];
     const body = request.body || {};
     const sets = [];
     const params = [request.params.id, tenantId];
@@ -2039,7 +2039,8 @@ async function build() {
   // pelas Notificações, só tocando as colunas desta tela.
   fastify.get('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna
+      `select horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna,
+              mensagem_aviso_pedido, mensagem_aviso_pedido_ativo
        from crm_configuracoes where tenant_id = $1`,
       [request.user.tenantId]
     );
@@ -2049,12 +2050,17 @@ async function build() {
       horario_atendimento_fim: config.horario_atendimento_fim ?? 18,
       bot_retomada_horas: config.bot_retomada_horas ?? 24,
       quadro_dias_ultima_coluna: config.quadro_dias_ultima_coluna ?? 30,
+      mensagem_aviso_pedido: config.mensagem_aviso_pedido ?? '📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.',
+      mensagem_aviso_pedido_ativo: config.mensagem_aviso_pedido_ativo ?? true,
     };
   });
 
   fastify.patch('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
-    const { horario_atendimento_inicio: inicio, horario_atendimento_fim: fim, bot_retomada_horas: retomadaHoras, quadro_dias_ultima_coluna: diasUltimaColuna } = request.body || {};
+    const {
+      horario_atendimento_inicio: inicio, horario_atendimento_fim: fim, bot_retomada_horas: retomadaHoras,
+      quadro_dias_ultima_coluna: diasUltimaColuna, mensagem_aviso_pedido: mensagemAviso, mensagem_aviso_pedido_ativo: mensagemAvisoAtiva,
+    } = request.body || {};
     if (![inicio, fim, retomadaHoras, diasUltimaColuna].every((v) => Number.isInteger(v))) {
       return reply.code(400).send({ error: 'Todos os campos são obrigatórios e precisam ser números inteiros' });
     }
@@ -2064,13 +2070,17 @@ async function build() {
     if (retomadaHoras < 1 || diasUltimaColuna < 1) {
       return reply.code(400).send({ error: 'Tempo de retomada e dias da última coluna precisam ser pelo menos 1' });
     }
+    if (typeof mensagemAviso !== 'string' || !mensagemAviso.trim()) {
+      return reply.code(400).send({ error: 'Mensagem de aviso do pedido é obrigatória' });
+    }
     const { rows } = await pool.query(
-      `insert into crm_configuracoes (tenant_id, horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna, atualizado_em)
-       values ($1, $2, $3, $4, $5, now())
+      `insert into crm_configuracoes (tenant_id, horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo, atualizado_em)
+       values ($1, $2, $3, $4, $5, $6, $7, now())
        on conflict (tenant_id) do update set
-         horario_atendimento_inicio = $2, horario_atendimento_fim = $3, bot_retomada_horas = $4, quadro_dias_ultima_coluna = $5, atualizado_em = now()
-       returning horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna`,
-      [tenantId, inicio, fim, retomadaHoras, diasUltimaColuna]
+         horario_atendimento_inicio = $2, horario_atendimento_fim = $3, bot_retomada_horas = $4, quadro_dias_ultima_coluna = $5,
+         mensagem_aviso_pedido = $6, mensagem_aviso_pedido_ativo = $7, atualizado_em = now()
+       returning horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo`,
+      [tenantId, inicio, fim, retomadaHoras, diasUltimaColuna, mensagemAviso.trim(), !!mensagemAvisoAtiva]
     );
     return rows[0];
   });

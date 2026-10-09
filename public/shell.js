@@ -410,6 +410,219 @@ function pedirMotivoCancelamento() {
   return pedirTexto('Cancelar pedido', 'Por que este pedido está sendo cancelado?', 'ex.: cliente desistiu, duplicado...', 'Cancelar pedido');
 }
 
+// --- Modal de edição de pedido (Quadro + Pedidos, 2026-10-09) ---------------
+// Antes eram duas implementações separadas e divergentes (uma por tela) —
+// agora as duas chamam esta função, só mudando o que fazem depois de salvar
+// (`onSalvo`, normalmente a própria `carregar()` da tela).
+const ORIGENS_MARKETPLACE_PEDIDO = ['shopee', 'tiktok', 'mercado livre', 'mercadolivre', ' ml'];
+function ehOrigemPropria(origem) {
+  const o = ` ${(origem || '').toLowerCase()}`;
+  return !ORIGENS_MARKETPLACE_PEDIDO.some((m) => o.includes(m));
+}
+
+function abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSalvo }) {
+  const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  const itensPedido = Array.isArray(p.itens) ? p.itens : [];
+  const avisoAtivo = !!(configGeral && configGeral.mensagem_aviso_pedido_ativo);
+  const mostrarAviso = avisoAtivo && ehOrigemPropria(p.origem) && !p.aviso_canal_proprio_fechado;
+
+  abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
+    <div class="pedido-resumo">
+      <div class="pedido-meta">
+        <span class="badge">${escapeHtml(p.origem || 'Sem origem')}</span>
+        ${itensPedido.length ? `<span class="pedido-meta-texto">${itensPedido.length} ${itensPedido.length === 1 ? 'item' : 'itens'}</span>` : ''}
+      </div>
+      <div class="pedido-total"><span>Valor do pedido</span><strong>${formatarMoeda(p.valor_total)}</strong></div>
+    </div>
+    ${mostrarAviso ? `
+    <div class="pedido-aviso" id="pedido-aviso-canal-proprio">
+      ${icon('package', 16)}<span>${escapeHtml(configGeral.mensagem_aviso_pedido)}</span>
+      <button type="button" class="pedido-aviso-fechar" id="btn-fechar-pedido-aviso" aria-label="Fechar aviso">${icon('x', 16)}</button>
+    </div>` : ''}
+    <div class="ds-form">
+      <div class="pedido-grade">
+        <div class="ds-campo s2"><label class="ds-rotulo" for="e-cliente-nome">Nome do cliente</label><input class="ds-input" id="e-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
+        <div class="ds-campo s2"><label class="ds-rotulo" for="e-cliente-telefone">Telefone</label><input class="ds-input" id="e-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
+
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="e-etapa">Etapa</label>
+          <div class="ds-select"><select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>${CHEVRON}</div>
+        </div>
+        ${recursos ? `
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="e-recurso">Recurso</label>
+          <div class="ds-select"><select id="e-recurso"><option value="">Sem recurso</option>${recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('')}</select>${CHEVRON}</div>
+        </div>` : ''}
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="e-prioridade">Prioridade</label>
+          <div class="ds-select"><select id="e-prioridade">
+            <option value="">Nenhuma</option>
+            <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
+            <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
+            <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
+            <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
+          </select>${CHEVRON}</div>
+        </div>
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="e-status">Pagamento</label>
+          <div class="ds-select"><select id="e-status">
+            <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
+            <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
+            <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
+          </select>${CHEVRON}</div>
+        </div>
+
+        <div class="ds-campo"><label class="ds-rotulo" for="e-recebido">Valor recebido</label><input class="ds-input" id="e-recebido" inputmode="decimal"></div>
+        <div class="ds-campo">
+          <label class="ds-rotulo" for="e-tipo-entrega">Tipo de frete</label>
+          <div class="ds-select"><select id="e-tipo-entrega"><option value="">Selecione…</option>${tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === p.tipo_entrega ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}</select>${CHEVRON}</div>
+        </div>
+        <div class="ds-campo"><label class="ds-rotulo" for="e-frete">Valor de frete</label><input class="ds-input" id="e-frete" inputmode="decimal" placeholder="0,00"></div>
+        <div class="ds-campo"><label class="ds-rotulo" for="e-entrega">Data de entrega</label><input class="ds-input" id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
+
+        <div class="ds-campo s2"><label class="ds-rotulo" for="e-emissao-nf">Data emissão NF</label><input class="ds-input" id="e-emissao-nf" type="date" value="${p.data_emissao_nf ? p.data_emissao_nf.slice(0, 10) : ''}"></div>
+        <div class="ds-campo s2">
+          <label class="ds-rotulo" for="e-observacoes">Observação</label>
+          <textarea class="ds-textarea" id="e-observacoes" placeholder="opcional">${p.observacoes ? escapeHtml(p.observacoes) : ''}</textarea>
+        </div>
+        <div class="ds-campo s2">
+          <span class="ds-rotulo">Itens do pedido</span>
+          <div class="pedido-itens">
+            ${itensPedido.length ? `
+            <div class="pedido-itens-cabecalho"><span class="col-qtd">Qtd</span><span class="col-desc">Descrição</span></div>
+            <div class="pedido-itens-corpo">
+              ${itensPedido.map((i) => {
+                const qtd = Number(i.quantidade) || 1;
+                const qtdTexto = Number.isInteger(qtd) ? qtd : qtd.toLocaleString('pt-BR');
+                const desc = i.descricao || 'Item sem descrição';
+                return `<div class="pedido-item-linha" title="${escapeHtml(desc)}"><span class="col-qtd">${qtdTexto}×</span><span class="col-desc">${escapeHtml(desc)}</span></div>`;
+              }).join('')}
+            </div>` : '<p class="pedido-itens-vazio">Nenhum item registrado.</p>'}
+          </div>
+        </div>
+      </div>
+      <div class="modal-erro" id="e-erro"></div>
+      <div class="ds-form-acoes">
+        <button type="button" class="ds-btn ds-btn-secundario" id="btn-cancelar-edicao">Cancelar</button>
+        <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-edicao" disabled>Salvar</button>
+      </div>
+    </div>
+  `, 'ds-modal-card-pedido');
+
+  document.getElementById('btn-cancelar-edicao').addEventListener('click', fecharModal);
+
+  const btnFecharAviso = document.getElementById('btn-fechar-pedido-aviso');
+  if (btnFecharAviso) {
+    btnFecharAviso.addEventListener('click', () => {
+      document.getElementById('pedido-aviso-canal-proprio').remove();
+      p.aviso_canal_proprio_fechado = true;
+      apiFetch(`/crm/api/pedidos/${p.id}/entrega`, { method: 'PATCH', body: JSON.stringify({ aviso_canal_proprio_fechado: true }) }).catch(() => {});
+    });
+  }
+
+  const campoRecebido = document.getElementById('e-recebido');
+  campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  aplicarMascaraMoeda(campoRecebido);
+  const campoFreteEdicao = document.getElementById('e-frete');
+  campoFreteEdicao.value = p.frete ? Number(p.frete).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+  aplicarMascaraMoeda(campoFreteEdicao);
+
+  // Salvar começa desabilitado — só libera quando algo muda de verdade
+  // (pedido do Bruno). Snapshot de todos os campos editáveis logo após
+  // aplicar os valores iniciais (inclusive os com máscara de moeda).
+  const formPedido = document.querySelector('.ds-modal-card-pedido .ds-form');
+  const btnSalvar = document.getElementById('btn-salvar-edicao');
+  function lerEstadoForm() {
+    return JSON.stringify({
+      nome: document.getElementById('e-cliente-nome').value.trim(),
+      telefone: document.getElementById('e-cliente-telefone').value.trim(),
+      etapa: document.getElementById('e-etapa').value,
+      recurso: document.getElementById('e-recurso') ? document.getElementById('e-recurso').value : undefined,
+      prioridade: document.getElementById('e-prioridade').value,
+      status: document.getElementById('e-status').value,
+      recebido: campoRecebido.value,
+      tipoEntrega: document.getElementById('e-tipo-entrega').value,
+      frete: campoFreteEdicao.value,
+      entrega: document.getElementById('e-entrega').value,
+      emissaoNf: document.getElementById('e-emissao-nf').value,
+      observacoes: document.getElementById('e-observacoes').value,
+    });
+  }
+  const estadoInicial = lerEstadoForm();
+  const atualizarSalvarHabilitado = () => { btnSalvar.disabled = lerEstadoForm() === estadoInicial; };
+  formPedido.addEventListener('input', atualizarSalvarHabilitado);
+  formPedido.addEventListener('change', atualizarSalvarHabilitado);
+
+  btnSalvar.addEventListener('click', async () => {
+    const novoNome = document.getElementById('e-cliente-nome').value.trim();
+    const novoTelefone = document.getElementById('e-cliente-telefone').value.trim();
+    const novaEtapaId = document.getElementById('e-etapa').value;
+    const novaPrioridade = document.getElementById('e-prioridade').value || null;
+    const novoStatus = document.getElementById('e-status').value;
+    const novoRecebido = valorMoedaParaNumero(campoRecebido);
+
+    // Edita o CLIENTE vinculado, não o pedido — nome/telefone não são
+    // campos de crm_pedidos. Só manda o PATCH se algo mudou de verdade.
+    if (novoNome !== (p.cliente_nome || '') || novoTelefone !== (p.cliente_telefone || '')) {
+      const resCliente = await apiFetch(`/crm/api/clientes/${p.cliente_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ nome: novoNome, telefone: novoTelefone }),
+      });
+      if (!resCliente.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar nome/telefone do cliente'; return; }
+    }
+
+    if (novaEtapaId !== p.etapa_id) {
+      const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
+      let motivoPerda;
+      if (etapaAlvo.tipo === 'perdida') {
+        motivoPerda = await pedirMotivoPerda();
+        if (!motivoPerda) return;
+      }
+      const res = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }) });
+      if (!res.ok) {
+        const dados = await res.json().catch(() => ({}));
+        document.getElementById('e-erro').textContent = dados.error || 'Falha ao mover etapa';
+        return;
+      }
+    }
+    const campoRecurso = document.getElementById('e-recurso');
+    if (campoRecurso) {
+      const novoRecursoId = campoRecurso.value || null;
+      if (novoRecursoId !== (p.recurso_id || null)) {
+        const res = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, { method: 'PATCH', body: JSON.stringify({ recurso_id: novoRecursoId }) });
+        if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atribuir recurso'; return; }
+      }
+    }
+    if (novaPrioridade !== (p.prioridade || null)) {
+      const res = await apiFetch(`/crm/api/pedidos/${p.id}/prioridade`, { method: 'PATCH', body: JSON.stringify({ prioridade: novaPrioridade }) });
+      if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atualizar prioridade'; return; }
+    }
+    const res = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }) });
+    if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar pagamento'; return; }
+
+    const novaEntrega = document.getElementById('e-entrega').value || null;
+    const novaEmissaoNf = document.getElementById('e-emissao-nf').value || null;
+    const novoTipoEntrega = document.getElementById('e-tipo-entrega').value || null;
+    const novoFrete = valorMoedaParaNumero(campoFreteEdicao) || null;
+    const novaObservacao = document.getElementById('e-observacoes').value.trim() || null;
+    const entregaMudou = novaEntrega !== (p.data_entrega ? p.data_entrega.slice(0, 10) : null)
+      || novaEmissaoNf !== (p.data_emissao_nf ? p.data_emissao_nf.slice(0, 10) : null)
+      || novoTipoEntrega !== (p.tipo_entrega || null)
+      || novoFrete !== (p.frete != null ? Number(p.frete) : null)
+      || novaObservacao !== (p.observacoes || null);
+    if (entregaMudou) {
+      const resEntrega = await apiFetch(`/crm/api/pedidos/${p.id}/entrega`, {
+        method: 'PATCH',
+        body: JSON.stringify({ data_entrega: novaEntrega, data_emissao_nf: novaEmissaoNf, tipo_entrega: novoTipoEntrega, frete: novoFrete, observacoes: novaObservacao }),
+      });
+      if (!resEntrega.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar dados de entrega'; return; }
+    }
+
+    fecharModal();
+    if (onSalvo) onSalvo();
+  });
+}
+
 // --- Ações rápidas por cliente (Painel Hoje: Aniversariantes do mês e
 // Pagamentos pendentes, pedido do Bruno 2026-10-03) — 3 ícones: WhatsApp
 // direto (wa.me), conversa pelo próprio CRM (abrirModalConversa, movida de
