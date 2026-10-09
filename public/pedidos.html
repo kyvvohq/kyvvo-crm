@@ -14,44 +14,6 @@
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
   .ds-filtros-pedidos-data { display:flex; align-items:center; gap:6px; }
-  .lista-itens-pedido { border:1px solid var(--border); border-radius:var(--radius-md); padding:2px 10px; margin-top:6px; }
-  .linha-item-pedido { padding:7px 0; border-top:1px solid var(--border); font-size:13px; color:var(--text-secondary); }
-  .linha-item-pedido:first-child { border-top:none; }
-
-  /* Modal de edição do pedido — 4 colunas, sem barra de rolagem em desktop */
-  .ds-modal-card-pedido { max-width:780px; max-height:96vh; padding:var(--space-5) var(--space-6) var(--space-5); }
-  .ds-modal-card-pedido .ds-modal-titulo { font-size:20px; }
-  .ds-modal-card-pedido .ds-modal-corpo { margin-top:var(--space-3); }
-  .pedido-resumo { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); margin-bottom:var(--space-4); }
-  .pedido-meta { display:flex; align-items:center; gap:var(--space-2); min-width:0; }
-  .pedido-meta-texto { font-size:13px; color:var(--muted-strong); }
-  .pedido-total { display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; }
-  .pedido-total span { font-size:12px; color:var(--muted-strong); }
-  .pedido-total strong { font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--text); letter-spacing:-.01em; }
-  .pedido-aviso { display:flex; align-items:center; gap:8px; margin-bottom:var(--space-4); padding:8px 12px; border-radius:var(--radius-md);
-    background:var(--accent-tint); color:var(--accent-strong); font-size:13px; line-height:1.35; }
-  .pedido-aviso svg { flex:none; }
-  .pedido-grade { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:18px 16px; }
-  .pedido-grade > .s2 { grid-column:span 2; }
-  .pedido-grade .ds-rotulo { margin:0; }
-  .pedido-grade .ds-textarea { height:100px; min-height:0; resize:none; }
-  .pedido-itens { height:100px; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius-md);
-    background:var(--surface-muted); overflow:hidden; }
-  .pedido-itens ul { list-style:none; margin:0; padding:0; }
-  .pedido-itens li { padding:2px 0; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .pedido-itens li + li { border-top:1px solid var(--border); }
-  .pedido-itens-mais, .pedido-itens-vazio { margin:1px 0 0; font-size:12px; color:var(--muted-strong); }
-  .ds-modal-card-pedido .modal-erro:empty { min-height:0; margin:0; }
-  .ds-modal-card-pedido .modal-erro { margin-top:10px; }
-  .ds-modal-card-pedido .ds-form { gap:var(--space-5); }
-  @media (max-width:720px) {
-    .pedido-grade { grid-template-columns:repeat(2, minmax(0,1fr)); }
-    .ds-modal-card-pedido { padding:var(--space-5) var(--space-4); }
-  }
-  @media (max-width:380px) {
-    .pedido-grade { grid-template-columns:minmax(0,1fr); }
-    .pedido-grade > .s2 { grid-column:auto; }
-  }
 </style>
 </head>
 <body>
@@ -174,7 +136,7 @@
         </div>
         <div class="ds-tabela-cabecalho" role="row">
           <span role="columnheader">Cliente</span><span role="columnheader">Etapa</span><span role="columnheader">Prioridade</span>
-          <span role="columnheader">Pagamento</span><span role="columnheader">Valor do pedido</span><span role="columnheader">Data do pedido</span>
+          <span role="columnheader">Pagamento</span><span role="columnheader">Valor do pedido</span><span role="columnheader">Data emissão NF</span>
           <span role="columnheader"></span>
         </div>
         <div id="linhas-pedidos"></div>
@@ -193,6 +155,7 @@
     let recursos = [];
     let produtos = [];
     let tiposEntrega = [];
+    let configGeral = {};
     let totalPedidos = 0;
     const estadoPedidos = { pagina: 1, tamanho: 25, busca: '' };
 
@@ -220,12 +183,13 @@
       if (document.getElementById('f-data-inicio').value) params.set('data_inicio', document.getElementById('f-data-inicio').value);
       if (document.getElementById('f-data-fim').value) params.set('data_fim', document.getElementById('f-data-fim').value);
 
-      const [resPedidos, resEtapas, resRecursos, resProdutos, resTiposEntrega] = await Promise.all([
+      const [resPedidos, resEtapas, resRecursos, resProdutos, resTiposEntrega, resConfigGeral] = await Promise.all([
         apiFetch(`/crm/api/pedidos?${params}`),
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
         apiFetch('/crm/api/produtos'),
         apiFetch('/crm/api/opcoes-cadastro?tipo=tipo_entrega'),
+        apiFetch('/crm/api/configuracoes-gerais'),
       ]);
       const corpoPedidos = await resPedidos.json();
       pedidos = corpoPedidos.dados;
@@ -234,6 +198,7 @@
       recursos = await resRecursos.json();
       produtos = await resProdutos.json();
       tiposEntrega = (await resTiposEntrega.json()).filter((o) => o.ativo);
+      configGeral = await resConfigGeral.json();
 
       document.getElementById('f-etapa').innerHTML = '<option value="">Qualquer etapa</option>' + etapas.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
       document.getElementById('f-recurso').innerHTML = '<option value="">Qualquer recurso</option>' + recursos.map((r) => `<option value="${r.id}">${escapeHtml(r.nome)}</option>`).join('');
@@ -292,7 +257,7 @@
           <span role="cell" data-rotulo="Prioridade">${p.prioridade ? `<span class="ds-badge ${BADGE_PRIORIDADE[p.prioridade]} ds-badge-sm">${ROTULO_PRIORIDADE[p.prioridade]}</span>` : '—'}</span>
           <span role="cell" data-rotulo="Pagamento"><span class="ds-badge ${BADGE_PAGAMENTO[p.status_pagamento]} ds-badge-sm">${ROTULO_PAGAMENTO[p.status_pagamento] || p.status_pagamento}</span></span>
           <span role="cell" data-rotulo="Valor">${formatarMoeda(p.valor_total)}</span>
-          <span role="cell" data-rotulo="Data">${formatarData(p.criado_em)}</span>
+          <span role="cell" data-rotulo="Data emissão NF">${formatarData(p.data_emissao_nf || p.criado_em)}</span>
           <span role="cell">
             <div class="ds-acoes" data-id="${p.id}">
               <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações do pedido de ${escapeHtml(p.cliente_nome)}">⋯</button>
@@ -366,43 +331,10 @@
       });
     }
 
-    // --- Editar pedido (etapa/recurso/prioridade/pagamento, mesmo shape do
-    // modal de detalhe do Quadro) ---------------------------------------------
-    const ORIGENS_MARKETPLACE = ['shopee', 'tiktok', 'mercado livre', 'mercadolivre', ' ml'];
-    function ehOrigemPropria(origem) {
-      const o = ` ${(origem || '').toLowerCase()}`;
-      return !ORIGENS_MARKETPLACE.some((m) => o.includes(m));
-    }
-
-    function pedirMotivoPerda() {
-      return new Promise((resolve) => {
-        const overlay = abrirModal('<h3>Motivo da perda</h3>', `
-          <div class="ds-form">
-            <div class="ds-campo"><label class="ds-rotulo" for="motivo-perda-texto">Por que este pedido foi perdido?</label><textarea class="ds-textarea" id="motivo-perda-texto" placeholder="ex.: cliente desistiu, não respondeu, preço..."></textarea></div>
-            <div class="modal-erro" id="motivo-perda-erro"></div>
-            <div class="ds-form-acoes">
-              <button type="button" class="ds-btn ds-btn-secundario" id="motivo-perda-cancelar">Cancelar</button>
-              <button type="button" class="ds-btn ds-btn-perigo" id="motivo-perda-confirmar">Marcar como perdido</button>
-            </div>
-          </div>
-        `);
-        let resolvido = false;
-        const finalizar = (valor) => { if (!resolvido) { resolvido = true; resolve(valor); } };
-        document.getElementById('motivo-perda-cancelar').addEventListener('click', () => { finalizar(null); fecharModal(); });
-        document.getElementById('motivo-perda-confirmar').addEventListener('click', () => {
-          const texto = document.getElementById('motivo-perda-texto').value.trim();
-          if (!texto) { document.getElementById('motivo-perda-erro').textContent = 'Motivo é obrigatório'; return; }
-          finalizar(texto);
-          fecharModal();
-        });
-        overlay.querySelector('#modal-close').addEventListener('click', () => finalizar(null));
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) finalizar(null); });
-      });
-    }
-
     // Pedido pode não estar na página carregada (lista agora é paginada) —
     // busca individualmente nesse caso, usado sobretudo pelo link direto
-    // ?abrir_pedido=<id> vindo do Painel Hoje.
+    // ?abrir_pedido=<id> vindo do Painel Hoje. Modal em si é compartilhado
+    // com o Quadro — ver abrirModalPedido em shell.js.
     async function abrirEdicaoPedido(pedidoId) {
       let p = pedidos.find((x) => x.id === pedidoId);
       if (!p) {
@@ -410,148 +342,7 @@
         if (!res.ok) return;
         p = await res.json();
       }
-      const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
-      const itensPedido = Array.isArray(p.itens) ? p.itens : [];
-      const MAX_ITENS_VISIVEIS = 3;
-      const linhasItens = itensPedido.slice(0, MAX_ITENS_VISIVEIS).map((i) => {
-        const txt = `${i.quantidade}× ${i.descricao || 'Item sem descrição'}`;
-        return `<li title="${escapeHtml(txt)}">${escapeHtml(txt)}</li>`;
-      }).join('');
-      const itensExtras = itensPedido.length - MAX_ITENS_VISIVEIS;
-      abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <div class="pedido-resumo">
-          <div class="pedido-meta">
-            <span class="badge">${escapeHtml(p.origem || 'Sem origem')}</span>
-            ${itensPedido.length ? `<span class="pedido-meta-texto">${itensPedido.length} ${itensPedido.length === 1 ? 'item' : 'itens'}</span>` : ''}
-          </div>
-          <div class="pedido-total"><span>Valor do pedido</span><strong>${formatarMoeda(p.valor_total)}</strong></div>
-        </div>
-        ${ehOrigemPropria(p.origem) ? `<div class="pedido-aviso">${icon('package', 16)}<span>Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span></div>` : ''}
-        <div class="ds-form">
-          <div class="pedido-grade">
-            <div class="ds-campo s2"><label class="ds-rotulo" for="e-cliente-nome">Nome do cliente</label><input class="ds-input" id="e-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
-            <div class="ds-campo s2"><label class="ds-rotulo" for="e-cliente-telefone">Telefone</label><input class="ds-input" id="e-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
-
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="e-etapa">Etapa</label>
-              <div class="ds-select"><select id="e-etapa">${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}</select>${CHEVRON}</div>
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="e-prioridade">Prioridade</label>
-              <div class="ds-select"><select id="e-prioridade">
-                <option value="">Nenhuma</option>
-                <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
-                <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
-                <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
-                <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
-              </select>${CHEVRON}</div>
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="e-status">Pagamento</label>
-              <div class="ds-select"><select id="e-status">
-                <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
-                <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
-                <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
-              </select>${CHEVRON}</div>
-            </div>
-            <div class="ds-campo"><label class="ds-rotulo" for="e-recebido">Valor recebido</label><input class="ds-input" id="e-recebido" inputmode="decimal"></div>
-
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="e-tipo-entrega">Tipo de frete</label>
-              <div class="ds-select"><select id="e-tipo-entrega"><option value="">Selecione…</option>${tiposEntrega.map((o) => `<option value="${escapeHtml(o.valor)}" ${o.valor === p.tipo_entrega ? 'selected' : ''}>${escapeHtml(o.valor)}</option>`).join('')}</select>${CHEVRON}</div>
-            </div>
-            <div class="ds-campo"><label class="ds-rotulo" for="e-frete">Valor de frete</label><input class="ds-input" id="e-frete" inputmode="decimal" placeholder="0,00"></div>
-            <div class="ds-campo"><label class="ds-rotulo" for="e-entrega">Data de entrega</label><input class="ds-input" id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
-            <div class="ds-campo"><label class="ds-rotulo" for="e-emissao-nf">Data emissão NF</label><input class="ds-input" id="e-emissao-nf" type="date" value="${p.data_emissao_nf ? p.data_emissao_nf.slice(0, 10) : ''}"></div>
-
-            <div class="ds-campo s2">
-              <label class="ds-rotulo" for="e-observacoes">Observação</label>
-              <textarea class="ds-textarea" id="e-observacoes" placeholder="opcional">${p.observacoes ? escapeHtml(p.observacoes) : ''}</textarea>
-            </div>
-            <div class="ds-campo s2">
-              <span class="ds-rotulo">Itens do pedido</span>
-              <div class="pedido-itens">
-                ${itensPedido.length
-                  ? `<ul>${linhasItens}</ul>${itensExtras > 0 ? `<p class="pedido-itens-mais">+ ${itensExtras} ${itensExtras === 1 ? 'item' : 'itens'}</p>` : ''}`
-                  : '<p class="pedido-itens-vazio">Nenhum item registrado.</p>'}
-              </div>
-            </div>
-          </div>
-          <div class="modal-erro" id="e-erro"></div>
-          <div class="ds-form-acoes">
-            <button type="button" class="ds-btn ds-btn-secundario" id="btn-cancelar-edicao">Cancelar</button>
-            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-edicao">Salvar</button>
-          </div>
-        </div>
-      `, 'ds-modal-card-pedido');
-      document.getElementById('btn-cancelar-edicao').addEventListener('click', fecharModal);
-      const campoRecebido = document.getElementById('e-recebido');
-      campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      aplicarMascaraMoeda(campoRecebido);
-      const campoFreteEdicao = document.getElementById('e-frete');
-      campoFreteEdicao.value = p.frete ? Number(p.frete).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
-      aplicarMascaraMoeda(campoFreteEdicao);
-
-      document.getElementById('btn-salvar-edicao').addEventListener('click', async () => {
-        const novoNome = document.getElementById('e-cliente-nome').value.trim();
-        const novoTelefone = document.getElementById('e-cliente-telefone').value.trim();
-        const novaEtapaId = document.getElementById('e-etapa').value;
-        const novaPrioridade = document.getElementById('e-prioridade').value || null;
-        const novoStatus = document.getElementById('e-status').value;
-        const novoRecebido = valorMoedaParaNumero(campoRecebido);
-
-        // Edita o CLIENTE vinculado, não o pedido — nome/telefone não são
-        // campos de crm_pedidos. Só manda o PATCH se algo mudou de verdade.
-        if (novoNome !== (p.cliente_nome || '') || novoTelefone !== (p.cliente_telefone || '')) {
-          const resCliente = await apiFetch(`/crm/api/clientes/${p.cliente_id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ nome: novoNome, telefone: novoTelefone }),
-          });
-          if (!resCliente.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar nome/telefone do cliente'; return; }
-        }
-
-        if (novaEtapaId !== p.etapa_id) {
-          const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
-          let motivoPerda;
-          if (etapaAlvo.tipo === 'perdida') {
-            motivoPerda = await pedirMotivoPerda();
-            if (!motivoPerda) return;
-          }
-          const res = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }) });
-          if (!res.ok) {
-            const dados = await res.json().catch(() => ({}));
-            document.getElementById('e-erro').textContent = dados.error || 'Falha ao mover etapa';
-            return;
-          }
-        }
-        if (novaPrioridade !== (p.prioridade || null)) {
-          const res = await apiFetch(`/crm/api/pedidos/${p.id}/prioridade`, { method: 'PATCH', body: JSON.stringify({ prioridade: novaPrioridade }) });
-          if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atualizar prioridade'; return; }
-        }
-        const res = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }) });
-        if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar pagamento'; return; }
-
-        const novaEntrega = document.getElementById('e-entrega').value || null;
-        const novaEmissaoNf = document.getElementById('e-emissao-nf').value || null;
-        const novoTipoEntrega = document.getElementById('e-tipo-entrega').value || null;
-        const novoFrete = valorMoedaParaNumero(campoFreteEdicao) || null;
-        const novaObservacao = document.getElementById('e-observacoes').value.trim() || null;
-        const entregaMudou = novaEntrega !== (p.data_entrega ? p.data_entrega.slice(0, 10) : null)
-          || novaEmissaoNf !== (p.data_emissao_nf ? p.data_emissao_nf.slice(0, 10) : null)
-          || novoTipoEntrega !== (p.tipo_entrega || null)
-          || novoFrete !== (p.frete != null ? Number(p.frete) : null)
-          || novaObservacao !== (p.observacoes || null);
-        if (entregaMudou) {
-          const resEntrega = await apiFetch(`/crm/api/pedidos/${p.id}/entrega`, {
-            method: 'PATCH',
-            body: JSON.stringify({ data_entrega: novaEntrega, data_emissao_nf: novaEmissaoNf, tipo_entrega: novoTipoEntrega, frete: novoFrete, observacoes: novaObservacao }),
-          });
-          if (!resEntrega.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar dados de entrega'; return; }
-        }
-
-        fecharModal();
-        carregar();
-      });
+      abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSalvo: carregar });
     }
 
     // --- Novo pedido (US do Bruno: saiu do Quadro, mora só aqui agora) -------

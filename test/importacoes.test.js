@@ -119,6 +119,13 @@ test('parseNfeXml: layout antigo <dEmi> (só data) e nota sem data', () => {
   assert.equal(parseNfeXml(semData).data_emissao, null);
 });
 
+test('parseNfeXml: extrai a série da nota (<serie>)', () => {
+  const comSerie = `<infNFe Id="NFe35240112345678901234550010000012341123456789"><ide><serie>0003</serie></ide></infNFe>`;
+  assert.equal(parseNfeXml(comSerie).serie, '0003');
+  const semSerie = `<infNFe Id="NFe35240112345678901234550010000012341123456789"><ide></ide></infNFe>`;
+  assert.equal(parseNfeXml(semSerie).serie, null);
+});
+
 test('importarNfe: pedido novo nasce com criado_em/entrou_na_etapa_em = emissão', async () => {
   const chamadas = [];
   const client = {
@@ -141,7 +148,7 @@ test('importarNfe: pedido novo nasce com criado_em/entrou_na_etapa_em = emissão
   assert.equal(r.status, 'criado');
   const insert = chamadas.find((c) => /insert into crm_pedidos /.test(c.sql));
   assert.match(insert.sql, /criado_em, entrou_na_etapa_em/);
-  assert.equal(insert.params[7], emissao);
+  assert.equal(insert.params[8], emissao);
 });
 
 // Bug real (2026-10-03): NF-e importada ficava com valor_recebido=0 e
@@ -169,8 +176,8 @@ test('importarNfe: pedido novo nasce com valor_recebido = valor_total e status_p
   }, 'nota.xml');
   const insert = chamadas.find((c) => /insert into crm_pedidos /.test(c.sql));
   assert.match(insert.sql, /valor_total, valor_recebido, status_pagamento/);
-  assert.match(insert.sql, /\$4, \$4, 'pago'/);
-  assert.equal(insert.params[3], 250);
+  assert.match(insert.sql, /\$5, \$5, 'pago'/);
+  assert.equal(insert.params[4], 250);
 });
 
 test('importarNfe: reimportar nota já importada corrige a data do pedido', async () => {
@@ -189,6 +196,58 @@ test('importarNfe: reimportar nota já importada corrige a data do pedido', asyn
   const upd = chamadas.find((c) => /update crm_pedidos set criado_em/.test(c.sql));
   assert.ok(upd, 'deveria corrigir criado_em');
   assert.deepEqual(upd.params, [emissao, 'pedido-antigo']);
-  assert.match(upd.sql, /origem = 'nfe'/);
+  // Sem <serie> na nota, cai no fallback 'nfe' de sempre — reimportar não
+  // muda a origem de um pedido que já tinha sido importado assim.
+  const updOrigem = chamadas.find((c) => /update crm_pedidos set origem/.test(c.sql));
+  assert.ok(updOrigem, 'deveria tentar corrigir a origem também');
+  assert.deepEqual(updOrigem.params, ['nfe', 'pedido-antigo']);
   assert.ok(chamadas.some((c) => c.sql === 'COMMIT'));
+});
+
+test('importarNfe: série da nota mapeada em Cadastro > Origens define a origem do pedido', async () => {
+  const chamadas = [];
+  const client = {
+    query: async (sql, params) => {
+      chamadas.push({ sql, params });
+      if (/select valor from crm_opcoes_cadastro/.test(sql)) return { rows: [{ valor: 'Shopee' }] };
+      if (/from crm_etapas/.test(sql)) return { rows: [{ id: 'etapa-ganha' }] };
+      if (/insert into crm_clientes/.test(sql)) return { rows: [{ id: 'cliente-1' }] };
+      if (/insert into crm_pedidos /.test(sql)) return { rows: [{ id: 'pedido-novo' }] };
+      if (/numero/.test(sql) && /select/.test(sql)) return { rows: [{ numero: 1, proximo: 1 }] };
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  await importarNfe({ connect: async () => client }, 'tenant-1', {
+    chave_nfe: '5'.repeat(44), numero_nota: '9', serie: '0003', data_emissao: new Date(),
+    cliente: { nome: 'Y', cpf: null, cnpj: null, telefone: null, cidade: null, uf: null },
+    valor_total: 50, identificador_externo_ref: null, itens: [],
+  }, 'nota.xml');
+  const lookup = chamadas.find((c) => /select valor from crm_opcoes_cadastro/.test(c.sql));
+  assert.deepEqual(lookup.params, ['tenant-1', '0003']);
+  const insert = chamadas.find((c) => /insert into crm_pedidos /.test(c.sql));
+  assert.equal(insert.params[3], 'Shopee');
+});
+
+test('importarNfe: série sem mapeamento cadastrado cai no fallback "nfe"', async () => {
+  const chamadas = [];
+  const client = {
+    query: async (sql, params) => {
+      chamadas.push({ sql, params });
+      if (/select valor from crm_opcoes_cadastro/.test(sql)) return { rows: [] };
+      if (/from crm_etapas/.test(sql)) return { rows: [{ id: 'etapa-ganha' }] };
+      if (/insert into crm_clientes/.test(sql)) return { rows: [{ id: 'cliente-1' }] };
+      if (/insert into crm_pedidos /.test(sql)) return { rows: [{ id: 'pedido-novo' }] };
+      if (/numero/.test(sql) && /select/.test(sql)) return { rows: [{ numero: 1, proximo: 1 }] };
+      return { rows: [] };
+    },
+    release: () => {},
+  };
+  await importarNfe({ connect: async () => client }, 'tenant-1', {
+    chave_nfe: '6'.repeat(44), numero_nota: '9', serie: '9999', data_emissao: new Date(),
+    cliente: { nome: 'Y', cpf: null, cnpj: null, telefone: null, cidade: null, uf: null },
+    valor_total: 50, identificador_externo_ref: null, itens: [],
+  }, 'nota.xml');
+  const insert = chamadas.find((c) => /insert into crm_pedidos /.test(c.sql));
+  assert.equal(insert.params[3], 'nfe');
 });

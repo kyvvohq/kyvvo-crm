@@ -347,7 +347,7 @@
         const dados = await res.json();
         if (!res.ok) { document.getElementById('sorteio-erro').textContent = dados.error || 'Falha ao sortear'; return; }
         abrirModal('<h3>🎉 Resultado do sorteio</h3>', `
-          ${dados.vencedores.map((v) => `<div class="linha-item"><span>${escapeHtml(v.nome)}</span><span style="color:var(--muted)">${escapeHtml(v.telefone || '—')}</span></div>`).join('')}
+          ${dados.vencedores.map((v) => `<div class="linha-item"><span>${modoPrivacidade ? escapeHtml(primeiroNome(v.nome)) : escapeHtml(v.nome)}</span><span style="color:var(--muted)">${modoPrivacidade ? mascararTelefone(v.telefone) : escapeHtml(v.telefone || '—')}</span></div>`).join('')}
           <div class="modal-acoes"><button type="button" class="ds-btn ds-btn-primario" id="sorteio-fechar">Fechar</button></div>
         `);
         document.getElementById('sorteio-fechar').addEventListener('click', () => { fecharModal(); carregar(); });

@@ -253,6 +253,8 @@
     let recursos = [];
     let pedidos = [];
     let produtos = [];
+    let tiposEntrega = [];
+    let configGeral = {};
     const TIPO_ARRASTO_COLUNA = 'application/x-etapa-id';
 
     // Recolher a coluna de recursos (raias) — botão manual no canto superior
@@ -280,16 +282,20 @@
     }
 
     async function carregar() {
-      const [resEtapas, resRecursos, resPedidos, resProdutos] = await Promise.all([
+      const [resEtapas, resRecursos, resPedidos, resProdutos, resTiposEntrega, resConfigGeral] = await Promise.all([
         apiFetch('/crm/api/etapas'),
         apiFetch('/crm/api/recursos'),
         apiFetch('/crm/api/pedidos?ocultar_antigos_ultima_coluna=1'),
         apiFetch('/crm/api/produtos'),
+        apiFetch('/crm/api/opcoes-cadastro?tipo=tipo_entrega'),
+        apiFetch('/crm/api/configuracoes-gerais'),
       ]);
       etapas = await resEtapas.json();
       recursos = await resRecursos.json();
       pedidos = await resPedidos.json();
       produtos = await resProdutos.json();
+      tiposEntrega = (await resTiposEntrega.json()).filter((o) => o.ativo);
+      configGeral = await resConfigGeral.json();
       renderizar();
     }
 
@@ -743,160 +749,13 @@
       });
     }
 
-    // --- Detalhe do pedido -----------------------------------------------------
-    // US20: aviso de cartão de recompra — só pra canal próprio. Marketplace
-    // (Shopee/TikTok Shop/Mercado Livre) proíbe material de outro
-    // produto/serviço ou link externo dentro do pacote (seção 9 do doc);
-    // regras do TikTok Shop ainda não confirmadas (DECISOES-PENDENTES #6),
-    // tratado com a mesma cautela da Shopee por ora.
-    const ORIGENS_MARKETPLACE = ['shopee', 'tiktok', 'mercado livre', 'mercadolivre', ' ml'];
-    function ehOrigemPropria(origem) {
-      const o = ` ${(origem || '').toLowerCase()}`;
-      return !ORIGENS_MARKETPLACE.some((m) => o.includes(m));
-    }
-
+    // --- Detalhe do pedido -------------------------------------------------
+    // Modal compartilhado com a tela de Pedidos — ver abrirModalPedido em
+    // shell.js (antes eram duas implementações separadas e divergentes).
     function abrirDetalhe(pedidoId) {
       const p = pedidos.find((x) => x.id === pedidoId);
       if (!p) return;
-      const opcoesRecurso = recursos.map((r) => `<option value="${r.id}" ${r.id === p.recurso_id ? 'selected' : ''}>${escapeHtml(r.nome)}</option>`).join('');
-      const overlay = abrirModal(`<h3>${escapeHtml(p.cliente_nome)}</h3>`, `
-        <p class="modal-texto">${escapeHtml(p.origem)}${p.tipo_entrega ? ' · ' + escapeHtml(p.tipo_entrega) : ''}${Number(p.quantidade_itens) > 0 ? ` · ${Number(p.quantidade_itens)} item(ns)` : ''}</p>
-
-        ${ehOrigemPropria(p.origem) ? `
-        <div class="banner-assinatura" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" id="banner-recompra-pedido">
-          <span>📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.</span>
-          <button type="button" id="btn-fechar-banner-recompra" aria-label="Fechar aviso" style="background:none;border:none;cursor:pointer;flex-shrink:0;display:flex;color:inherit;opacity:.7">${icon('x', 16)}</button>
-        </div>` : ''}
-
-        ${Array.isArray(p.itens) && p.itens.length ? `
-        <div class="card" style="padding:10px 14px;margin-top:12px">
-          ${p.itens.map((it) => {
-            const q = Number(it.quantidade) || 1;
-            const qtdTexto = Number.isInteger(q) ? q : q.toLocaleString('pt-BR');
-            return `<p class="modal-texto" style="margin:0 0 4px">${qtdTexto}× ${escapeHtml(it.descricao || 'Item')}</p>`;
-          }).join('')}
-        </div>` : ''}
-
-        <div class="ds-form">
-          <div class="ds-form-grade">
-            <div class="ds-campo"><label class="ds-rotulo" for="d-cliente-nome">Nome do cliente</label><input class="ds-input" id="d-cliente-nome" value="${escapeHtml(p.cliente_nome || '')}"></div>
-            <div class="ds-campo"><label class="ds-rotulo" for="d-cliente-telefone">Telefone</label><input class="ds-input" id="d-cliente-telefone" value="${escapeHtml(p.cliente_telefone || '')}"></div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="d-etapa">Etapa</label>
-              <div class="ds-select"><select id="d-etapa">
-                ${etapas.map((et) => `<option value="${et.id}" ${et.id === p.etapa_id ? 'selected' : ''}>${escapeHtml(et.nome)}</option>`).join('')}
-              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="d-recurso">Recurso</label>
-              <div class="ds-select"><select id="d-recurso"><option value="">Sem recurso</option>${opcoesRecurso}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="d-prioridade">Prioridade</label>
-              <div class="ds-select"><select id="d-prioridade">
-                <option value="">Nenhuma</option>
-                <option value="altissima" ${p.prioridade === 'altissima' ? 'selected' : ''}>Altíssima</option>
-                <option value="alta" ${p.prioridade === 'alta' ? 'selected' : ''}>Alta</option>
-                <option value="media" ${p.prioridade === 'media' ? 'selected' : ''}>Média</option>
-                <option value="baixa" ${p.prioridade === 'baixa' ? 'selected' : ''}>Baixa</option>
-              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="d-status">Pagamento</label>
-              <div class="ds-select"><select id="d-status">
-                <option value="pendente" ${p.status_pagamento === 'pendente' ? 'selected' : ''}>Pendente</option>
-                <option value="parcial" ${p.status_pagamento === 'parcial' ? 'selected' : ''}>Parcial</option>
-                <option value="pago" ${p.status_pagamento === 'pago' ? 'selected' : ''}>Pago</option>
-              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo"><label class="ds-rotulo" for="d-recebido">Valor recebido</label><input class="ds-input" id="d-recebido" inputmode="decimal"></div>
-          </div>
-          <p class="modal-texto">Frete: ${formatarMoeda(p.frete)}${p.frete_pago ? ' <span class="badge sucesso">pago</span>' : ''} · Valor total: ${formatarMoeda(p.valor_total)}</p>
-
-          <div class="modal-erro" id="d-erro"></div>
-          <div class="ds-form-acoes">
-            ${p.cliente_telefone ? `<a class="ds-btn ds-btn-secundario" style="color:#25D366" href="${linkWhatsapp(p.cliente_telefone)}" target="_blank" rel="noopener">${icon('message-circle', 16)} WhatsApp</a>` : ''}
-            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-detalhe">Salvar</button>
-          </div>
-        </div>
-      `);
-
-      const campoRecebido = document.getElementById('d-recebido');
-      campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      aplicarMascaraMoeda(campoRecebido);
-
-      const btnFecharBannerRecompra = document.getElementById('btn-fechar-banner-recompra');
-      if (btnFecharBannerRecompra) {
-        btnFecharBannerRecompra.addEventListener('click', () => {
-          document.getElementById('banner-recompra-pedido').remove();
-        });
-      }
-
-      document.getElementById('btn-salvar-detalhe').addEventListener('click', async () => {
-        const novoNome = document.getElementById('d-cliente-nome').value.trim();
-        const novoTelefone = document.getElementById('d-cliente-telefone').value.trim();
-        const novaEtapaId = document.getElementById('d-etapa').value;
-        const novoRecursoId = document.getElementById('d-recurso').value || null;
-        const novaPrioridade = document.getElementById('d-prioridade').value || null;
-        const novoStatus = document.getElementById('d-status').value;
-        const novoRecebido = valorMoedaParaNumero(campoRecebido);
-
-        // Edita o CLIENTE vinculado, não o pedido — nome/telefone não são
-        // campos de crm_pedidos. Só manda o PATCH se algo mudou de verdade.
-        if (novoNome !== (p.cliente_nome || '') || novoTelefone !== (p.cliente_telefone || '')) {
-          const resCliente = await apiFetch(`/crm/api/clientes/${p.cliente_id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ nome: novoNome, telefone: novoTelefone }),
-          });
-          if (!resCliente.ok) { document.getElementById('d-erro').textContent = 'Falha ao salvar nome/telefone do cliente'; return; }
-        }
-
-        if (novaEtapaId !== p.etapa_id) {
-          const etapaAlvo = etapas.find((et) => et.id === novaEtapaId);
-          let motivoPerda;
-          if (etapaAlvo.tipo === 'perdida') {
-            // Abre por cima do modal de detalhe (abrirModal fecha o atual antes
-            // de abrir o novo) — os valores do formulário já foram lidos acima,
-            // então perder o modal de detalhe aqui não perde dado nenhum.
-            motivoPerda = await pedirMotivoPerda();
-            if (!motivoPerda) return;
-          }
-          const resEtapa = await apiFetch(`/crm/api/pedidos/${p.id}/etapa`, {
-            method: 'PATCH',
-            body: JSON.stringify({ etapa_id: novaEtapaId, motivo_perda: motivoPerda }),
-          });
-          if (!resEtapa.ok) {
-            const dados = await resEtapa.json().catch(() => ({}));
-            document.getElementById('d-erro').textContent = dados.error || 'Falha ao mover etapa';
-            return;
-          }
-        }
-
-        if (novoRecursoId !== (p.recurso_id || null)) {
-          const resRecurso = await apiFetch(`/crm/api/pedidos/${p.id}/recurso`, {
-            method: 'PATCH',
-            body: JSON.stringify({ recurso_id: novoRecursoId }),
-          });
-          if (!resRecurso.ok) { document.getElementById('d-erro').textContent = 'Falha ao atribuir recurso'; return; }
-        }
-
-        if (novaPrioridade !== (p.prioridade || null)) {
-          const resPrioridade = await apiFetch(`/crm/api/pedidos/${p.id}/prioridade`, {
-            method: 'PATCH',
-            body: JSON.stringify({ prioridade: novaPrioridade }),
-          });
-          if (!resPrioridade.ok) { document.getElementById('d-erro').textContent = 'Falha ao atualizar prioridade'; return; }
-        }
-
-        const resPagamento = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }),
-        });
-        if (!resPagamento.ok) { document.getElementById('d-erro').textContent = 'Falha ao salvar pagamento'; return; }
-
-        fecharModal();
-        carregar();
-      });
+      abrirModalPedido(p, { etapas, recursos, tiposEntrega, configGeral, onSalvo: carregar });
     }
 
     // "Vincular a um cliente" — busca entre clientes JÁ cadastrados (reaproveita
