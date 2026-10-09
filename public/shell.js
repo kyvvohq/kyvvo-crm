@@ -474,8 +474,7 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
         </div>
         <div class="ds-campo"><label class="ds-rotulo" for="e-frete">Valor de frete</label><input class="ds-input" id="e-frete" inputmode="decimal" placeholder="0,00"></div>
         <div class="ds-campo"><label class="ds-rotulo" for="e-entrega">Data de entrega</label><input class="ds-input" id="e-entrega" type="date" value="${p.data_entrega ? p.data_entrega.slice(0, 10) : ''}"></div>
-
-        <div class="ds-campo s2"><label class="ds-rotulo" for="e-emissao-nf">Data emissão NF</label><input class="ds-input" id="e-emissao-nf" type="date" value="${p.data_emissao_nf ? p.data_emissao_nf.slice(0, 10) : ''}"></div>
+        <div class="ds-campo"><label class="ds-rotulo" for="e-emissao-nf">Data emissão NF</label><input class="ds-input" id="e-emissao-nf" type="date" value="${p.data_emissao_nf ? p.data_emissao_nf.slice(0, 10) : ''}"></div>
         <div class="ds-campo s2">
           <label class="ds-rotulo" for="e-observacoes">Observação</label>
           <textarea class="ds-textarea" id="e-observacoes" placeholder="opcional">${p.observacoes ? escapeHtml(p.observacoes) : ''}</textarea>
