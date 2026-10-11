@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
+<style>.ds-tabela .ds-switch { margin: 0; }</style>
 </head>
 <body>
   <header class="ds-topbar">
@@ -91,13 +92,28 @@
 
     <div class="painel-main">
       <div class="ds-pagina-cab">
-        <div class="ds-pagina-cab-texto"><h1 class="ds-pagina-cab-titulo">Automações</h1></div>
+        <div class="ds-pagina-cab-texto">
+          <h1 class="ds-pagina-cab-titulo">Automações</h1>
+          <p class="ds-pagina-cab-sub">Mensagens automáticas enviadas pelo WhatsApp quando algo acontece nos pedidos.</p>
+        </div>
         <div class="ds-pagina-cab-acoes">
           <button type="button" class="ds-btn ds-btn-primario" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
         </div>
       </div>
 
-      <div class="ds-tabela" role="table" aria-label="Automações" style="--ds-colunas: minmax(0,1.3fr) minmax(0,1.7fr) minmax(0,1.2fr) 90px 48px">
+      <div class="ds-tabela" role="table" aria-label="Automações" style="--ds-colunas: minmax(0,1.8fr) minmax(0,1.7fr) minmax(0,1fr) 110px 48px">
+        <div class="ds-filtros">
+          <div class="ds-select">
+            <select id="filtro-gatilho" aria-label="Filtrar por gatilho">
+              <option value="">Todos os gatilhos</option>
+              <option value="mudanca_etapa">Pedido muda de etapa</option>
+              <option value="pedido_criado">Pedido criado</option>
+              <option value="pedido_parado">Pedido parado numa etapa</option>
+              <option value="aniversario_cliente">Aniversário do cliente</option>
+            </select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </div>
         <div class="ds-tabela-cabecalho" role="row">
           <span role="columnheader">Nome</span>
           <span role="columnheader">Gatilho</span>
@@ -118,6 +134,7 @@
     let automacoes = [];
     let etapas = [];
     let templates = [];
+    let filtroGatilho = '';
 
     const ROTULO_GATILHO = {
       mudanca_etapa: 'Pedido muda de etapa',
@@ -144,7 +161,12 @@
         el.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhuma automação configurada ainda</p><p class="ds-vazio-texto">Crie a primeira para avisar seus clientes automaticamente pelo WhatsApp.</p></div>';
         return;
       }
-      el.innerHTML = automacoes.map((a) => `
+      const itens = automacoes.filter((a) => !filtroGatilho || a.gatilho === filtroGatilho);
+      if (!itens.length) {
+        el.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhuma automação encontrada</p><p class="ds-vazio-texto">Ajuste o filtro ou crie uma nova automação.</p></div>';
+        return;
+      }
+      el.innerHTML = itens.map((a) => `
         <div class="ds-tabela-linha" role="row" data-id="${a.id}">
           <span role="cell"><span class="ds-tabela-primario">${escapeHtml(a.nome)}</span></span>
           <span role="cell" class="ds-tabela-mudo" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO[a.gatilho] || a.gatilho)}${a.etapa_nome ? ` — etapa "${escapeHtml(a.etapa_nome)}"` : ''}</span>
@@ -158,7 +180,7 @@
             <div class="ds-acoes" data-id="${a.id}">
               <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações de ${escapeHtml(a.nome)}">⋯</button>
               <div class="ds-acoes-menu" role="menu" hidden>
-                <button type="button" class="ds-acoes-item" role="menuitem" data-acao="remover">Remover</button>
+                <button type="button" class="ds-acoes-item ds-acoes-item-perigo" role="menuitem" data-acao="excluir">Excluir</button>
               </div>
             </div>
           </span>
@@ -177,20 +199,20 @@
       carregar();
     });
     listaAutomacoes.addEventListener('ds-acoes-escolher', (e) => {
-      if (e.detail.acao === 'remover') confirmarRemover(e.target.closest('[data-id]').dataset.id);
+      if (e.detail.acao === 'excluir') confirmarExcluir(e.target.closest('[data-id]').dataset.id);
     });
 
-    function confirmarRemover(id) {
+    function confirmarExcluir(id) {
       const automacao = automacoes.find((a) => a.id === id);
-      abrirModal('<h3>Remover automação?</h3>', `
+      abrirModal('<h3>Excluir automação?</h3>', `
         <p class="modal-texto">"${escapeHtml(automacao ? automacao.nome : '')}" para de disparar imediatamente. Essa ação não pode ser desfeita.</p>
         <div class="modal-acoes">
-          <button type="button" class="ds-btn ds-btn-secundario" id="remover-automacao-voltar">Voltar</button>
-          <button type="button" class="ds-btn ds-btn-perigo" id="remover-automacao-confirmar">Remover</button>
+          <button type="button" class="ds-btn ds-btn-secundario" id="excluir-automacao-voltar">Voltar</button>
+          <button type="button" class="ds-btn ds-btn-perigo" id="excluir-automacao-confirmar">Excluir</button>
         </div>
       `);
-      document.getElementById('remover-automacao-voltar').addEventListener('click', fecharModal);
-      document.getElementById('remover-automacao-confirmar').addEventListener('click', async () => {
+      document.getElementById('excluir-automacao-voltar').addEventListener('click', fecharModal);
+      document.getElementById('excluir-automacao-confirmar').addEventListener('click', async () => {
         await apiFetch(`/crm/api/automacoes/${id}`, { method: 'DELETE' });
         fecharModal();
         carregar();
@@ -283,6 +305,10 @@
       });
     }
 
+    document.getElementById('filtro-gatilho').addEventListener('change', (e) => {
+      filtroGatilho = e.target.value;
+      renderizar();
+    });
     document.getElementById('btn-nova-automacao').addEventListener('click', () => abrirModalNovaAutomacao());
 
     carregar().then(() => {
