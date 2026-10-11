@@ -24,6 +24,7 @@ const { provisionarWhatsapp } = require('./lib/provisionamento-whatsapp');
 const metaWhatsappService = require('./lib/meta-whatsapp-service');
 const { relatorioPedidos, listarPedidosDetalhado } = require('./lib/relatorios');
 const { novoDocumentoRelatorio, desenharResumo, desenharTabela, formatarMoedaPdf } = require('./lib/pdf-relatorios');
+const { enviarEmail } = require('./lib/email');
 const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
@@ -272,6 +273,33 @@ async function build() {
     if (!enviado) return reply.code(502).send({ error: 'Falha ao enviar a mensagem pelo WhatsApp.' });
 
     await registrarMensagem(pool, { tenantId, telefoneE164, direcao: 'enviada', tipo: 'texto', conteudo: mensagem });
+    return { ok: true };
+  });
+
+  // Ícone de e-mail do Painel > Aniversariantes do mês: dispara o e-mail
+  // pro cliente (pedido do Bruno, 2026-10-11). Busca o e-mail no cadastro
+  // em vez de confiar no que o front manda — defesa simples contra mandar
+  // pra um destinatário arbitrário. Usa o layout padrão da plataforma
+  // (lib/email.js -> platform /internal/email/send), mesma identidade
+  // visual Kyvvo dos outros e-mails do produto.
+  fastify.post('/crm/api/clientes/:id/email-aniversario', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const assunto = (request.body?.assunto || '').trim();
+    const corpo = (request.body?.corpo || '').trim();
+    if (!assunto || !corpo) return reply.code(400).send({ error: 'Assunto e mensagem são obrigatórios' });
+
+    const { rows } = await pool.query('select email from crm_clientes where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!rows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
+    if (!rows[0].email) return reply.code(409).send({ error: 'Cliente sem e-mail cadastrado' });
+
+    const enviado = await enviarEmail({
+      to: rows[0].email,
+      subject: assunto,
+      text: corpo,
+      tag: 'crm_aniversario',
+      layout: { tipo: 'mensagem', titulo: assunto, paragrafos: [corpo] },
+    });
+    if (!enviado) return reply.code(502).send({ error: 'Falha ao enviar o e-mail.' });
     return { ok: true };
   });
 
@@ -1629,8 +1657,9 @@ async function build() {
   });
 
   // --- Modelos de mensagem (US25) -----------------------------------------------
-  // Sem POST/DELETE livre: as 4 chaves mapeiam pra pontos fixos do código
-  // (Painel Hoje), então só editar o texto faz sentido no MVP.
+  // Sem POST/DELETE livre: as 5 chaves mapeiam pra pontos fixos do código
+  // (Painel Hoje), então só editar o texto (e, pra 'aniversario_email', o
+  // assunto) faz sentido no MVP.
   fastify.get('/crm/api/modelos-mensagem', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query('select * from crm_modelos_mensagem where tenant_id = $1 order by chave', [request.user.tenantId]);
     return rows;
@@ -1639,9 +1668,10 @@ async function build() {
   fastify.patch('/crm/api/modelos-mensagem/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
     const texto = (request.body?.texto || '').trim();
     if (!texto) return reply.code(400).send({ error: 'Texto é obrigatório' });
+    const assunto = request.body?.assunto != null ? request.body.assunto.trim() : undefined;
     const { rows } = await pool.query(
-      'update crm_modelos_mensagem set texto = $1 where id = $2 and tenant_id = $3 returning *',
-      [texto, request.params.id, request.user.tenantId]
+      `update crm_modelos_mensagem set texto = $1, assunto = coalesce($2, assunto) where id = $3 and tenant_id = $4 returning *`,
+      [texto, assunto, request.params.id, request.user.tenantId]
     );
     if (!rows[0]) return reply.code(404).send({ error: 'Modelo não encontrado' });
     return rows[0];
@@ -1914,7 +1944,7 @@ async function build() {
       // ação (ver acoesClienteHtml, shell.js, que agora mostra os ícones
       // desabilitados em vez de sumir).
       pool.query(
-        `select id, nome, telefone, extract(day from data_nascimento)::int as dia_nascimento
+        `select id, nome, telefone, email, extract(day from data_nascimento)::int as dia_nascimento
          from crm_clientes
          where tenant_id = $1 and data_nascimento is not null
            and extract(month from data_nascimento) = extract(month from current_date)

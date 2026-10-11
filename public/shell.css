@@ -223,6 +223,13 @@ a.acao:hover { color:var(--accent-dark); }
   color:var(--border-strong); flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; opacity:.6; }
 .acoes-cliente-desabilitado img { opacity:.5; filter:grayscale(1); }
 
+/* Ícone de e-mail de aniversário (Aniversariantes do mês, único bloco que
+   usa este 4º ícone) — mesmo visual de "desabilitado" acima, mas
+   independente do telefone: cliente pode ter telefone e não ter e-mail
+   (ou o contrário), então não faz parte do wrapper -desabilitado. */
+.acoes-cliente .acao-email-desabilitado { width:32px; height:32px; border-radius:50%; background:var(--surface-muted);
+  color:var(--border-strong); flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; opacity:.6; }
+
 /* Modal de edição de pedido (abrirModalPedido, shell.js) — compartilhado
    entre Quadro e Pedidos (2026-10-09, antes eram duas implementações
    separadas e divergentes). 4 colunas, sem barra de rolagem em desktop. */
