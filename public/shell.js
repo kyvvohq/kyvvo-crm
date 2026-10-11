@@ -58,6 +58,7 @@ const ICON_PATHS = {
   'chevrons-right': '<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>',
   'chart-column': '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
   bot: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
 };
 
 function icon(name, size = 18) {
@@ -613,29 +614,43 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
 // direto (wa.me), conversa pelo próprio CRM (abrirModalConversa, movida de
 // whatsapp.html pra cá pra ser reusável) e disparo individual (mensagem
 // avulsa agora, usando o modelo já cadastrado da situação).
-function acoesClienteHtml(telefone, nomeCliente, mensagemPadrao) {
-  // Sem telefone, os 3 ícones aparecem desabilitados (cinza, sem clique) em
-  // vez de sumirem — uma pessoa sem telefone cadastrado (ex.: aniversariante
-  // sem WhatsApp na ficha) ainda devia aparecer na lista, só sem como agir
-  // em cima dela. Sumir a linha inteira (tentativa anterior) ficava pior:
-  // parecia que a pessoa tinha desaparecido, não que faltava um dado.
+// `emailAniversario` é opt-in ({ id, email, assunto, corpo }) — só o bloco
+// Aniversariantes do mês do Painel passa isto; Pagamentos pendentes (outro
+// chamador) continua com só os 3 ícones de sempre. Fica fora do wrapper
+// "sem telefone" porque é independente dele: cliente pode ter telefone e
+// não ter e-mail cadastrado, ou o contrário.
+function acoesClienteHtml(telefone, nomeCliente, mensagemPadrao, emailAniversario) {
+  const nome = escapeHtml(nomeCliente || '');
+  let emailBtn = '';
+  if (emailAniversario) {
+    emailBtn = emailAniversario.email
+      ? `<button type="button" class="acao-email-aniversario" data-cliente-id="${escapeHtml(emailAniversario.id)}" data-nome="${nome}" data-assunto="${escapeHtml(emailAniversario.assunto || '')}" data-corpo="${escapeHtml(emailAniversario.corpo || '')}" title="Enviar e-mail de aniversário" aria-label="Enviar e-mail de aniversário">${icon('mail', 16)}</button>`
+      : `<span class="acao-email-desabilitado" title="Sem e-mail cadastrado">${icon('mail', 16)}</span>`;
+  }
+  // Sem telefone, os 3 ícones de WhatsApp/conversa/disparo aparecem
+  // desabilitados (cinza, sem clique) em vez de sumirem — uma pessoa sem
+  // telefone cadastrado (ex.: aniversariante sem WhatsApp na ficha) ainda
+  // devia aparecer na lista, só sem como agir em cima dela. Sumir a linha
+  // inteira (tentativa anterior) ficava pior: parecia que a pessoa tinha
+  // desaparecido, não que faltava um dado.
   if (!telefone) {
     return `
       <div class="acoes-cliente acoes-cliente-desabilitado" title="Sem telefone cadastrado">
         <span>${icon('message-circle', 16)}</span>
         <span><img src="/ds/favicon.svg" width="16" height="16" alt=""></span>
         <span>${icon('zap', 16)}</span>
+        ${emailBtn}
       </div>
     `;
   }
   const tel = escapeHtml(telefone);
-  const nome = escapeHtml(nomeCliente || '');
   const msg = escapeHtml(mensagemPadrao || '');
   return `
     <div class="acoes-cliente">
       <a class="acao-whatsapp" href="${linkWhatsapp(telefone, mensagemPadrao)}" target="_blank" rel="noopener" title="Chamar no WhatsApp" aria-label="Chamar no WhatsApp">${icon('message-circle', 16)}</a>
       <button type="button" class="acao-conversa-crm" data-telefone="${tel}" data-nome="${nome}" title="Conversa pelo CRM" aria-label="Conversa pelo CRM"><img src="/ds/favicon.svg" width="16" height="16" alt=""></button>
       <button type="button" class="acao-disparo-individual" data-telefone="${tel}" data-nome="${nome}" data-mensagem="${msg}" title="Disparo individual" aria-label="Disparo individual">${icon('zap', 16)}</button>
+      ${emailBtn}
     </div>
   `;
 }
@@ -643,7 +658,9 @@ document.addEventListener('click', (e) => {
   const btnConversa = e.target.closest('.acao-conversa-crm');
   if (btnConversa) { abrirModalConversa(btnConversa.dataset.telefone, btnConversa.dataset.nome); return; }
   const btnDisparo = e.target.closest('.acao-disparo-individual');
-  if (btnDisparo) abrirModalDisparoIndividual(btnDisparo.dataset.telefone, btnDisparo.dataset.nome, btnDisparo.dataset.mensagem);
+  if (btnDisparo) { abrirModalDisparoIndividual(btnDisparo.dataset.telefone, btnDisparo.dataset.nome, btnDisparo.dataset.mensagem); return; }
+  const btnEmail = e.target.closest('.acao-email-aniversario');
+  if (btnEmail) abrirModalEmailAniversario(btnEmail.dataset.clienteId, btnEmail.dataset.nome, btnEmail.dataset.assunto, btnEmail.dataset.corpo);
 });
 
 // Popup com o histórico completo da conversa (igual whatsapp.html > aba
@@ -722,6 +739,49 @@ function abrirModalDisparoIndividual(telefone, nomeCliente, mensagemPadrao) {
     const res = await apiFetch('/crm/api/disparo-individual', {
       method: 'POST',
       body: JSON.stringify({ telefone, mensagem }),
+    });
+    if (!res.ok) {
+      const dados = await res.json().catch(() => ({}));
+      erroEl.textContent = dados.error || 'Erro ao enviar.';
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+      return;
+    }
+    fecharModal();
+  });
+}
+
+// E-mail avulso de aniversário (ícone do Painel > Aniversariantes do mês) —
+// mesmo molde do disparo individual de WhatsApp acima, mas com assunto +
+// corpo (e-mail precisa dos dois) pré-preenchidos com o modelo
+// 'aniversario_email' (crm_modelos_mensagem, editável em Configurações).
+function abrirModalEmailAniversario(clienteId, nomeCliente, assuntoPadrao, corpoPadrao) {
+  abrirModal(
+    `<h3>E-mail de aniversário</h3><p class="modal-texto">${escapeHtml(nomeCliente || '')}</p>`,
+    `
+      <label for="email-aniversario-assunto">Assunto</label>
+      <input type="text" id="email-aniversario-assunto" value="${escapeHtml(assuntoPadrao || '')}">
+      <label for="email-aniversario-corpo">Mensagem</label>
+      <textarea id="email-aniversario-corpo">${escapeHtml(corpoPadrao || '')}</textarea>
+      <div class="modal-erro" id="email-aniversario-erro"></div>
+      <div class="modal-acoes">
+        <button type="button" class="ds-btn ds-btn-secundario" id="email-aniversario-cancelar">Cancelar</button>
+        <button type="button" class="ds-btn ds-btn-primario" id="email-aniversario-enviar">Enviar</button>
+      </div>
+    `
+  );
+  document.getElementById('email-aniversario-cancelar').addEventListener('click', fecharModal);
+  document.getElementById('email-aniversario-enviar').addEventListener('click', async () => {
+    const assunto = document.getElementById('email-aniversario-assunto').value.trim();
+    const corpo = document.getElementById('email-aniversario-corpo').value.trim();
+    const erroEl = document.getElementById('email-aniversario-erro');
+    if (!assunto || !corpo) { erroEl.textContent = 'Assunto e mensagem são obrigatórios.'; return; }
+    const btn = document.getElementById('email-aniversario-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+    const res = await apiFetch(`/crm/api/clientes/${clienteId}/email-aniversario`, {
+      method: 'POST',
+      body: JSON.stringify({ assunto, corpo }),
     });
     if (!res.ok) {
       const dados = await res.json().catch(() => ({}));

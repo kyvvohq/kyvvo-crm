@@ -307,7 +307,12 @@
             <div class="nome">${escapeHtml(a.nome)}</div>
             <div class="meta">Dia ${a.dia_nascimento}</div>
           </div>
-          ${acoesClienteHtml(a.telefone, a.nome, preencherModelo('aniversario', a.nome))}
+          ${acoesClienteHtml(a.telefone, a.nome, preencherModelo('aniversario', a.nome), {
+            id: a.id,
+            email: a.email,
+            assunto: preencherModelo('aniversario_email', a.nome, 'assunto'),
+            corpo: preencherModelo('aniversario_email', a.nome),
+          })}
         </div>
       `;
     }
@@ -325,11 +330,13 @@
 
     // US25: mensagem vem do modelo cadastrado pra cada situação
     // (crm_modelos_mensagem), não mais fixa no código — só {{nome}} por
-    // enquanto (primeiro nome da pessoa).
+    // enquanto (primeiro nome da pessoa). `campo` = 'texto' (padrão, usado
+    // pelo WhatsApp) ou 'assunto' (só 'aniversario_email' tem — e-mail
+    // precisa de assunto além do corpo).
     let modelosMensagem = {};
-    function preencherModelo(chave, nomeCompleto) {
-      const texto = (modelosMensagem[chave] && modelosMensagem[chave].texto) || '';
-      return texto.replace(/\{\{nome\}\}/g, (nomeCompleto || '').split(' ')[0] || '');
+    function preencherModelo(chave, nomeCompleto, campo = 'texto') {
+      const valor = (modelosMensagem[chave] && modelosMensagem[chave][campo]) || '';
+      return valor.replace(/\{\{nome\}\}/g, (nomeCompleto || '').split(' ')[0] || '');
     }
 
     let etapas = [];
