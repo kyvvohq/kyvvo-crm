@@ -1,0 +1,28 @@
+{
+  "_comentario": "Configuração inicial do agente para a Basic 3D Print. É dado, não código: outra conta usa outro arquivo no mesmo formato. Número de WhatsApp e tenant entram por argumento do script (scripts/seed-agente.js), nunca aqui.",
+  "config": {
+    "modelo_runtime": "claude-haiku-4-5",
+    "horario_atendimento": { "inicio": "08:00", "fim": "18:00", "fuso": "America/Sao_Paulo", "dias": null },
+    "mensagem_fora_horario": "Recebi sua mensagem! A equipe responde no próximo período de atendimento. Enquanto isso, posso ir anotando os detalhes do que você precisa para agilizar o orçamento.",
+    "regras_categoria": {
+      "categorias": [
+        { "nome": "Cortador", "quantidade_padrao": 1 },
+        { "nome": "Ejetor", "quantidade_padrao": 1 },
+        { "nome": "Carimbo de doces", "quantidade_padrao": 1 }
+      ]
+    },
+    "limites": { "max_turnos": 20, "max_mensagens_conversa": 40 },
+    "flags": { "status_automatico": false }
+  },
+  "campos_pedido": [
+    { "chave": "produto_modelo", "label": "Produto ou modelo desejado", "tipo": "texto", "ordem": 1 },
+    { "chave": "categoria", "label": "Categoria", "tipo": "selecao", "opcoes": ["Cortador", "Ejetor", "Carimbo de doces", "Personalizado", "Outro"], "ordem": 2 },
+    { "chave": "personalizacao", "label": "Personalização (logo, nomes, textos)", "tipo": "texto", "ordem": 3 },
+    { "chave": "cores", "label": "Cores", "tipo": "texto", "ordem": 4 },
+    { "chave": "medida", "label": "Medida", "tipo": "texto", "ordem": 5 },
+    { "chave": "formato", "label": "Formato", "tipo": "texto", "ordem": 6 },
+    { "chave": "uso", "label": "Uso / onde será utilizado", "tipo": "texto", "ordem": 7 },
+    { "chave": "data_desejada", "label": "Data desejada", "tipo": "data", "ordem": 8 },
+    { "chave": "cep_cidade", "label": "CEP ou cidade", "tipo": "texto", "ordem": 9 }
+  ]
+}
