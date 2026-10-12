@@ -29,6 +29,7 @@ const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
 } = require('./lib/notificacoes');
+const { criarAgente } = require('./lib/agente');
 const platform = require('./lib/platform');
 const { resolverClaims } = require('./lib/resolver-sessao');
 
@@ -60,8 +61,10 @@ const PRODUTOS_HANDOFF_DESTINO = {
   people: 'https://people.kyvvo.com.br/people/sso',
 };
 
-async function build() {
+async function build(opcoes = {}) {
   const fastify = Fastify({ logger: true });
+  // Agente de IA (Fase 2). `opcoes.agente` permite injetar dependências nos testes.
+  fastify.decorate('agente', opcoes.agente || criarAgente(pool));
 
   // Sessão não é mais JWT local assinado pelo CRM: o kyvvo-platform é a
   // única autoridade de auth (mesmo corte já feito no Studio/People) —
@@ -134,6 +137,10 @@ async function build() {
     }
     try {
       const body = request.body || {};
+      // Números com agente ligado (crm_agente_config.modo <> 'desligado') são
+      // tratados pelo agente: grava e responde 200; o resto roda em segundo
+      // plano. Os demais seguem no bot por lista abaixo, sem mudança.
+      const { tratados } = await fastify.agente.tratarWebhook(body);
       const change = (((body.entry || [])[0] || {}).changes || [])[0];
       const value = change ? change.value : null;
       const phoneNumberId = value && value.metadata && value.metadata.phone_number_id;
@@ -144,7 +151,7 @@ async function build() {
       const nomeWhatsapp = value && Array.isArray(value.contacts) && value.contacts[0] && value.contacts[0].profile
         ? value.contacts[0].profile.name : null;
 
-      if (entrada && phoneNumberId) {
+      if (entrada && phoneNumberId && !tratados.has(phoneNumberId)) {
         const { rows } = await pool.query('select tenant_id from crm_whatsapp_numeros where phone_number_id = $1', [phoneNumberId]);
         const tenantId = rows[0] && rows[0].tenant_id;
         const telefoneE164 = tenantId ? paraE164(msg.from) : null;
@@ -2191,6 +2198,7 @@ async function start() {
   const fastify = await build();
   try {
     await migrar();
+    fastify.agente.iniciarVarredura();
     // Checador dos gatilhos de automação sem evento síncrono (pedido parado
     // numa etapa, aniversário do cliente) — granularidade de dia, de hora em
     // hora é sobra. Só em start() (não em build(), usado pelos testes) pra
