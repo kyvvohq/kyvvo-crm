@@ -13,16 +13,87 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .resultado-preview { margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
-  .resultado-preview .contagem { font-weight:700; color:var(--text); font-family:var(--font-display); }
-  .linha-item { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-top:1px solid var(--border); font-size:13px; }
+  [hidden] { display:none !important; }
+  #vista-lista, #vista-assistente { display:flex; flex-direction:column; gap:var(--space-5); min-width:0; }
+  #vista-lista .ds-btn, #vista-assistente .ds-btn { margin:0; }
+  .ds-tabela .ds-switch { margin:0; }
+  #vista-assistente .ds-campo > .ds-rotulo, #vista-assistente label.ds-check { margin:0; }
+  #vista-assistente label.ds-check { font-weight:400; }
+  #vista-assistente .ds-input, #vista-assistente .ds-textarea { margin:0; }
+
+  /* Linha da lista */
+  .camp-acao-linha { white-space:nowrap; }
+  .camp-erro-texto { color:var(--danger-text); }
+
+  /* Passos do assistente */
+  .passos { display:flex; gap:8px; list-style:none; margin:0; padding:0; }
+  .passo { flex:1 1 0; display:flex; align-items:center; gap:10px; min-width:0; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--card); color:var(--muted-strong); font-size:13px; font-weight:600; }
+  .passo-num { flex:none; width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:var(--surface-muted); font-size:12px; }
+  .passo-nome { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .passo.ativo { border-color:var(--accent-dark); color:var(--text); }
+  .passo.ativo .passo-num { background:var(--accent); color:#fff; }
+  .passo.feito { color:var(--text); cursor:pointer; }
+  .passo.feito .passo-num { background:rgba(var(--success-rgb), .16); color:var(--success-text); }
+  @media (max-width:720px) { .passo { padding:8px; justify-content:center; } .passo:not(.ativo) .passo-nome { display:none; } .passo.ativo { flex:3 1 0; justify-content:flex-start; } }
+
+  /* Layout dos passos */
+  .assist-grade { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:var(--space-5); align-items:start; }
+  @media (max-width:960px) { .assist-grade { grid-template-columns:minmax(0,1fr); } }
+  .assist-coluna { display:flex; flex-direction:column; gap:var(--space-5); min-width:0; }
+  .card-titulo { font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 4px; color:var(--text); }
+  .card-sub { font-size:13px; color:var(--muted-strong); margin:0 0 16px; line-height:1.5; }
+  .rodape-assistente { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .rodape-assistente > div { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .dica-passo { font-size:13px; color:var(--muted-strong); }
+
+  /* Cartões de escolha */
+  .opcoes-grade { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px,1fr)); gap:12px; }
+  .opcao-card { position:relative; display:flex; gap:12px; align-items:flex-start; margin:0; padding:14px; border:1px solid var(--border-strong); border-radius:var(--radius-md); background:var(--card); cursor:pointer; font-weight:400; color:var(--text); }
+  .opcao-card:hover { background:var(--surface-hover); }
+  .opcao-card input { position:absolute; opacity:0; width:1px; height:1px; margin:0; padding:0; pointer-events:none; }
+  .opcao-card:has(input:checked) { border-color:var(--accent-dark); box-shadow:0 0 0 1px var(--accent-dark); background:var(--surface-hover); }
+  .opcao-card:has(input:focus-visible) { outline:2px solid var(--accent-dark); outline-offset:2px; }
+  .opcao-card.desativada { opacity:.55; cursor:not-allowed; }
+  .opcao-card.desativada:hover { background:var(--card); }
+  .opcao-icone { flex:none; width:36px; height:36px; border-radius:var(--radius-md); background:var(--surface-muted); display:inline-flex; align-items:center; justify-content:center; color:var(--muted-strong); }
+  .opcao-card:has(input:checked) .opcao-icone { background:var(--accent); color:#fff; }
+  .opcao-titulo { display:block; font-weight:600; font-size:14px; color:var(--text); }
+  .opcao-desc { display:block; font-size:12.5px; color:var(--muted-strong); margin-top:2px; line-height:1.4; }
+
+  /* Público */
+  .publico-total { font-family:var(--font-display); font-size:38px; font-weight:700; color:var(--text); line-height:1; }
+  .publico-rotulo { font-size:13px; color:var(--muted-strong); margin-top:4px; }
+  .publico-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:16px 0; }
+  .publico-stat { padding:10px 12px; border-radius:var(--radius-md); background:var(--surface-muted); }
+  .publico-stat b { display:block; font-size:18px; color:var(--text); font-family:var(--font-display); }
+  .publico-stat span { font-size:12px; color:var(--muted-strong); }
+  .linha-item { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--border); font-size:13px; }
   .linha-item:first-child { border-top:none; }
-  .lista-segmentos-item, .lista-sorteios-item { padding:12px 0; border-top:1px solid var(--border); }
-  .lista-segmentos-item:first-child, .lista-sorteios-item:first-child { border-top:none; }
-  .lista-segmentos-item .topo, .lista-sorteios-item .topo { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-  .lista-segmentos-item .nome { font-weight:600; color:var(--text); }
-  .lista-segmentos-item .acoes-linha { display:flex; gap:8px; }
-  .lista-segmentos-item .acoes-linha button { height:30px; padding:0 12px; font-size:12px; }
+  .linha-item > span:first-child { color:var(--text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .linha-item > span + span { color:var(--muted-strong); flex:none; }
+  .publico-mais { font-size:12.5px; color:var(--muted-strong); margin:8px 0 0; }
+
+  /* Mensagem */
+  .pre-msg { white-space:pre-wrap; padding:14px; border-radius:var(--radius-md); background:var(--surface-muted); font-size:14px; line-height:1.55; color:var(--text); overflow-wrap:anywhere; }
+  .pre-assunto { font-weight:600; margin-bottom:8px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .ajuda { font-size:12.5px; color:var(--muted-strong); line-height:1.5; margin:6px 0 0; }
+  .pilha { display:flex; flex-direction:column; gap:var(--space-4); }
+
+  /* Revisão */
+  .resumo-lista { display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px 16px; margin:12px 0 0; font-size:14px; }
+  .resumo-lista dt { color:var(--muted-strong); }
+  .resumo-lista dd { margin:0; color:var(--text); overflow-wrap:anywhere; }
+  @media (max-width:520px) { .resumo-lista { grid-template-columns:minmax(0,1fr); gap:2px; } .resumo-lista dd { margin-bottom:10px; } }
+
+  /* Modais */
+  .modal-rolagem { max-height:50vh; overflow-y:auto; }
+  .envio-linha { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) auto; gap:10px; padding:9px 0; border-top:1px solid var(--border); font-size:13px; align-items:center; }
+  .envio-linha:first-child { border-top:none; }
+  .envio-linha .mudo { color:var(--muted-strong); overflow-wrap:anywhere; }
+  .vencedor { display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--border); }
+  .vencedor:first-child { border-top:none; }
+  .vencedor-num { flex:none; width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
 </style>
 </head>
 <body>
@@ -102,69 +173,68 @@
     </nav>
 
     <div class="painel-main">
-      <div class="cabecalho-pagina">
-        <div class="textos">
-          <div class="linha-titulo"><h1>Campanhas</h1></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-          <h2 style="font-size:15px;margin:0;color:var(--text)">Nova campanha</h2>
-          <button type="button" class="ds-btn ds-btn-secundario ds-btn-icone" id="btn-privacidade" title="Ocultar dados dos clientes na tela" aria-pressed="false">
-            <span data-icon="eye" data-size="16"></span>
-          </button>
-        </div>
-        <div class="ds-form">
-          <div class="ds-form-grade">
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="f-tag">Tag</label>
-              <div class="ds-select"><select id="f-tag"><option value="">Qualquer</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo"><label class="ds-rotulo" for="f-cidade">Cidade</label><input class="ds-input" type="text" id="f-cidade" placeholder="ex.: Uberlândia"></div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="f-origem">Origem</label>
-              <div class="ds-select"><select id="f-origem"><option value="">Qualquer</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="f-produto">Produto comprado</label>
-              <div class="ds-select"><select id="f-produto"><option value="">Qualquer</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
-            <div class="ds-campo"><label class="ds-rotulo" for="f-dias-sem-comprar">Dias sem comprar (mínimo)</label><input class="ds-input" type="number" min="0" id="f-dias-sem-comprar" placeholder="ex.: 30"></div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="f-pagamento">Status de pagamento</label>
-              <div class="ds-select"><select id="f-pagamento">
-                <option value="">Qualquer</option>
-                <option value="pendente">Pendente</option>
-                <option value="parcial">Parcial</option>
-                <option value="pago">Pago</option>
-              </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
-            </div>
+      <!-- Lista de campanhas -->
+      <div id="vista-lista">
+        <div class="ds-pagina-cab">
+          <div class="ds-pagina-cab-texto">
+            <h1 class="ds-pagina-cab-titulo">Campanhas</h1>
+            <p class="ds-pagina-cab-sub">Envie mensagens por WhatsApp ou e-mail para grupos de clientes e sorteie brindes ou descontos.</p>
           </div>
-          <label class="ds-check"><input type="checkbox" id="f-aniversario">Aniversário no mês atual</label>
-          <label class="ds-check"><input type="checkbox" id="f-consentimento">Só clientes com consentimento de comunicação registrado</label>
-
-          <div class="ds-form-acoes">
-            <button type="button" class="ds-btn ds-btn-secundario" id="btn-pre-visualizar">Pré-visualizar</button>
-            <button type="button" class="ds-btn ds-btn-secundario" id="btn-exportar-csv" disabled>Exportar CSV</button>
-            <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-segmento" disabled>Salvar campanha</button>
+          <div class="ds-pagina-cab-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario ds-btn-icone" id="btn-privacidade" title="Ocultar dados dos clientes na tela" aria-label="Ocultar dados dos clientes na tela" aria-pressed="false"><span data-icon="eye" data-size="16"></span></button>
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-nova-campanha"><span data-icon="plus" data-size="16"></span>Nova campanha</button>
           </div>
         </div>
 
-        <div class="resultado-preview" id="resultado-preview" hidden>
-          <p><span class="contagem" id="preview-contagem">0</span> cliente(s) encontrado(s).</p>
-          <div id="preview-lista"></div>
+        <div id="aviso-lista" hidden></div>
+
+        <div class="ds-tabela" role="table" aria-label="Campanhas" style="--ds-colunas: minmax(0,1.6fr) minmax(0,1.3fr) 80px minmax(0,1.5fr) 120px 48px">
+          <div class="ds-filtros">
+            <div class="ds-select">
+              <select id="filtro-tipo" aria-label="Filtrar por tipo">
+                <option value="">Todos os tipos</option>
+                <option value="disparo">Disparos</option>
+                <option value="sorteio">Sorteios</option>
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <div class="ds-select">
+              <select id="filtro-status" aria-label="Filtrar por situação">
+                <option value="">Todas as situações</option>
+                <option value="rascunho">Rascunhos</option>
+                <option value="enviando">Enviando</option>
+                <option value="enviada">Enviadas</option>
+                <option value="sorteada">Sorteadas</option>
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          </div>
+          <div class="ds-tabela-cabecalho" role="row">
+            <span role="columnheader">Campanha</span>
+            <span role="columnheader">Tipo</span>
+            <span role="columnheader">Público</span>
+            <span role="columnheader">Situação</span>
+            <span role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Atalho</span></span>
+            <span role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ações</span></span>
+          </div>
+          <div id="lista-campanhas"><div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div></div>
         </div>
       </div>
 
-      <div class="card">
-        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Campanhas salvas</h2>
-        <div id="lista-segmentos-salvos"><p class="vazio">Carregando…</p></div>
-      </div>
-
-      <div class="card">
-        <h2 style="font-size:15px;margin:0 0 14px;color:var(--text)">Sorteios recentes</h2>
-        <div id="lista-sorteios"><p class="vazio">Carregando…</p></div>
+      <!-- Assistente de nova campanha -->
+      <div id="vista-assistente" hidden>
+        <div class="ds-pagina-cab">
+          <div class="ds-pagina-cab-texto">
+            <h1 class="ds-pagina-cab-titulo" id="assistente-titulo">Nova campanha</h1>
+            <p class="ds-pagina-cab-sub">Em quatro passos: escolha o público, o tipo, a mensagem e revise antes de enviar.</p>
+          </div>
+          <div class="ds-pagina-cab-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-sair-assistente"><span data-icon="arrow-left" data-size="16"></span>Voltar às campanhas</button>
+          </div>
+        </div>
+        <ol class="passos" id="assistente-passos" aria-label="Passos da campanha"></ol>
+        <div id="assistente-corpo" class="pilha"></div>
+        <div class="rodape-assistente" id="assistente-rodape"></div>
       </div>
     </div>
   </div>
@@ -174,15 +244,26 @@
   <script src="/ds/components.js"></script>
   <script src="/crm/shell.js"></script>
   <script>
+    const MAX_DESTINATARIOS = 2000;
+    const ROTULO_CANAL = { whatsapp: 'WhatsApp', email: 'E-mail' };
+    const ROTULO_PREMIO = { brinde: 'Brinde', desconto_percentual: 'Desconto em %', desconto_valor: 'Desconto em R$' };
+    const PASSOS = ['Público', 'Tipo e canal', 'Mensagem', 'Revisar'];
+    const PADRAO_ASSUNTO = 'Parabéns, {{nome}}! Você ganhou um prêmio';
+    const PADRAO_CORPO = 'Olá, {{nome}}!\n\nVocê foi sorteado(a) na nossa campanha e ganhou: {{premio}}.\n\nResponda esta mensagem ou fale com a gente para combinar como receber. Parabéns!';
+
+    let campanhas = [];
+    let sorteios = [];
     let tags = [];
     let produtos = [];
-    let segmentosSalvos = [];
-    let ultimoPreview = [];
+    let origens = [];
+    let canais = { whatsapp: { conectado: false, numero: null, modelos: [] }, email: { disponivel: false } };
     let modoPrivacidade = false;
+    let est = null; // estado do assistente (null = lista visível)
+    let timerAtualizacao = null;
+    let timerPublico = null;
+    let tokenPublico = 0;
 
-    // Modo privacidade (ícone de olho) — mostra só primeiro nome + últimos 4
-    // dígitos do celular, pra quem for compartilhar a tela sem expor dados
-    // completos de cliente. Afeta a pré-visualização inteira, não linha a linha.
+    // ---------- Helpers ----------
     function primeiroNome(nome) {
       return ((nome || '').trim().split(/\s+/)[0]) || '—';
     }
@@ -190,67 +271,797 @@
       const digitos = String(telefone || '').replace(/\D/g, '');
       return digitos ? `•••• ${digitos.slice(-4)}` : '—';
     }
+    function nomeExibido(nome) {
+      return modoPrivacidade ? primeiroNome(nome) : (nome || '—');
+    }
+    function contatoExibido(valor, ehTelefone) {
+      if (!valor) return '—';
+      if (!modoPrivacidade) return valor;
+      return ehTelefone ? mascararTelefone(valor) : '••••••';
+    }
+    function plural(n, singular, pluralTxt) {
+      return `${n} ${n === 1 ? singular : pluralTxt}`;
+    }
+    function textoPremio(c) {
+      if (!c || !c.premio_tipo) return '';
+      const extra = c.premio_descricao ? ` — ${c.premio_descricao}` : '';
+      if (c.premio_tipo === 'brinde') return c.premio_descricao || 'Brinde';
+      const v = Number(c.premio_valor);
+      if (c.premio_tipo === 'desconto_percentual') return `${v}% de desconto${extra}`;
+      return `${formatarMoeda(v)} de desconto${extra}`;
+    }
+    function canalPadrao() {
+      if (canais.whatsapp.conectado) return 'whatsapp';
+      if (canais.email.disponivel) return 'email';
+      return null;
+    }
+    function canalDisponivel(canal) {
+      if (canal === 'whatsapp') return canais.whatsapp.conectado;
+      if (canal === 'email') return canais.email.disponivel;
+      return true;
+    }
+    // Mesma regra do servidor (lib/campanhas.js erroConteudo).
+    function conteudoCompleto(c) {
+      if (!c.canal) return false;
+      if (c.canal === 'whatsapp') return !!c.whatsapp_template;
+      return !!(c.assunto && c.corpo);
+    }
+    function aplicarVariaveisLocal(modelo, dados) {
+      return String(modelo || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, chave) => (dados[chave] != null ? String(dados[chave]) : ''));
+    }
+    function opcaoSelect(valor, rotulo, selecionado) {
+      return `<option value="${escapeHtml(valor)}" ${selecionado ? 'selected' : ''}>${escapeHtml(rotulo)}</option>`;
+    }
+    const SETA_SELECT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+    function mostrarAviso(tipo, titulo, texto) {
+      const el = document.getElementById('aviso-lista');
+      el.hidden = false;
+      el.innerHTML = `<div class="ds-alerta ds-alerta-${tipo}" role="status"><div class="ds-alerta-corpo"><p class="ds-alerta-titulo">${escapeHtml(titulo)}</p>${texto ? `<p class="ds-alerta-texto">${escapeHtml(texto)}</p>` : ''}</div></div>`;
+    }
+    function limparAviso() {
+      const el = document.getElementById('aviso-lista');
+      el.hidden = true;
+      el.innerHTML = '';
+    }
+    function alertaHtml(tipo, titulo, texto) {
+      return `<div class="ds-alerta ds-alerta-${tipo}" role="status"><div class="ds-alerta-corpo"><p class="ds-alerta-titulo">${escapeHtml(titulo)}</p>${texto ? `<p class="ds-alerta-texto">${escapeHtml(texto)}</p>` : ''}</div></div>`;
+    }
+    async function lerErro(res, padrao) {
+      try { const d = await res.json(); return d.error || d.message || padrao; } catch { return padrao; }
+    }
+
+    // Modo privacidade (olho): só primeiro nome e final do telefone nas listas.
     document.getElementById('btn-privacidade').addEventListener('click', (e) => {
       modoPrivacidade = !modoPrivacidade;
       e.currentTarget.setAttribute('aria-pressed', String(modoPrivacidade));
       e.currentTarget.innerHTML = icon(modoPrivacidade ? 'eye-off' : 'eye', 16);
-      if (!document.getElementById('resultado-preview').hidden) renderizarPreview(ultimoPreview);
+      renderizarLista();
+      if (est && est.passo === 1) renderPublico();
     });
 
-    async function carregar() {
-      const [resTags, resProdutos, resSegmentos, resSorteios, resOrigens] = await Promise.all([
-        apiFetch('/crm/api/tags'),
-        apiFetch('/crm/api/produtos'),
-        apiFetch('/crm/api/segmentos'),
-        apiFetch('/crm/api/sorteios'),
-        apiFetch('/crm/api/opcoes-cadastro?tipo=origem'),
+    // ---------- Carregamento ----------
+    async function carregarApoio() {
+      const buscar = async (url, vazio) => {
+        try { const r = await apiFetch(url); const d = await r.json(); return r.ok ? d : vazio; } catch { return vazio; }
+      };
+      [tags, produtos, origens, canais] = await Promise.all([
+        buscar('/crm/api/tags', []),
+        buscar('/crm/api/produtos', []),
+        buscar('/crm/api/opcoes-cadastro?tipo=origem', []),
+        buscar('/crm/api/campanhas/canais', canais),
       ]);
-      tags = await resTags.json();
-      produtos = await resProdutos.json();
-      segmentosSalvos = await resSegmentos.json();
-      const sorteios = await resSorteios.json();
-      const origens = await resOrigens.json();
+      if (!Array.isArray(tags)) tags = [];
+      if (!Array.isArray(produtos)) produtos = [];
+      if (!Array.isArray(origens)) origens = [];
+    }
 
-      document.getElementById('f-tag').innerHTML = '<option value="">Qualquer</option>' + tags.map((t) => `<option value="${t.id}">${escapeHtml(t.nome)}</option>`).join('');
-      document.getElementById('f-produto').innerHTML = '<option value="">Qualquer</option>' + produtos.map((p) => `<option value="${p.id}">${escapeHtml(p.nome)}</option>`).join('');
-      document.getElementById('f-origem').innerHTML = '<option value="">Qualquer</option>' + origens.filter((o) => o.ativo).map((o) => `<option value="${escapeHtml(o.valor)}">${escapeHtml(o.valor)}</option>`).join('');
+    async function carregar() {
+      try {
+        const [resSeg, resSort] = await Promise.all([apiFetch('/crm/api/segmentos'), apiFetch('/crm/api/sorteios')]);
+        const seg = await resSeg.json();
+        const sort = await resSort.json();
+        campanhas = Array.isArray(seg) ? seg : [];
+        sorteios = Array.isArray(sort) ? sort : [];
+      } catch (err) {
+        if (!campanhas.length) document.getElementById('lista-campanhas').innerHTML = '<div class="ds-vazio"><p class="ds-vazio-titulo">Não foi possível carregar as campanhas</p><p class="ds-vazio-texto">Tente recarregar a página.</p></div>';
+        agendarAtualizacao();
+        return;
+      }
+      renderizarLista();
+      agendarAtualizacao();
+    }
 
-      renderizarSegmentosSalvos();
-      renderizarSorteios(sorteios);
+    // Enquanto alguma campanha está sendo enviada, atualiza a lista sozinho.
+    function agendarAtualizacao() {
+      clearTimeout(timerAtualizacao);
+      if (!campanhas.some((c) => c.status === 'enviando')) return;
+      timerAtualizacao = setTimeout(() => {
+        if (est || document.hidden) agendarAtualizacao();
+        else carregar();
+      }, 4000);
+    }
+
+    // ---------- Lista ----------
+    let filtroTipo = '';
+    let filtroStatus = '';
+    document.getElementById('filtro-tipo').addEventListener('change', (e) => { filtroTipo = e.target.value; renderizarLista(); });
+    document.getElementById('filtro-status').addEventListener('change', (e) => { filtroStatus = e.target.value; renderizarLista(); });
+    document.getElementById('btn-nova-campanha').addEventListener('click', () => abrirAssistente(null));
+
+    function textoCanal(c) {
+      if (c.tipo === 'sorteio') {
+        if (!c.canal) return 'sem aviso aos ganhadores';
+        return `aviso por ${ROTULO_CANAL[c.canal]}`;
+      }
+      return c.canal ? ROTULO_CANAL[c.canal] : 'canal não definido';
+    }
+
+    function celulaSituacao(c) {
+      if (c.status === 'enviando') {
+        const feitos = Number(c.enviados) + Number(c.erros) + Number(c.ignorados);
+        return `<span class="ds-badge ds-badge-info ds-badge-sm">Enviando…</span><span class="ds-tabela-secundario">${feitos} de ${c.total_publico ?? '…'}</span>`;
+      }
+      if (c.status === 'enviada') {
+        const partes = [plural(Number(c.enviados), 'enviado', 'enviados')];
+        if (Number(c.erros)) partes.push(`${c.erros} com erro`);
+        if (Number(c.ignorados)) partes.push(`${c.ignorados} pulado${Number(c.ignorados) === 1 ? '' : 's'}`);
+        return `<span class="ds-badge ds-badge-sucesso ds-badge-sm">Enviada</span><span class="ds-tabela-secundario">${escapeHtml(partes.join(' · '))}</span>`;
+      }
+      if (c.status === 'sorteada') {
+        const s = sorteios.find((x) => x.segmento_id === c.id);
+        const nomes = s ? (s.vencedores || []).map((v) => nomeExibido(v.nome)).join(', ') : '';
+        return `<span class="ds-badge ds-badge-sucesso ds-badge-sm">Sorteada</span><span class="ds-tabela-secundario">${nomes ? `Ganhou: ${escapeHtml(nomes)}` : '—'}</span>`;
+      }
+      return `<span class="ds-badge ds-badge-sm">Rascunho</span>${c.canal || c.tipo === 'sorteio' ? '' : '<span class="ds-tabela-secundario">Falta configurar</span>'}`;
+    }
+
+    function atalhoLinha(c) {
+      if (c.status === 'rascunho') {
+        const pronta = c.tipo === 'sorteio' ? !!c.premio_tipo && (!c.canal || conteudoCompleto(c)) : conteudoCompleto(c);
+        if (!pronta) return '<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm camp-acao-linha" data-acao-linha="editar">Configurar</button>';
+        return `<button type="button" class="ds-btn ds-btn-primario ds-btn-sm camp-acao-linha" data-acao-linha="revisar">${c.tipo === 'sorteio' ? 'Sortear' : 'Enviar'}</button>`;
+      }
+      if (c.status === 'sorteada') return '<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm camp-acao-linha" data-acao-linha="resultado">Ver resultado</button>';
+      if (c.status === 'enviada' || c.status === 'enviando') return '<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm camp-acao-linha" data-acao-linha="envios">Ver envios</button>';
+      return '';
+    }
+
+    function itensMenu(c) {
+      const item = (acao, rotulo, perigo) => `<button type="button" class="ds-acoes-item${perigo ? ' ds-acoes-item-perigo' : ''}" role="menuitem" data-acao="${acao}">${rotulo}</button>`;
+      const itens = [];
+      if (c.status === 'rascunho') itens.push(item('editar', 'Editar'));
+      if (c.status === 'sorteada') { itens.push(item('resultado', 'Ver resultado')); itens.push(item('sortear-novamente', 'Sortear novamente')); }
+      if (c.status === 'enviada' || c.status === 'enviando') itens.push(item('envios', 'Ver envios'));
+      itens.push(item('publico', 'Ver público'));
+      itens.push(item('duplicar', 'Duplicar'));
+      if (c.status !== 'enviando') itens.push(item('excluir', 'Excluir', true));
+      return itens.join('');
+    }
+
+    function renderizarLista() {
+      const el = document.getElementById('lista-campanhas');
+      if (!campanhas.length) {
+        el.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhuma campanha ainda</p><p class="ds-vazio-texto">Crie a primeira para enviar uma mensagem por WhatsApp ou e-mail, ou para sortear um brinde ou desconto entre seus clientes.</p></div>';
+        return;
+      }
+      const itens = campanhas.filter((c) => (!filtroTipo || c.tipo === filtroTipo) && (!filtroStatus || c.status === filtroStatus));
+      if (!itens.length) {
+        el.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhuma campanha encontrada</p><p class="ds-vazio-texto">Ajuste os filtros para ver outras campanhas.</p></div>';
+        return;
+      }
+      el.innerHTML = itens.map((c) => {
+        const sub = c.tipo === 'sorteio' ? (textoPremio(c) || 'Prêmio não definido') : textoCanal(c);
+        return `
+        <div class="ds-tabela-linha" role="row" data-campanha="${c.id}">
+          <span role="cell"><span class="ds-tabela-primario">${escapeHtml(c.nome)}</span><span class="ds-tabela-secundario">Criada em ${formatarData(c.criado_em)}</span></span>
+          <span role="cell" data-rotulo="Tipo"><span class="ds-tabela-primario">${c.tipo === 'sorteio' ? 'Sorteio' : 'Disparo'}</span><span class="ds-tabela-secundario" title="${escapeHtml(sub)}">${escapeHtml(sub)}</span></span>
+          <span role="cell" class="ds-tabela-mudo" data-rotulo="Público">${c.total_publico == null ? '—' : c.total_publico}</span>
+          <span role="cell" data-rotulo="Situação">${celulaSituacao(c)}</span>
+          <span role="cell">${atalhoLinha(c)}</span>
+          <span role="cell" class="ds-tabela-acoes">
+            <div class="ds-acoes" data-campanha-id="${c.id}">
+              <button type="button" class="ds-acoes-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Ações de ${escapeHtml(c.nome)}">⋯</button>
+              <div class="ds-acoes-menu" role="menu" hidden>${itensMenu(c)}</div>
+            </div>
+          </span>
+        </div>`;
+      }).join('');
+    }
+
+    function acharCampanha(id) {
+      return campanhas.find((c) => c.id === id);
+    }
+
+    function executarAcao(acao, id) {
+      const c = acharCampanha(id);
+      if (!c) return;
+      if (acao === 'editar') abrirAssistente(c, c.canal || c.tipo === 'sorteio' ? 1 : 2);
+      else if (acao === 'revisar') abrirAssistente(c, 4);
+      else if (acao === 'sortear-novamente') abrirAssistente(c, 4);
+      else if (acao === 'publico') abrirPublico(c);
+      else if (acao === 'envios') abrirEnvios(c);
+      else if (acao === 'resultado') abrirResultadoSalvo(c);
+      else if (acao === 'duplicar') duplicar(c);
+      else if (acao === 'excluir') confirmarExcluir(c);
+    }
+
+    const listaEl = document.getElementById('lista-campanhas');
+    listaEl.addEventListener('ds-acoes-escolher', (e) => executarAcao(e.detail.acao, e.target.closest('[data-campanha]').dataset.campanha));
+    listaEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-acao-linha]');
+      if (btn) executarAcao(btn.dataset.acaoLinha, btn.closest('[data-campanha]').dataset.campanha);
+    });
+
+    async function duplicar(c) {
+      const res = await apiFetch(`/crm/api/segmentos/${c.id}/duplicar`, { method: 'POST' });
+      if (!res.ok) { mostrarAviso('erro', 'Não foi possível duplicar a campanha', await lerErro(res, '')); return; }
+      const nova = await res.json();
+      mostrarAviso('sucesso', 'Campanha duplicada', `"${nova.nome}" foi criada como rascunho.`);
+      carregar();
+    }
+
+    function confirmarExcluir(c) {
+      abrirModal('<h3>Excluir campanha?</h3>', `
+        <p class="modal-texto">"${escapeHtml(c.nome)}" e o histórico de envios dela serão apagados. Essa ação não pode ser desfeita.</p>
+        <div class="modal-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="excluir-campanha-voltar">Voltar</button>
+          <button type="button" class="ds-btn ds-btn-perigo" id="excluir-campanha-confirmar">Excluir</button>
+        </div>
+      `);
+      document.getElementById('excluir-campanha-voltar').addEventListener('click', fecharModal);
+      document.getElementById('excluir-campanha-confirmar').addEventListener('click', async () => {
+        await apiFetch(`/crm/api/segmentos/${c.id}`, { method: 'DELETE' });
+        fecharModal();
+        limparAviso();
+        carregar();
+      });
+    }
+
+    // ---------- Assistente ----------
+    function novoEstado(c, passo) {
+      const f = c && c.filtros && typeof c.filtros === 'object' ? c.filtros : {};
+      return {
+        id: c ? c.id : null,
+        status: c ? c.status : 'rascunho',
+        passo: passo || 1,
+        maxPasso: passo || 1,
+        nome: c ? c.nome : '',
+        filtros: { ...f },
+        tipo: c ? c.tipo : 'disparo',
+        canal: c ? (c.canal || (c.tipo === 'sorteio' && c.premio_tipo ? null : canalPadrao())) : canalPadrao(),
+        whatsapp_template: (c && c.whatsapp_template) || '',
+        assunto: (c && c.assunto) || '',
+        corpo: (c && c.corpo) || '',
+        premio_tipo: (c && c.premio_tipo) || 'brinde',
+        premio_descricao: (c && c.premio_descricao) || '',
+        premio_valor: c && c.premio_valor != null ? String(Number(c.premio_valor)) : '',
+        qtd_vencedores: (c && c.qtd_vencedores) || 1,
+        publico: null,
+        erro: '',
+      };
+    }
+
+    function abrirAssistente(c, passo) {
+      limparAviso();
+      est = novoEstado(c, passo);
+      if (est.passo >= 3) preencherPadroes();
+      document.getElementById('vista-lista').hidden = true;
+      document.getElementById('vista-assistente').hidden = false;
+      document.getElementById('assistente-titulo').textContent = c ? c.nome : 'Nova campanha';
+      window.scrollTo({ top: 0 });
+      renderPasso();
+      atualizarPublico(0);
+    }
+
+    function fecharAssistente() {
+      clearTimeout(timerPublico);
+      tokenPublico += 1;
+      est = null;
+      document.getElementById('vista-assistente').hidden = true;
+      document.getElementById('vista-lista').hidden = false;
+      window.scrollTo({ top: 0 });
+      carregar();
+    }
+    document.getElementById('btn-sair-assistente').addEventListener('click', () => {
+      if (est) fecharAssistente();
+    });
+
+    function irParaPasso(n) {
+      if (n === 3) preencherPadroes();
+      est.passo = n;
+      est.maxPasso = Math.max(est.maxPasso, n);
+      est.erro = '';
+      renderPasso();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Sorteio por e-mail já começa com um texto de parabéns pronto pra editar.
+    function preencherPadroes() {
+      if (est.tipo === 'sorteio' && est.canal === 'email' && !est.assunto && !est.corpo) {
+        est.assunto = PADRAO_ASSUNTO;
+        est.corpo = PADRAO_CORPO;
+      }
+    }
+
+    function renderPasso() {
+      document.getElementById('assistente-passos').innerHTML = PASSOS.map((nome, i) => {
+        const n = i + 1;
+        const classe = n === est.passo ? 'ativo' : (n <= est.maxPasso ? 'feito' : '');
+        const marca = n < est.passo ? icon('check', 14) : n;
+        return `<li class="passo ${classe}" data-passo="${n}" ${n === est.passo ? 'aria-current="step"' : ''}><span class="passo-num">${marca}</span><span class="passo-nome">${nome}</span></li>`;
+      }).join('');
+      const corpo = document.getElementById('assistente-corpo');
+      if (est.passo === 1) corpo.innerHTML = htmlPasso1();
+      else if (est.passo === 2) corpo.innerHTML = htmlPasso2();
+      else if (est.passo === 3) corpo.innerHTML = htmlPasso3();
+      else corpo.innerHTML = htmlPasso4();
+      if (est.passo === 1) renderPublico();
+      if (est.passo === 2) renderCanais();
+      if (est.passo === 3) { ajustarPremioUI(); atualizarPrevias(); }
+      renderRodape();
+    }
+
+    document.getElementById('assistente-passos').addEventListener('click', (e) => {
+      const li = e.target.closest('.passo.feito');
+      if (!li || !est) return;
+      const n = Number(li.dataset.passo);
+      if (n < est.passo || validarPasso(est.passo) === null) irParaPasso(n);
+    });
+
+    // ----- Passo 1: público -----
+    function selectFiltro(id, rotulo, opcoes) {
+      return `<div class="ds-campo"><label class="ds-rotulo" for="${id}">${rotulo}</label><div class="ds-select"><select id="${id}" data-filtro>${opcoes}</select>${SETA_SELECT}</div></div>`;
+    }
+    function htmlPasso1() {
+      const f = est.filtros;
+      const opcoesTags = opcaoSelect('', 'Qualquer', !f.tag_id) + tags.map((t) => opcaoSelect(t.id, t.nome, String(f.tag_id) === String(t.id))).join('');
+      const opcoesProdutos = opcaoSelect('', 'Qualquer', !f.produto_id) + produtos.map((p) => opcaoSelect(p.id, p.nome, String(f.produto_id) === String(p.id))).join('');
+      const listaOrigens = origens.filter((o) => o.ativo);
+      const opcoesOrigens = opcaoSelect('', 'Qualquer', !f.origem) + listaOrigens.map((o) => opcaoSelect(o.valor, o.valor, f.origem === o.valor)).join('')
+        + (f.origem && !listaOrigens.some((o) => o.valor === f.origem) ? opcaoSelect(f.origem, f.origem, true) : '');
+      const opcoesPagamento = [['', 'Qualquer'], ['pendente', 'Pendente'], ['parcial', 'Parcial'], ['pago', 'Pago']].map(([v, r]) => opcaoSelect(v, r, (f.status_pagamento || '') === v)).join('');
+      return `
+        <div class="assist-grade">
+          <div class="card">
+            <h2 class="card-titulo">Quem vai participar?</h2>
+            <p class="card-sub">Use os filtros para chegar ao grupo certo. Sem nenhum filtro, a campanha inclui todos os clientes.</p>
+            <div class="ds-form">
+              <div class="ds-form-grade">
+                ${selectFiltro('f-tag', 'Tag', opcoesTags)}
+                <div class="ds-campo"><label class="ds-rotulo" for="f-cidade">Cidade</label><input class="ds-input" type="text" id="f-cidade" data-filtro placeholder="ex.: Uberlândia" value="${escapeHtml(f.cidade || '')}"></div>
+                ${selectFiltro('f-origem', 'Origem', opcoesOrigens)}
+                ${selectFiltro('f-produto', 'Produto comprado', opcoesProdutos)}
+                <div class="ds-campo"><label class="ds-rotulo" for="f-dias-sem-comprar">Dias sem comprar (mínimo)</label><input class="ds-input" type="number" min="0" id="f-dias-sem-comprar" data-filtro placeholder="ex.: 30" value="${f.dias_sem_comprar_min != null ? f.dias_sem_comprar_min : ''}"></div>
+                ${selectFiltro('f-pagamento', 'Status de pagamento', opcoesPagamento)}
+              </div>
+              <label class="ds-check"><input type="checkbox" id="f-aniversario" data-filtro ${f.aniversario_mes ? 'checked' : ''}>Aniversário no mês atual</label>
+              <label class="ds-check"><input type="checkbox" id="f-consentimento" data-filtro ${f.consentimento ? 'checked' : ''}>Só clientes com consentimento de comunicação registrado</label>
+            </div>
+          </div>
+          <div class="card" id="card-publico"></div>
+        </div>`;
     }
 
     function lerFiltros() {
+      const v = (id) => document.getElementById(id).value;
       const filtros = {};
-      if (document.getElementById('f-tag').value) filtros.tag_id = document.getElementById('f-tag').value;
-      if (document.getElementById('f-cidade').value.trim()) filtros.cidade = document.getElementById('f-cidade').value.trim();
-      if (document.getElementById('f-origem').value.trim()) filtros.origem = document.getElementById('f-origem').value.trim();
-      if (document.getElementById('f-produto').value) filtros.produto_id = document.getElementById('f-produto').value;
-      if (document.getElementById('f-dias-sem-comprar').value) filtros.dias_sem_comprar_min = Number(document.getElementById('f-dias-sem-comprar').value);
-      if (document.getElementById('f-pagamento').value) filtros.status_pagamento = document.getElementById('f-pagamento').value;
+      if (v('f-tag')) filtros.tag_id = v('f-tag');
+      if (v('f-cidade').trim()) filtros.cidade = v('f-cidade').trim();
+      if (v('f-origem')) filtros.origem = v('f-origem');
+      if (v('f-produto')) filtros.produto_id = v('f-produto');
+      if (v('f-dias-sem-comprar') !== '') filtros.dias_sem_comprar_min = Number(v('f-dias-sem-comprar'));
+      if (v('f-pagamento')) filtros.status_pagamento = v('f-pagamento');
       if (document.getElementById('f-aniversario').checked) filtros.aniversario_mes = true;
       if (document.getElementById('f-consentimento').checked) filtros.consentimento = true;
       return filtros;
     }
 
-    function renderizarPreview(clientes) {
-      ultimoPreview = clientes;
-      document.getElementById('resultado-preview').hidden = false;
-      document.getElementById('preview-contagem').textContent = clientes.length;
-      document.getElementById('preview-lista').innerHTML = clientes.slice(0, 30).map((c) => `
-        <div class="linha-item"><span>${modoPrivacidade ? escapeHtml(primeiroNome(c.nome)) : escapeHtml(c.nome)}</span><span style="color:var(--muted)">${modoPrivacidade ? mascararTelefone(c.telefone) : escapeHtml(c.telefone || '—')}</span></div>
-      `).join('') || '<p class="vazio">Nenhum cliente bate com esses filtros.</p>';
-      document.getElementById('btn-exportar-csv').disabled = clientes.length === 0;
-      document.getElementById('btn-salvar-segmento').disabled = false;
+    // Alcance do público: bloqueados nunca recebem; WhatsApp precisa de telefone e e-mail de e-mail.
+    function alcance() {
+      const clientes = est && est.publico ? est.publico.clientes : [];
+      const livres = clientes.filter((c) => !c.bloqueado);
+      return {
+        total: clientes.length,
+        bloqueados: clientes.length - livres.length,
+        livres: livres.length,
+        whatsapp: livres.filter((c) => c.telefone).length,
+        email: livres.filter((c) => c.email).length,
+      };
     }
 
-    document.getElementById('btn-pre-visualizar').addEventListener('click', async () => {
-      const res = await apiFetch('/crm/api/segmentos/preview', { method: 'POST', body: JSON.stringify({ filtros: lerFiltros() }) });
-      const dados = await res.json();
-      renderizarPreview(dados.clientes);
+    function atualizarPublico(atraso) {
+      clearTimeout(timerPublico);
+      timerPublico = setTimeout(async () => {
+        if (!est) return;
+        const meu = ++tokenPublico;
+        est.carregandoPublico = true;
+        if (est.passo === 1) { renderPublico(); renderRodape(); }
+        try {
+          const res = await apiFetch('/crm/api/segmentos/preview', { method: 'POST', body: JSON.stringify({ filtros: est.filtros }) });
+          const dados = await res.json();
+          if (meu !== tokenPublico || !est) return;
+          est.publico = res.ok ? { total: dados.total, clientes: dados.clientes || [] } : null;
+          est.erroPublico = res.ok ? '' : (dados.error || 'Não foi possível calcular o público.');
+        } catch {
+          if (meu !== tokenPublico || !est) return;
+          est.publico = null;
+          est.erroPublico = 'Não foi possível calcular o público.';
+        }
+        est.carregandoPublico = false;
+        if (est.passo === 1) { renderPublico(); renderRodape(); }
+        if (est.passo === 4) renderPasso();
+      }, atraso);
+    }
+
+    function renderPublico() {
+      const card = document.getElementById('card-publico');
+      if (!card) return;
+      if (!est.publico) {
+        card.innerHTML = `<h2 class="card-titulo">Público</h2><p class="card-sub">${est.erroPublico ? escapeHtml(est.erroPublico) : 'Calculando…'}</p>`;
+        return;
+      }
+      const a = alcance();
+      const lista = est.publico.clientes.slice(0, 8);
+      card.innerHTML = `
+        <h2 class="card-titulo">Público</h2>
+        <div class="publico-total">${a.total}</div>
+        <div class="publico-rotulo">${a.total === 1 ? 'cliente encontrado' : 'clientes encontrados'}${est.carregandoPublico ? ' · atualizando…' : ''}</div>
+        <div class="publico-stats">
+          <div class="publico-stat"><b>${a.livres}</b><span>podem receber</span></div>
+          <div class="publico-stat"><b>${a.whatsapp}</b><span>com WhatsApp</span></div>
+          <div class="publico-stat"><b>${a.email}</b><span>com e-mail</span></div>
+        </div>
+        ${a.bloqueados ? `<p class="ajuda" style="margin:-4px 0 12px">${plural(a.bloqueados, 'cliente bloqueado não recebe', 'clientes bloqueados não recebem')} mensagens.</p>` : ''}
+        <div>${lista.map((c) => `<div class="linha-item"><span>${escapeHtml(nomeExibido(c.nome))}</span><span>${escapeHtml(contatoExibido(c.telefone || c.email, !!c.telefone))}</span></div>`).join('') || '<p class="vazio">Nenhum cliente bate com esses filtros.</p>'}</div>
+        ${a.total > lista.length ? `<p class="publico-mais">e mais ${a.total - lista.length}…</p>` : ''}
+        <div style="margin-top:16px"><button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-exportar-csv" ${a.total ? '' : 'disabled'}><span data-icon="download" data-size="14"></span>Exportar CSV</button></div>`;
+      card.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = icon(el.dataset.icon, Number(el.dataset.size) || 18); });
+    }
+
+    // ----- Passo 2: tipo e canal -----
+    function cartaoOpcao({ nome, valor, checked, disabled, icone, titulo, desc }) {
+      return `<label class="opcao-card${disabled ? ' desativada' : ''}"><input type="radio" name="${nome}" value="${valor}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="opcao-icone">${icon(icone, 18)}</span><span><span class="opcao-titulo">${titulo}</span><span class="opcao-desc">${desc}</span></span></label>`;
+    }
+    function htmlPasso2() {
+      return `
+        <div class="card">
+          <h2 class="card-titulo">O que você quer fazer?</h2>
+          <p class="card-sub">Escolha entre enviar uma mensagem ao público ou sortear um prêmio entre eles.</p>
+          <div class="opcoes-grade">
+            ${cartaoOpcao({ nome: 'tipo', valor: 'disparo', checked: est.tipo === 'disparo', icone: 'send', titulo: 'Disparo de mensagem', desc: 'Envia a mesma mensagem para todo o público.' })}
+            ${cartaoOpcao({ nome: 'tipo', valor: 'sorteio', checked: est.tipo === 'sorteio', icone: 'gift', titulo: 'Sorteio de brinde ou desconto', desc: 'Sorteia ganhadores entre o público e avisa cada um.' })}
+          </div>
+        </div>
+        <div class="card">
+          <h2 class="card-titulo" id="canal-titulo"></h2>
+          <p class="card-sub" id="canal-sub"></p>
+          <div class="opcoes-grade" id="canal-opcoes"></div>
+          <div id="canal-alerta" style="margin-top:16px"></div>
+        </div>`;
+    }
+    function renderCanais() {
+      const sorteio = est.tipo === 'sorteio';
+      document.getElementById('canal-titulo').textContent = sorteio ? 'Como avisar os ganhadores?' : 'Por onde enviar?';
+      document.getElementById('canal-sub').textContent = sorteio
+        ? 'Os ganhadores recebem a mensagem logo depois do sorteio.'
+        : 'A mensagem sai pelo canal escolhido para cada cliente do público.';
+      const wa = canais.whatsapp;
+      const em = canais.email;
+      let html = cartaoOpcao({
+        nome: 'canal', valor: 'whatsapp', checked: est.canal === 'whatsapp', disabled: !wa.conectado, icone: 'message-circle', titulo: 'WhatsApp',
+        desc: wa.conectado ? `Número ${escapeHtml(wa.numero || '')} · usa um modelo de mensagem aprovado pela Meta.` : 'Nenhum número conectado. Vincule um em Configurações › WhatsApp.',
+      });
+      html += cartaoOpcao({
+        nome: 'canal', valor: 'email', checked: est.canal === 'email', disabled: !em.disponivel, icone: 'mail', titulo: 'E-mail',
+        desc: em.disponivel ? 'Mensagem com assunto e texto livre, enviada ao e-mail do cliente.' : 'O envio de e-mail não está configurado neste ambiente.',
+      });
+      if (sorteio) {
+        html += cartaoOpcao({ nome: 'canal', valor: '', checked: !est.canal, icone: 'bell-off', titulo: 'Não avisar', desc: 'Só registra o resultado; você entra em contato com os ganhadores.' });
+      }
+      document.getElementById('canal-opcoes').innerHTML = html;
+      const alerta = document.getElementById('canal-alerta');
+      if (!sorteio && !wa.conectado && !em.disponivel) {
+        alerta.innerHTML = alertaHtml('aviso', 'Nenhum canal de envio disponível', 'Conecte um número de WhatsApp em Configurações › WhatsApp para enviar disparos.');
+      } else if (est.canal === 'whatsapp' && wa.conectado && !wa.modelos.length) {
+        alerta.innerHTML = alertaHtml('aviso', 'Nenhum modelo de mensagem aprovado', 'O WhatsApp só permite iniciar conversas com modelos aprovados pela Meta. Crie e aprove um modelo antes de enviar.');
+      } else {
+        alerta.innerHTML = '';
+      }
+    }
+
+    // ----- Passo 3: mensagem ou prêmio -----
+    function htmlPasso3() {
+      return `${est.tipo === 'sorteio' ? htmlPremio() : ''}${htmlMensagem()}`;
+    }
+    function htmlPremio() {
+      return `
+        <div class="card">
+          <h2 class="card-titulo">Prêmio do sorteio</h2>
+          <p class="card-sub">Defina o que será sorteado e quantos ganhadores a campanha terá.</p>
+          <div class="opcoes-grade">
+            ${cartaoOpcao({ nome: 'premio_tipo', valor: 'brinde', checked: est.premio_tipo === 'brinde', icone: 'gift', titulo: 'Brinde', desc: 'Um item ou presente.' })}
+            ${cartaoOpcao({ nome: 'premio_tipo', valor: 'desconto_percentual', checked: est.premio_tipo === 'desconto_percentual', icone: 'percent', titulo: 'Desconto em %', desc: 'Percentual sobre a próxima compra.' })}
+            ${cartaoOpcao({ nome: 'premio_tipo', valor: 'desconto_valor', checked: est.premio_tipo === 'desconto_valor', icone: 'circle-dollar-sign', titulo: 'Desconto em R$', desc: 'Valor fixo de desconto.' })}
+          </div>
+          <div class="ds-form" style="margin-top:16px">
+            <div class="ds-form-grade">
+              <div class="ds-campo" id="campo-premio-valor"><label class="ds-rotulo" for="c-premio-valor" id="rotulo-premio-valor"></label><input class="ds-input" type="number" min="0" step="0.01" id="c-premio-valor" value="${escapeHtml(est.premio_valor)}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="c-premio-desc" id="rotulo-premio-desc"></label><input class="ds-input" type="text" id="c-premio-desc" maxlength="140" value="${escapeHtml(est.premio_descricao)}"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="c-qtd">Quantos ganhadores?</label><input class="ds-input" type="number" min="1" max="500" id="c-qtd" value="${escapeHtml(String(est.qtd_vencedores))}"></div>
+            </div>
+          </div>
+        </div>`;
+    }
+    function ajustarPremioUI() {
+      const campoValor = document.getElementById('campo-premio-valor');
+      if (!campoValor) return;
+      const t = est.premio_tipo;
+      campoValor.hidden = t === 'brinde';
+      document.getElementById('rotulo-premio-valor').textContent = t === 'desconto_percentual' ? 'Percentual de desconto (%)' : 'Valor do desconto (R$)';
+      const valor = document.getElementById('c-premio-valor');
+      valor.placeholder = t === 'desconto_percentual' ? 'ex.: 15' : 'ex.: 50';
+      if (t === 'desconto_percentual') valor.max = '100'; else valor.removeAttribute('max');
+      document.getElementById('rotulo-premio-desc').textContent = t === 'brinde' ? 'Qual é o brinde?' : 'Detalhes do desconto (opcional)';
+      document.getElementById('c-premio-desc').placeholder = t === 'brinde' ? 'ex.: Caneca personalizada' : 'ex.: válido na próxima compra';
+    }
+
+    function modeloSelecionado() {
+      return canais.whatsapp.modelos.find((m) => m.nome === est.whatsapp_template) || null;
+    }
+    function ajudaModelo(m) {
+      if (!m) return '';
+      const ps = m.parametros_corpo || [];
+      if (!ps.length) return 'Este modelo não tem variáveis: todos recebem o mesmo texto.';
+      if (m.parametros_nomeados) return `Variáveis preenchidas automaticamente: ${ps.map((p) => `{{${p}}}`).join(', ')}. Use cliente ou nome para o nome do cliente e premio para o prêmio.`;
+      return `{{1}} vira o nome do cliente${ps.length > 1 ? ' e {{2}} vira o prêmio (nos sorteios)' : ''}.`;
+    }
+    function htmlMensagem() {
+      const sorteio = est.tipo === 'sorteio';
+      if (sorteio && !est.canal) {
+        return '<div class="card"><h2 class="card-titulo">Aviso aos ganhadores</h2><p class="card-sub" style="margin:0">Você escolheu não avisar os ganhadores. O resultado fica registrado na campanha e você pode entrar em contato com eles depois.</p></div>';
+      }
+      const titulo = sorteio ? 'Mensagem aos ganhadores' : 'Mensagem';
+      if (est.canal === 'whatsapp') {
+        const modelos = canais.whatsapp.modelos;
+        if (est.whatsapp_template && !modelos.some((m) => m.nome === est.whatsapp_template)) est.whatsapp_template = '';
+        return `
+          <div class="card">
+            <h2 class="card-titulo">${titulo}</h2>
+            <p class="card-sub">No WhatsApp, a primeira mensagem para o cliente precisa usar um modelo aprovado pela Meta.</p>
+            ${modelos.length ? `
+              <div class="ds-form">
+                <div class="ds-campo"><label class="ds-rotulo" for="c-modelo">Modelo de mensagem</label>
+                  <div class="ds-select"><select id="c-modelo">${opcaoSelect('', 'Escolha um modelo', !est.whatsapp_template)}${modelos.map((m) => opcaoSelect(m.nome, m.nome, m.nome === est.whatsapp_template)).join('')}</select>${SETA_SELECT}</div>
+                </div>
+              </div>
+              <div id="modelo-previa" style="margin-top:16px"></div>`
+              : alertaHtml('aviso', 'Nenhum modelo aprovado encontrado', 'Confira se o número de WhatsApp está vinculado e se há modelos aprovados na Meta.')}
+          </div>`;
+      }
+      const chaves = [['{{nome}}', 'Primeiro nome'], ['{{nome_completo}}', 'Nome completo']];
+      if (sorteio) chaves.push(['{{premio}}', 'Prêmio']);
+      return `
+        <div class="card">
+          <h2 class="card-titulo">${titulo}</h2>
+          <p class="card-sub">Escreva o e-mail. Use as variáveis para personalizar cada mensagem.</p>
+          <div class="ds-form">
+            <div class="ds-campo"><label class="ds-rotulo" for="c-assunto">Assunto</label><input class="ds-input" type="text" id="c-assunto" maxlength="150" placeholder="${sorteio ? 'ex.: Você ganhou!' : 'ex.: Uma novidade pra você, {{nome}}'}" value="${escapeHtml(est.assunto)}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="c-corpo">Texto do e-mail</label><textarea class="ds-textarea" id="c-corpo" rows="8" placeholder="Olá, {{nome}}!">${escapeHtml(est.corpo)}</textarea>
+              <div class="chips">${chaves.map(([v, r]) => `<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" data-variavel="${v}">${r}</button>`).join('')}</div>
+            </div>
+          </div>
+          <div style="margin-top:20px">
+            <p class="ds-rotulo" style="margin:0 0 8px">Prévia (com um cliente de exemplo)</p>
+            <div class="pre-msg"><div class="pre-assunto" id="email-previa-assunto"></div><div id="email-previa-corpo"></div></div>
+          </div>
+        </div>`;
+    }
+    function atualizarPrevias() {
+      const previaModelo = document.getElementById('modelo-previa');
+      if (previaModelo) {
+        const m = modeloSelecionado();
+        previaModelo.innerHTML = m
+          ? `<p class="ds-rotulo" style="margin:0 0 8px">Texto do modelo</p><div class="pre-msg">${escapeHtml(m.corpo || '')}</div><p class="ajuda">${escapeHtml(ajudaModelo(m))}</p>`
+          : '';
+      }
+      const pa = document.getElementById('email-previa-assunto');
+      if (pa) {
+        const dados = { nome: 'Maria', nome_completo: 'Maria Souza', cliente: 'Maria Souza', premio: textoPremio(est) || 'seu prêmio' };
+        pa.textContent = aplicarVariaveisLocal(est.assunto, dados) || '(sem assunto)';
+        document.getElementById('email-previa-corpo').textContent = aplicarVariaveisLocal(est.corpo, dados) || '(sem texto)';
+      }
+    }
+
+    // ----- Passo 4: revisão -----
+    function destinatariosPrevistos() {
+      const a = alcance();
+      if (est.tipo === 'sorteio') return a.livres;
+      return est.canal === 'whatsapp' ? a.whatsapp : a.email;
+    }
+    // Impede enviar quando já se sabe que o servidor vai recusar.
+    function motivoBloqueioEnvio() {
+      if (!est.publico) return { titulo: 'Público não calculado', texto: 'Volte ao primeiro passo e confira os filtros.' };
+      const a = alcance();
+      if (!a.livres) return { titulo: 'Ninguém para receber', texto: 'O público está vazio (ou só tem clientes bloqueados). Ajuste os filtros no primeiro passo.' };
+      if (est.tipo === 'disparo') {
+        if (a.livres > MAX_DESTINATARIOS) return { titulo: 'Público grande demais', texto: `O público tem ${a.livres} clientes e o máximo por campanha é ${MAX_DESTINATARIOS}. Refine os filtros no primeiro passo.` };
+        if (!destinatariosPrevistos()) return { titulo: `Ninguém no público tem ${est.canal === 'whatsapp' ? 'WhatsApp' : 'e-mail'}`, texto: 'Escolha outro canal ou ajuste o público.' };
+      }
+      return null;
+    }
+    function htmlPasso4() {
+      const a = alcance();
+      const sorteio = est.tipo === 'sorteio';
+      const alertas = [];
+      const bloqueio = motivoBloqueioEnvio();
+      if (bloqueio) alertas.push(alertaHtml('erro', bloqueio.titulo, bloqueio.texto));
+      if (sorteio) {
+        const qtd = Number(est.qtd_vencedores) || 1;
+        if (a.livres && qtd > a.livres) alertas.push(alertaHtml('aviso', 'Mais ganhadores que participantes', `Você pediu ${qtd} ganhadores, mas há só ${plural(a.livres, 'participante', 'participantes')}. Todos serão sorteados.`));
+        alertas.push(alertaHtml('info', 'Lista de participantes congelada', 'No momento do sorteio, a lista de participantes fica registrada e não muda mais. Clientes bloqueados não participam.'));
+      } else {
+        if (!est.filtros.consentimento) alertas.push(alertaHtml('aviso', 'Consentimento não filtrado', 'Esta campanha vai para todo o público, tenha o cliente registrado consentimento de comunicação ou não. Envie apenas para quem aceitou receber mensagens.'));
+        if (est.canal === 'whatsapp') alertas.push(alertaHtml('info', 'Uma mensagem por dia', 'Clientes que já receberam outra mensagem automática do WhatsApp nas últimas 24 horas são pulados e aparecem como "pulados" no histórico.'));
+      }
+      const m = est.canal === 'whatsapp' ? modeloSelecionado() : null;
+      const linhas = [
+        ['Público', `${plural(a.total, 'cliente', 'clientes')} (${a.livres} podem receber)`],
+        ['Tipo', sorteio ? 'Sorteio de brinde ou desconto' : 'Disparo de mensagem'],
+        [sorteio ? 'Aviso aos ganhadores' : 'Canal', est.canal ? ROTULO_CANAL[est.canal] : 'Sem aviso'],
+      ];
+      if (est.canal === 'whatsapp') linhas.push(['Modelo', est.whatsapp_template || '—']);
+      if (est.canal === 'email') linhas.push(['Assunto', est.assunto || '—']);
+      if (sorteio) { linhas.push(['Prêmio', textoPremio(est) || '—']); linhas.push(['Ganhadores', String(Number(est.qtd_vencedores) || 1)]); }
+      else linhas.push(['Vão receber', plural(destinatariosPrevistos(), 'cliente', 'clientes')]);
+      return `
+        <div class="assist-grade">
+          <div class="assist-coluna">
+            <div class="card">
+              <h2 class="card-titulo">Dê um nome à campanha</h2>
+              <p class="card-sub">O nome é só para você identificar a campanha na lista.</p>
+              <div class="ds-form"><div class="ds-campo"><label class="ds-rotulo" for="c-nome">Nome da campanha</label><input class="ds-input" type="text" id="c-nome" maxlength="120" placeholder="${sorteio ? 'ex.: Sorteio de aniversário' : 'ex.: Clientes sem comprar há 30 dias'}" value="${escapeHtml(est.nome)}"></div></div>
+              <div class="modal-erro" id="assistente-erro" role="alert">${escapeHtml(est.erro)}</div>
+            </div>
+            ${alertas.length ? `<div class="pilha">${alertas.join('')}</div>` : ''}
+          </div>
+          <div class="card">
+            <h2 class="card-titulo">Resumo</h2>
+            <dl class="resumo-lista">${linhas.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('')}</dl>
+            ${m && m.corpo ? `<p class="ds-rotulo" style="margin:16px 0 8px">Texto do modelo</p><div class="pre-msg">${escapeHtml(m.corpo)}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    // ----- Validação e rodapé -----
+    // Devolve null quando o passo está ok, ou o texto do que falta.
+    function validarPasso(n) {
+      if (n === 1) {
+        if (est.carregandoPublico) return 'Calculando o público…';
+        if (!est.publico) return est.erroPublico || 'Calculando o público…';
+        if (!alcance().total) return 'Nenhum cliente bate com esses filtros.';
+        return null;
+      }
+      if (n === 2) {
+        if (est.tipo === 'disparo' && !est.canal) return 'Escolha por onde enviar.';
+        if (est.canal && !canalDisponivel(est.canal)) return 'Esse canal não está disponível.';
+        return null;
+      }
+      if (n === 3) {
+        if (est.tipo === 'sorteio') {
+          if (est.premio_tipo === 'brinde' && !est.premio_descricao.trim()) return 'Descreva o brinde.';
+          if (est.premio_tipo !== 'brinde') {
+            const v = Number(est.premio_valor);
+            if (!(v > 0)) return 'Informe o valor do desconto.';
+            if (est.premio_tipo === 'desconto_percentual' && v > 100) return 'O desconto não pode passar de 100%.';
+          }
+          const q = Number(est.qtd_vencedores);
+          if (!Number.isInteger(q) || q < 1 || q > 500) return 'Informe de 1 a 500 ganhadores.';
+        }
+        if (est.canal === 'whatsapp' && !est.whatsapp_template) return 'Escolha o modelo de mensagem.';
+        if (est.canal === 'email' && (!est.assunto.trim() || !est.corpo.trim())) return 'Preencha o assunto e o texto do e-mail.';
+        return null;
+      }
+      return null;
+    }
+
+    function renderRodape() {
+      const rodape = document.getElementById('assistente-rodape');
+      if (!est) return;
+      const p = est.passo;
+      if (p < 4) {
+        const falta = validarPasso(p);
+        rodape.innerHTML = `
+          <div>${p > 1 ? '<button type="button" class="ds-btn ds-btn-secundario" id="btn-voltar-passo">Voltar</button>' : ''}</div>
+          <div>${falta ? `<span class="dica-passo">${escapeHtml(falta)}</span>` : ''}<button type="button" class="ds-btn ds-btn-primario" id="btn-proximo-passo" ${falta ? 'disabled' : ''}>Continuar</button></div>`;
+      } else {
+        const bloqueado = !!motivoBloqueioEnvio();
+        rodape.innerHTML = `
+          <div><button type="button" class="ds-btn ds-btn-secundario" id="btn-voltar-passo">Voltar</button></div>
+          <div>
+            <button type="button" class="ds-btn ds-btn-secundario" id="btn-salvar-rascunho">Salvar rascunho</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-finalizar" ${bloqueado ? 'disabled' : ''}>${est.tipo === 'sorteio' ? 'Sortear agora' : 'Enviar agora'}</button>
+          </div>`;
+      }
+    }
+
+    // ----- Eventos do assistente (delegados) -----
+    const assistenteEl = document.getElementById('vista-assistente');
+
+    assistenteEl.addEventListener('input', (e) => {
+      if (!est) return;
+      const t = e.target;
+      if (t.matches('[data-filtro]') && t.type !== 'checkbox' && t.tagName !== 'SELECT') {
+        est.filtros = lerFiltros();
+        atualizarPublico(450);
+        renderRodape();
+      } else if (t.id === 'c-assunto') { est.assunto = t.value; atualizarPrevias(); renderRodape(); }
+      else if (t.id === 'c-corpo') { est.corpo = t.value; atualizarPrevias(); renderRodape(); }
+      else if (t.id === 'c-premio-valor') { est.premio_valor = t.value; atualizarPrevias(); renderRodape(); }
+      else if (t.id === 'c-premio-desc') { est.premio_descricao = t.value; atualizarPrevias(); renderRodape(); }
+      else if (t.id === 'c-qtd') { est.qtd_vencedores = t.value; renderRodape(); }
+      else if (t.id === 'c-nome') { est.nome = t.value; }
     });
 
-    document.getElementById('btn-exportar-csv').addEventListener('click', () => {
-      exportarCsv(ultimoPreview, 'campanha');
+    assistenteEl.addEventListener('change', (e) => {
+      if (!est) return;
+      const t = e.target;
+      if (t.matches('[data-filtro]')) {
+        est.filtros = lerFiltros();
+        atualizarPublico(150);
+        renderRodape();
+      } else if (t.name === 'tipo') {
+        if (est.assunto === PADRAO_ASSUNTO && est.corpo === PADRAO_CORPO) { est.assunto = ''; est.corpo = ''; }
+        est.tipo = t.value;
+        renderCanais();
+        renderRodape();
+      } else if (t.name === 'canal') {
+        est.canal = t.value || null;
+        renderCanais();
+        renderRodape();
+      } else if (t.name === 'premio_tipo') {
+        if ((est.premio_tipo === 'brinde') !== (t.value === 'brinde')) {
+          est.premio_descricao = '';
+          document.getElementById('c-premio-desc').value = '';
+        }
+        est.premio_tipo = t.value;
+        ajustarPremioUI();
+        atualizarPrevias();
+        renderRodape();
+      } else if (t.id === 'c-modelo') {
+        est.whatsapp_template = t.value;
+        atualizarPrevias();
+        renderRodape();
+      }
+    });
+
+    let ultimoCampoEmail = 'c-corpo';
+    assistenteEl.addEventListener('focusin', (e) => {
+      if (e.target.id === 'c-assunto' || e.target.id === 'c-corpo') ultimoCampoEmail = e.target.id;
+    });
+    assistenteEl.addEventListener('mousedown', (e) => {
+      if (e.target.closest('[data-variavel]')) e.preventDefault(); // não tira o foco do campo
+    });
+
+    assistenteEl.addEventListener('click', (e) => {
+      if (!est) return;
+      const variavel = e.target.closest('[data-variavel]');
+      if (variavel) {
+        const campo = document.getElementById(ultimoCampoEmail) || document.getElementById('c-corpo');
+        const ini = campo.selectionStart == null ? campo.value.length : campo.selectionStart;
+        const fim = campo.selectionEnd == null ? ini : campo.selectionEnd;
+        const v = variavel.dataset.variavel;
+        campo.value = campo.value.slice(0, ini) + v + campo.value.slice(fim);
+        campo.focus();
+        campo.setSelectionRange(ini + v.length, ini + v.length);
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      if (e.target.closest('#btn-exportar-csv')) { exportarCsv(est.publico ? est.publico.clientes : [], 'campanha'); return; }
+      if (e.target.closest('#btn-voltar-passo')) { irParaPasso(est.passo - 1); return; }
+      if (e.target.closest('#btn-proximo-passo')) { if (validarPasso(est.passo) === null) irParaPasso(est.passo + 1); return; }
+      if (e.target.closest('#btn-salvar-rascunho')) { salvarRascunho(); return; }
+      if (e.target.closest('#btn-finalizar')) confirmarFinalizar();
     });
 
     function exportarCsv(clientes, nomeArquivo) {
@@ -267,107 +1078,176 @@
       URL.revokeObjectURL(url);
     }
 
-    document.getElementById('btn-salvar-segmento').addEventListener('click', () => {
-      const overlay = abrirModal('<h3>Salvar campanha</h3>', `
-        <div class="ds-form">
-          <div class="ds-campo"><label class="ds-rotulo" for="seg-nome">Nome da campanha</label><input class="ds-input" type="text" id="seg-nome" placeholder="ex.: Clientes de Uberlândia sem comprar há 30 dias"></div>
-          <div class="modal-erro" id="seg-erro"></div>
-          <div class="ds-form-acoes">
-            <button type="button" class="ds-btn ds-btn-secundario" id="seg-cancelar">Cancelar</button>
-            <button type="button" class="ds-btn ds-btn-primario" id="seg-confirmar">Salvar</button>
-          </div>
+    // ---------- Salvar, enviar e sortear ----------
+    function payloadCampanha() {
+      const sorteio = est.tipo === 'sorteio';
+      return {
+        nome: est.nome.trim(),
+        filtros: est.filtros,
+        tipo: est.tipo,
+        canal: est.canal,
+        whatsapp_template: est.canal === 'whatsapp' ? est.whatsapp_template : null,
+        assunto: est.canal === 'email' ? est.assunto : null,
+        corpo: est.canal === 'email' ? est.corpo : null,
+        premio_tipo: sorteio ? est.premio_tipo : null,
+        premio_descricao: sorteio ? est.premio_descricao : null,
+        premio_valor: sorteio && est.premio_tipo !== 'brinde' ? est.premio_valor : null,
+        qtd_vencedores: sorteio ? (Number(est.qtd_vencedores) || 1) : null,
+        notificar_vencedores: sorteio ? !!est.canal : true,
+      };
+    }
+
+    function mostrarErroAssistente(msg) {
+      est.erro = msg;
+      const el = document.getElementById('assistente-erro');
+      if (el) el.textContent = msg;
+    }
+
+    // Grava (cria ou atualiza) a campanha como rascunho. Devolve a linha salva ou null.
+    async function salvar() {
+      if (!est.nome.trim()) {
+        mostrarErroAssistente('Dê um nome à campanha.');
+        const campo = document.getElementById('c-nome');
+        if (campo) campo.focus();
+        return null;
+      }
+      mostrarErroAssistente('');
+      const res = await apiFetch(est.id ? `/crm/api/segmentos/${est.id}` : '/crm/api/segmentos', {
+        method: est.id ? 'PATCH' : 'POST',
+        body: JSON.stringify(payloadCampanha()),
+      });
+      if (!res.ok) { mostrarErroAssistente(await lerErro(res, 'Não foi possível salvar a campanha.')); return null; }
+      const c = await res.json();
+      est.id = c.id;
+      return c;
+    }
+
+    async function salvarRascunho() {
+      const btn = document.getElementById('btn-salvar-rascunho');
+      btn.disabled = true;
+      const c = await salvar();
+      if (!c) { btn.disabled = false; return; }
+      fecharAssistente();
+      mostrarAviso('sucesso', 'Rascunho salvo', `"${c.nome}" está na lista. Você pode continuar de onde parou quando quiser.`);
+    }
+
+    function confirmarFinalizar() {
+      if (!est.nome.trim()) { mostrarErroAssistente('Dê um nome à campanha.'); const campo = document.getElementById('c-nome'); if (campo) campo.focus(); return; }
+      if (validarPasso(1) || validarPasso(2) || validarPasso(3)) { mostrarErroAssistente('Falta completar algum passo anterior — volte e confira.'); return; }
+      const sorteio = est.tipo === 'sorteio';
+      const a = alcance();
+      const canalTxt = est.canal ? ROTULO_CANAL[est.canal] : '';
+      const texto = sorteio
+        ? `Vamos sortear ${plural(Math.min(Number(est.qtd_vencedores) || 1, a.livres), 'ganhador', 'ganhadores')} entre ${plural(a.livres, 'participante', 'participantes')}${est.canal ? ` e avisá-los por ${canalTxt}` : ''}. O resultado fica registrado e não pode ser desfeito.`
+        : `"${est.nome.trim()}" será enviada por ${canalTxt} para ${plural(destinatariosPrevistos(), 'cliente', 'clientes')}. Depois do envio, a campanha não pode ser editada nem reenviada — só duplicada.`;
+      abrirModal(`<h3>${sorteio ? 'Sortear agora?' : 'Enviar campanha agora?'}</h3>`, `
+        <p class="modal-texto">${escapeHtml(texto)}</p>
+        <div class="modal-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="finalizar-voltar">Voltar</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="finalizar-confirmar">${sorteio ? 'Sortear agora' : 'Enviar agora'}</button>
         </div>
       `);
-      document.getElementById('seg-cancelar').addEventListener('click', fecharModal);
-      document.getElementById('seg-confirmar').addEventListener('click', async () => {
-        const nome = document.getElementById('seg-nome').value.trim();
-        if (!nome) { document.getElementById('seg-erro').textContent = 'Nome é obrigatório'; return; }
-        const res = await apiFetch('/crm/api/segmentos', { method: 'POST', body: JSON.stringify({ nome, filtros: lerFiltros() }) });
-        if (!res.ok) { document.getElementById('seg-erro').textContent = 'Falha ao salvar'; return; }
+      document.getElementById('finalizar-voltar').addEventListener('click', fecharModal);
+      document.getElementById('finalizar-confirmar').addEventListener('click', (e) => {
+        e.currentTarget.disabled = true;
+        e.currentTarget.textContent = sorteio ? 'Sorteando…' : 'Enviando…';
+        finalizar();
+      });
+    }
+
+    async function finalizar() {
+      const sorteio = est.tipo === 'sorteio';
+      const c = await salvar();
+      if (!c) { fecharModal(); return; }
+      const nome = c.nome;
+      let res;
+      try {
+        res = sorteio
+          ? await apiFetch(`/crm/api/segmentos/${c.id}/sortear`, { method: 'POST', body: JSON.stringify({ quantidade: Number(est.qtd_vencedores) || 1, notificar: !!est.canal }) })
+          : await apiFetch(`/crm/api/segmentos/${c.id}/enviar`, { method: 'POST' });
+      } catch {
         fecharModal();
-        carregar();
-      });
-    });
-
-    function renderizarSegmentosSalvos() {
-      const el = document.getElementById('lista-segmentos-salvos');
-      el.innerHTML = segmentosSalvos.length ? segmentosSalvos.map((s) => `
-        <div class="lista-segmentos-item">
-          <div class="topo">
-            <div>
-              <div class="nome">${escapeHtml(s.nome)}</div>
-              <div style="color:var(--muted);font-size:12px">${formatarDataHora(s.criado_em)}</div>
-            </div>
-            <div class="acoes-linha">
-              <button type="button" class="ds-btn ds-btn-secundario" data-ver-segmento="${s.id}">Ver</button>
-              <button type="button" class="ds-btn ds-btn-primario" data-sortear-segmento="${s.id}" data-nome-segmento="${escapeHtml(s.nome)}">Sortear</button>
-              <button type="button" class="ds-btn ds-btn-perigo" data-apagar-segmento="${s.id}">Excluir</button>
-            </div>
-          </div>
-        </div>
-      `).join('') : '<p class="vazio">Nenhuma campanha salva ainda.</p>';
-
-      el.querySelectorAll('[data-ver-segmento]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const res = await apiFetch(`/crm/api/segmentos/${btn.dataset.verSegmento}/clientes`);
-          const dados = await res.json();
-          renderizarPreview(dados.clientes);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-      });
-      el.querySelectorAll('[data-apagar-segmento]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          confirmarAcao('Excluir campanha?', 'Deseja excluir a campanha?', async () => {
-            await apiFetch(`/crm/api/segmentos/${btn.dataset.apagarSegmento}`, { method: 'DELETE' });
-            carregar();
-          }, { textoConfirmar: 'Confirmar', textoCancelar: 'Sair' });
-        });
-      });
-      el.querySelectorAll('[data-sortear-segmento]').forEach((btn) => {
-        btn.addEventListener('click', () => abrirModalSortear(btn.dataset.sortearSegmento, btn.dataset.nomeSegmento));
-      });
+        mostrarErroAssistente('Não foi possível concluir. A campanha ficou salva como rascunho.');
+        return;
+      }
+      const dados = await res.json().catch(() => ({}));
+      fecharModal();
+      if (!res.ok) { mostrarErroAssistente(`${dados.error || 'Não foi possível concluir.'} A campanha ficou salva como rascunho.`); return; }
+      fecharAssistente();
+      if (sorteio) abrirResultado(dados, nome);
+      else mostrarAviso('sucesso', 'Envio iniciado', `"${nome}" está sendo enviada para ${plural(dados.total, 'cliente', 'clientes')}. Acompanhe o andamento aqui na lista.`);
     }
 
-    function abrirModalSortear(segmentoId, nomeSegmento) {
-      const overlay = abrirModal(`<h3>Sortear — ${escapeHtml(nomeSegmento)}</h3>`, `
-        <p class="modal-texto">A lista de participantes é congelada no momento do sorteio — fica registrada pra sempre, mesmo se a campanha mudar depois.</p>
-        <div class="ds-form">
-          <div class="ds-campo"><label class="ds-rotulo" for="sorteio-qtd">Quantos vencedores?</label><input class="ds-input" type="number" id="sorteio-qtd" min="1" value="1"></div>
-          <div class="modal-erro" id="sorteio-erro"></div>
-          <div class="ds-form-acoes">
-            <button type="button" class="ds-btn ds-btn-secundario" id="sorteio-cancelar">Cancelar</button>
-            <button type="button" class="ds-btn ds-btn-primario" id="sorteio-confirmar">Sortear</button>
-          </div>
-        </div>
-      `);
-      document.getElementById('sorteio-cancelar').addEventListener('click', fecharModal);
-      document.getElementById('sorteio-confirmar').addEventListener('click', async () => {
-        const quantidade = Number(document.getElementById('sorteio-qtd').value) || 1;
-        const res = await apiFetch(`/crm/api/segmentos/${segmentoId}/sortear`, { method: 'POST', body: JSON.stringify({ quantidade }) });
-        const dados = await res.json();
-        if (!res.ok) { document.getElementById('sorteio-erro').textContent = dados.error || 'Falha ao sortear'; return; }
-        abrirModal('<h3>🎉 Resultado do sorteio</h3>', `
-          ${dados.vencedores.map((v) => `<div class="linha-item"><span>${escapeHtml(v.nome)}</span><span style="color:var(--muted)">${escapeHtml(v.telefone || '—')}</span></div>`).join('')}
-          <div class="modal-acoes"><button type="button" class="ds-btn ds-btn-primario" id="sorteio-fechar">Fechar</button></div>
-        `);
-        document.getElementById('sorteio-fechar').addEventListener('click', () => { fecharModal(); carregar(); });
-      });
+    // ---------- Detalhes: resultado, público e envios ----------
+    function notificacaoHtml(n) {
+      if (!n) return '<p class="ajuda" style="margin-top:16px">Os ganhadores não foram avisados por aqui — entre em contato com eles.</p>';
+      if (n.erro) return `<div style="margin-top:16px">${alertaHtml('erro', 'Não foi possível avisar os ganhadores', n.erro)}</div>`;
+      const partes = [plural(n.enviados || 0, 'aviso enviado', 'avisos enviados')];
+      if (n.erros) partes.push(`${n.erros} com erro`);
+      if (n.ignorados) partes.push(`${n.ignorados} pulado${n.ignorados === 1 ? '' : 's'} (sem contato ou bloqueado)`);
+      return `<div style="margin-top:16px">${alertaHtml(n.erros ? 'aviso' : 'sucesso', `Aviso por ${ROTULO_CANAL[n.canal] || 'mensagem'}`, partes.join(' · '))}</div>`;
     }
 
-    function renderizarSorteios(sorteios) {
-      const el = document.getElementById('lista-sorteios');
-      el.innerHTML = sorteios.length ? sorteios.map((s) => `
-        <div class="lista-sorteios-item">
-          <div class="topo">
-            <span class="nome">${escapeHtml(s.segmento_nome || 'Campanha removida')}</span>
-            <span style="color:var(--muted);font-size:12px">${formatarDataHora(s.criado_em)}</span>
-          </div>
-          <p class="campo-ajuda" style="margin-top:6px">Vencedor(es): ${(s.vencedores || []).map((v) => escapeHtml(v.nome)).join(', ') || '—'}</p>
-        </div>
-      `).join('') : '<p class="vazio">Nenhum sorteio ainda.</p>';
+    function abrirResultado(s, nomeCampanha) {
+      const venc = s.vencedores || [];
+      const premio = s.premio && s.premio.texto;
+      abrirModal('<h3>Resultado do sorteio</h3>', `
+        <p class="modal-texto" style="margin-top:0"><strong>${escapeHtml(nomeCampanha || '')}</strong>${premio ? ` · Prêmio: ${escapeHtml(premio)}` : ''}<br>Sorteio feito em ${formatarDataHora(s.criado_em)} entre ${plural((s.participantes || []).length, 'participante', 'participantes')}.</p>
+        <div class="modal-rolagem" style="margin-top:12px">${venc.map((v, i) => `
+          <div class="vencedor"><span class="vencedor-num">${i + 1}</span><div style="min-width:0"><span class="ds-tabela-primario">${escapeHtml(nomeExibido(v.nome))}</span><span class="ds-tabela-secundario">${escapeHtml(contatoExibido(v.telefone || v.email, !!v.telefone))}</span></div></div>`).join('') || '<p class="vazio">Sem ganhadores.</p>'}</div>
+        ${notificacaoHtml(s.notificacao)}
+        <div class="modal-acoes"><button type="button" class="ds-btn ds-btn-primario" id="resultado-fechar">Fechar</button></div>
+      `, 'ds-modal-card-detalhe');
+      document.getElementById('resultado-fechar').addEventListener('click', fecharModal);
     }
 
-    carregar();
+    function abrirResultadoSalvo(c) {
+      const s = sorteios.find((x) => x.segmento_id === c.id);
+      if (!s) { avisar('Sem resultado', 'Não encontramos o resultado deste sorteio.'); return; }
+      abrirResultado(s, c.nome);
+    }
+
+    async function abrirPublico(c) {
+      const res = await apiFetch(`/crm/api/segmentos/${c.id}/clientes`);
+      if (!res.ok) { avisar('Não foi possível abrir', 'Tente novamente em instantes.'); return; }
+      const dados = await res.json();
+      const clientes = dados.clientes || [];
+      abrirModal(`<h3>Público — ${escapeHtml(c.nome)}</h3>`, `
+        <p class="modal-texto" style="margin-top:0">${plural(clientes.length, 'cliente atende', 'clientes atendem')} aos filtros agora${c.status === 'enviada' ? ' (a lista pode ter mudado desde o envio)' : ''}.</p>
+        <div class="modal-rolagem" style="margin-top:12px">${clientes.slice(0, 200).map((x) => `<div class="linha-item"><span>${escapeHtml(nomeExibido(x.nome))}${x.bloqueado ? ' · bloqueado' : ''}</span><span>${escapeHtml(contatoExibido(x.telefone || x.email, !!x.telefone))}</span></div>`).join('') || '<p class="vazio">Nenhum cliente no público.</p>'}</div>
+        ${clientes.length > 200 ? `<p class="publico-mais">Mostrando 200 de ${clientes.length}. O CSV traz todos.</p>` : ''}
+        <div class="modal-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="publico-csv" ${clientes.length ? '' : 'disabled'}>Exportar CSV</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="publico-fechar">Fechar</button>
+        </div>
+      `, 'ds-modal-card-detalhe');
+      document.getElementById('publico-csv').addEventListener('click', () => exportarCsv(clientes, 'campanha'));
+      document.getElementById('publico-fechar').addEventListener('click', fecharModal);
+    }
+
+    const ROTULO_ENVIO = { enviado: ['sucesso', 'Enviado'], erro: ['erro', 'Erro'], ignorado: ['aviso', 'Pulado'] };
+    async function abrirEnvios(c) {
+      const res = await apiFetch(`/crm/api/segmentos/${c.id}/envios`);
+      if (!res.ok) { avisar('Não foi possível abrir', 'Tente novamente em instantes.'); return; }
+      const envios = await res.json();
+      const conta = (s) => envios.filter((e) => e.status === s).length;
+      abrirModal(`<h3>Envios — ${escapeHtml(c.nome)}</h3>`, `
+        <p class="modal-texto" style="margin-top:0">${plural(conta('enviado'), 'enviado', 'enviados')} · ${conta('erro')} com erro · ${plural(conta('ignorado'), 'pulado', 'pulados')}${c.status === 'enviando' ? ' · envio em andamento' : ''}</p>
+        <div class="modal-rolagem" style="margin-top:12px">${envios.map((e) => {
+          const [tom, rotulo] = ROTULO_ENVIO[e.status] || ['info', e.status];
+          const destino = e.destino ? contatoExibido(e.destino, e.canal === 'whatsapp') : '—';
+          return `<div class="envio-linha"><span>${escapeHtml(nomeExibido(e.cliente_nome))}${e.finalidade === 'sorteio' ? ' · ganhador' : ''}</span><span class="mudo">${escapeHtml(destino)}${e.motivo ? ` · ${escapeHtml(e.motivo)}` : ''}</span><span class="ds-badge ds-badge-${tom} ds-badge-sm">${rotulo}</span></div>`;
+        }).join('') || '<p class="vazio">Nenhum envio registrado ainda.</p>'}</div>
+        <div class="modal-acoes"><button type="button" class="ds-btn ds-btn-primario" id="envios-fechar">Fechar</button></div>
+      `, 'ds-modal-card-detalhe');
+      document.getElementById('envios-fechar').addEventListener('click', fecharModal);
+    }
+
+    // ---------- Início ----------
+    (async function iniciar() {
+      await carregarApoio();
+      await carregar();
+    })();
   </script>
 </body>
 </html>

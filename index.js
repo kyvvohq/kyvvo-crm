@@ -12,6 +12,7 @@ const { encontrarOuCriarPorTelefone, buscarMetricas } = require('./lib/clientes'
 const { proximoNumeroPedido } = require('./lib/pedidos');
 const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
+const campanhas = require('./lib/campanhas');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano } = require('./lib/importacoes');
@@ -1744,25 +1745,87 @@ async function build() {
     return reply.code(201).send({ ok: true });
   });
 
-  // --- Segmentos e sorteio (US23/US24) --------------------------------------------
+  // --- Campanhas: público (segmento), disparo e sorteio (US23/US24 + disparo) ------
+  // Uma campanha é uma linha de crm_segmentos (db/030_campanhas.sql): filtros do
+  // público + tipo (disparo|sorteio) + canal + conteúdo/prêmio. A lógica de
+  // envio e sorteio fica em lib/campanhas.js.
   fastify.post('/crm/api/segmentos/preview', { preHandler: fastify.authenticate }, async (request) => {
     const clientes = await resolverSegmento(pool, request.user.tenantId, request.body?.filtros);
     return { total: clientes.length, clientes };
   });
 
+  // Canais disponíveis pro assistente: WhatsApp (número vinculado + modelos
+  // aprovados na Meta) e e-mail (provedor configurado no servidor).
+  fastify.get('/crm/api/campanhas/canais', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select numero_exibido from crm_whatsapp_numeros where tenant_id = $1 limit 1', [request.user.tenantId]);
+    const modelos = rows[0] ? await listarTemplates() : [];
+    return {
+      whatsapp: { conectado: !!rows[0], numero: rows[0] ? rows[0].numero_exibido : null, modelos: modelos.filter((m) => m.status === 'APPROVED') },
+      email: { disponivel: !!(process.env.PLATFORM_EMAIL_TOKEN || process.env.RESEND_API_KEY) },
+    };
+  });
+
   fastify.get('/crm/api/segmentos', { preHandler: fastify.authenticate }, async (request) => {
-    const { rows } = await pool.query('select * from crm_segmentos where tenant_id = $1 order by criado_em desc', [request.user.tenantId]);
+    const { rows } = await pool.query(
+      `select s.*,
+              coalesce(e.enviados, 0) as enviados, coalesce(e.erros, 0) as erros, coalesce(e.ignorados, 0) as ignorados
+       from crm_segmentos s
+       left join lateral (
+         select count(*) filter (where status = 'enviado')::int as enviados,
+                count(*) filter (where status = 'erro')::int as erros,
+                count(*) filter (where status = 'ignorado')::int as ignorados
+         from crm_campanhas_envios where campanha_id = s.id and finalidade = 'disparo'
+       ) e on true
+       where s.tenant_id = $1 order by s.criado_em desc`,
+      [request.user.tenantId]
+    );
     return rows;
   });
 
   fastify.post('/crm/api/segmentos', { preHandler: fastify.authenticate }, async (request, reply) => {
-    const { tenantId } = request.user;
-    const { nome, filtros } = request.body || {};
-    if (!nome || !nome.trim()) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const { erro, valores: v } = campanhas.normalizarCampanha(request.body);
+    if (erro) return reply.code(400).send({ error: erro });
     const { rows } = await pool.query(
-      'insert into crm_segmentos (tenant_id, nome, filtros) values ($1, $2, $3) returning *',
-      [tenantId, nome.trim(), JSON.stringify(filtros || {})]
+      `insert into crm_segmentos (tenant_id, nome, filtros, tipo, canal, whatsapp_template, assunto, corpo,
+                                  premio_tipo, premio_descricao, premio_valor, qtd_vencedores, notificar_vencedores)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning *`,
+      [request.user.tenantId, v.nome, JSON.stringify(v.filtros), v.tipo, v.canal, v.whatsapp_template, v.assunto, v.corpo,
+        v.premio_tipo, v.premio_descricao, v.premio_valor, v.qtd_vencedores, v.notificar_vencedores]
     );
+    return reply.code(201).send(rows[0]);
+  });
+
+  // Edita um rascunho (campanha já enviada/sorteada não muda: vira histórico).
+  fastify.patch('/crm/api/segmentos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows: atuais } = await pool.query('select * from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!atuais[0]) return reply.code(404).send({ error: 'Campanha não encontrada' });
+    if (atuais[0].status === 'enviando' || atuais[0].status === 'enviada') {
+      return reply.code(409).send({ error: 'Campanha já enviada não pode ser editada. Duplique-a para criar uma nova.' });
+    }
+    const { erro, valores: v } = campanhas.normalizarCampanha({ ...atuais[0], ...request.body });
+    if (erro) return reply.code(400).send({ error: erro });
+    const { rows } = await pool.query(
+      `update crm_segmentos set nome = $3, filtros = $4, tipo = $5, canal = $6, whatsapp_template = $7, assunto = $8, corpo = $9,
+              premio_tipo = $10, premio_descricao = $11, premio_valor = $12, qtd_vencedores = $13, notificar_vencedores = $14,
+              atualizado_em = now()
+       where id = $1 and tenant_id = $2 returning *`,
+      [request.params.id, tenantId, v.nome, JSON.stringify(v.filtros), v.tipo, v.canal, v.whatsapp_template, v.assunto, v.corpo,
+        v.premio_tipo, v.premio_descricao, v.premio_valor, v.qtd_vencedores, v.notificar_vencedores]
+    );
+    return rows[0];
+  });
+
+  fastify.post('/crm/api/segmentos/:id/duplicar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { rows } = await pool.query(
+      `insert into crm_segmentos (tenant_id, nome, filtros, tipo, canal, whatsapp_template, assunto, corpo,
+                                  premio_tipo, premio_descricao, premio_valor, qtd_vencedores, notificar_vencedores)
+       select tenant_id, nome || ' (cópia)', filtros, tipo, canal, whatsapp_template, assunto, corpo,
+              premio_tipo, premio_descricao, premio_valor, qtd_vencedores, notificar_vencedores
+       from crm_segmentos where id = $1 and tenant_id = $2 returning *`,
+      [request.params.id, request.user.tenantId]
+    );
+    if (!rows[0]) return reply.code(404).send({ error: 'Campanha não encontrada' });
     return reply.code(201).send(rows[0]);
   });
 
@@ -1780,9 +1843,46 @@ async function build() {
     return { segmento: rows[0], clientes };
   });
 
+  // Dispara a campanha (WhatsApp ou e-mail). Responde 202 na hora e envia em
+  // segundo plano — a tela acompanha pelo status ('enviando' → 'enviada').
+  fastify.post('/crm/api/segmentos/:id/enviar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows } = await pool.query('select * from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    const campanha = rows[0];
+    if (!campanha) return reply.code(404).send({ error: 'Campanha não encontrada' });
+
+    const preparo = await campanhas.prepararDisparo(pool, { tenantId, campanha });
+    if (preparo.erro) return reply.code(preparo.status || 400).send({ error: preparo.erro });
+
+    // `where status <> 'enviando'/'enviada'` fecha a janela de dois cliques seguidos
+    const { rows: marcada } = await pool.query(
+      `update crm_segmentos set status = 'enviando', enviado_em = now(), total_publico = $3, atualizado_em = now()
+       where id = $1 and tenant_id = $2 and status in ('rascunho', 'sorteada') returning *`,
+      [campanha.id, tenantId, preparo.clientes.length]
+    );
+    if (!marcada[0]) return reply.code(409).send({ error: 'Esta campanha já foi enviada ou está sendo enviada.' });
+
+    setImmediate(() => campanhas.executarDisparo(pool, { tenantId, campanha: marcada[0], clientes: preparo.clientes }));
+    return reply.code(202).send({ ok: true, total: preparo.clientes.length });
+  });
+
+  fastify.get('/crm/api/segmentos/:id/envios', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows: seg } = await pool.query('select id from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!seg[0]) return reply.code(404).send({ error: 'Campanha não encontrada' });
+    const { rows } = await pool.query(
+      `select e.id, e.finalidade, e.canal, e.destino, e.status, e.motivo, e.criado_em, c.nome as cliente_nome
+       from crm_campanhas_envios e left join crm_clientes c on c.id = e.cliente_id
+       where e.campanha_id = $1 order by e.criado_em desc limit 500`,
+      [request.params.id]
+    );
+    return rows;
+  });
+
   // Congela a lista de participantes no momento do sorteio — reabrir o
   // mesmo segmento depois pode trazer clientes diferentes, o sorteio já
-  // feito não muda (seção 7.5 do doc: "auditável").
+  // feito não muda (seção 7.5 do doc: "auditável"). Se a campanha tem prêmio e
+  // canal, os ganhadores são avisados.
   fastify.post('/crm/api/segmentos/:id/sortear', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId, userId } = request.user;
     if (!userId) return reply.code(400).send({ error: 'Sessão sem usuário identificado — faça login de novo pra sortear.' });
@@ -1790,19 +1890,13 @@ async function build() {
     const { rows: segRows } = await pool.query('select * from crm_segmentos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
     if (!segRows[0]) return reply.code(404).send({ error: 'Segmento não encontrado' });
 
-    const participantes = await resolverSegmento(pool, tenantId, segRows[0].filtros);
-    if (!participantes.length) return reply.code(400).send({ error: 'Este segmento não tem nenhum participante agora.' });
-
-    const quantidade = Math.min(Math.max(Number(request.body?.quantidade) || 1, 1), participantes.length);
-    const embaralhados = [...participantes].sort(() => Math.random() - 0.5);
-    const vencedores = embaralhados.slice(0, quantidade).map((c) => ({ id: c.id, nome: c.nome, telefone: c.telefone }));
-
-    const { rows } = await pool.query(
-      `insert into crm_sorteios (tenant_id, segmento_id, participantes, vencedores, ator_id)
-       values ($1, $2, $3, $4, $5) returning *`,
-      [tenantId, segRows[0].id, JSON.stringify(participantes.map((c) => c.id)), JSON.stringify(vencedores), userId]
-    );
-    return reply.code(201).send(rows[0]);
+    const resultado = await campanhas.sortearCampanha(pool, {
+      tenantId, userId, campanha: segRows[0],
+      quantidade: request.body?.quantidade,
+      notificar: typeof request.body?.notificar === 'boolean' ? request.body.notificar : null,
+    });
+    if (resultado.erro) return reply.code(400).send({ error: resultado.erro });
+    return reply.code(201).send(resultado.sorteio);
   });
 
   fastify.get('/crm/api/sorteios', { preHandler: fastify.authenticate }, async (request) => {
