@@ -314,18 +314,21 @@ async function build(opcoes = {}) {
   // Força o reprocessamento de uma conversa travada (tentativas esgotadas)
   // com os MESMOS deps de produção (fastify.agente.deps) — diferente da
   // varredura periódica, devolve o erro de verdade na resposta em vez de só
-  // logar no console do container (que não dá pra ver de fora).
-  fastify.post('/crm/admin-interno/reprocessar/:tenantId/:conversaId', async (request, reply) => {
+  // logar no console do container (que não dá pra ver de fora). Por telefone
+  // (não id da conversa) — o diagnóstico (#143) não expõe o id, só o
+  // telefone, que já identifica a conversa (unique por tenant+telefone).
+  fastify.post('/crm/admin-interno/reprocessar/:tenantId/:telefone', async (request, reply) => {
     if (!autenticarAdminInterno(request, reply)) return;
-    const { tenantId, conversaId } = request.params;
+    const { tenantId, telefone } = request.params;
+    const { rows: [conversa] } = await pool.query(
+      'select id from crm_conversas_whatsapp where tenant_id = $1 and telefone_e164 = $2', [tenantId, telefone]);
+    if (!conversa) return reply.code(404).send({ error: 'Conversa não encontrada' });
     await pool.query(
       `update crm_mensagens_whatsapp set tentativas = 0
-         where tenant_id = $1 and processada_em is null and telefone_e164 = (
-           select telefone_e164 from crm_conversas_whatsapp where tenant_id = $1 and id = $2
-         )`,
-      [tenantId, conversaId],
+         where tenant_id = $1 and telefone_e164 = $2 and processada_em is null`,
+      [tenantId, telefone],
     );
-    const resultado = await processarConversa(pool, tenantId, conversaId, fastify.agente.deps);
+    const resultado = await processarConversa(pool, tenantId, conversa.id, fastify.agente.deps);
     return resultado;
   });
 
