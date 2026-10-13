@@ -55,3 +55,6 @@ Recomendação provisória: `modelo_runtime = claude-haiku-5-5` (mais acertos e 
 ### Rodada real nº 3 (2026-10-13 02:00) e decisão de modelo
 `claude-haiku-4-5` 17/24 (71%), US$ 0,28 · `claude-haiku-5-5` 21/24 (88%), US$ 0,05. **Padrão passa a `claude-haiku-5-5`** (migration 038 + seed). Falhas do 5.5: `adv-id-shopee` era artefato do eval (mesmo tenant para os dois modelos — agora cada modelo roda em tenant próprio); `adv-urgencia` e `doc04-3` tiveram a resposta bloqueada por o modelo repetir o "amanhã" da cliente (filtro agora só barra "amanhã" ligado a promessa) e o bloqueio sobrescrevia o motivo do handoff (agora preserva).
 Falta a rodada nº 4 só com o 5.5 para confirmar ≥ 90%.
+
+### Rodada real nº 4 (2026-10-13) — marco 4 encerrado
+`claude-haiku-5-5`: 96% dos casos. Modelo padrão confirmado.
