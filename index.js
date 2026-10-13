@@ -227,6 +227,15 @@ async function build(opcoes = {}) {
     return { ok: true };
   });
 
+  // Leitura do modo do agente (desligado/rascunho/automatico) por tenant —
+  // suporte pediu pra diagnosticar "bot não responde" sem precisar de query
+  // manual no banco (achado ao vivo, 2026-10-13: ver admin > WABAs).
+  fastify.get('/crm/admin-interno/agente-config/:tenantId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const config = await atendimento.obterConfig(pool, request.params.tenantId);
+    return config;
+  });
+
   // --- Conversas (histórico de mensagens do bot, crm_mensagens_whatsapp) ---
   // Configurações > WhatsApp > Conversas. Uma linha por telefone (a mensagem
   // mais recente, pra prévia da lista) — a thread completa vem só ao abrir
