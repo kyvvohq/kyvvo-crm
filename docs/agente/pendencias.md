@@ -36,3 +36,9 @@ Migration 036; `lib/agente/{posfiltro,horario,ferramentas,contexto,executor}.js`
 - Pós-filtro é deliberadamente estrito (bloqueia até a palavra "frete" na boca do agente): o custo é um encaminhamento a mais; acompanhar a taxa de bloqueio nos evals.
 - Rate limit por número e retenção de logs ainda não implementados (marco 6).
 - Modelo padrão `claude-haiku-4-5`; `claude-haiku-5-5` entra na comparação do marco 4.
+
+## Marco 4 — concluído (parcial: falta a rodada real)
+`evals/` (carregador, avaliador, executor, CLI), 25 casos (6 do doc 04 + 19 adversariais) e `npm run evals`; `test/evals.test.js` roda a suíte em modo mock no `npm test`. Carregador de `evals/basic/` pronto (vazio até chegarem as conversas anonimizadas).
+- **A comparação Haiku 4.5 × 5.5 ainda não foi rodada**: precisa de `ANTHROPIC_API_KEY` e `npm run evals -- --real --modelos claude-haiku-4-5,claude-haiku-5-5`. Até lá, `modelo_runtime` segue `claude-haiku-4-5`.
+- Batch API não é usada: cada caso é um laço de ferramentas com várias idas e voltas.
+- Os preços por modelo em `evals/cli.js` (`PRECOS`) são os vigentes em 2026-10; conferir antes de decidir por custo.

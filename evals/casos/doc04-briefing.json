@@ -1,0 +1,97 @@
+[
+  {
+    "id": "doc04-1-cortador-pronta-entrega",
+    "descricao": "Caso 1 do doc 04: pergunta por cortador de pronta entrega. Registra o briefing, não afirma disponibilidade, assume quantidade padrão.",
+    "mensagens": [{ "texto": "Oi! Vocês têm cortador da Nossa Senhora Aparecida pronta entrega?" }],
+    "esperado": {
+      "ferramentas": ["registrar_briefing"],
+      "resposta_nao_casa": ["\\btemos\\b", "dispon", "estoque"],
+      "bloqueada": false,
+      "pedido": { "origem": "WhatsApp", "quantidade": 1, "campos": { "produto_modelo": "Aparecida" } }
+    },
+    "mock": [
+      { "ferramenta": "buscar_ou_criar_cliente" },
+      { "ferramenta": "registrar_briefing", "input": { "produto_modelo": "Cortador Nossa Senhora Aparecida", "categoria": "Cortador" } },
+      { "texto": "Oi! Sou a assistente virtual da Basic 3D Print. Anotei o cortador da Nossa Senhora Aparecida, 1 unidade, certo? E para qual data você precisa? 🩵" }
+    ]
+  },
+  {
+    "id": "doc04-2-carimbo-com-logo",
+    "descricao": "Caso 2: carimbo com logotipo. Pede logo, tamanho e formato; menciona proposta de modelagem sem prometer viabilidade.",
+    "mensagens": [{ "texto": "Quero um carimbo de doces com a logo da minha confeitaria" }],
+    "esperado": {
+      "ferramentas": ["registrar_briefing"],
+      "resposta_casa": ["logo"],
+      "resposta_nao_casa": ["com certeza consigo", "sem problema nenhum, fica"],
+      "bloqueada": false,
+      "pedido": { "campos": { "produto_modelo": "carimbo" } }
+    },
+    "mock": [
+      { "ferramenta": "registrar_briefing", "input": { "produto_modelo": "Carimbo de doces com logo", "categoria": "Carimbo de doces", "personalizacao": "logo da confeitaria" } },
+      { "texto": "Que legal! Me envia a logo em boa qualidade, por favor? E qual tamanho e formato você quer: redondo, retangular ou quadrado?" }
+    ]
+  },
+  {
+    "id": "doc04-3-chaveiros-data-comemorativa",
+    "descricao": "Caso 3: dois chaveiros com nomes e pergunta se fica pronto amanhã. Registra, não promete prazo, encaminha.",
+    "mensagens": [{ "texto": "Preciso de 2 chaveiros pro Dia dos Professores, com os nomes Ana e Bia. Fica pronto amanhã?" }],
+    "esperado": {
+      "ferramentas": ["registrar_briefing", "transferir_para_equipe"],
+      "handoff": ["pergunta_valor_prazo_frete_pagamento", "urgencia"],
+      "resposta_nao_casa": ["sim,? fica", "fica pronto amanh"],
+      "pedido": { "quantidade": 2, "campos": { "personalizacao": "Ana" } }
+    },
+    "mock": [
+      { "ferramenta": "registrar_briefing", "input": { "produto_modelo": "Chaveiro personalizado", "quantidade": 2, "personalizacao": "nomes Ana e Bia" } },
+      { "ferramenta": "transferir_para_equipe", "input": { "motivo": "urgencia", "resumo": "2 chaveiros com os nomes Ana e Bia, quer saber se fica pronto no dia seguinte." } },
+      { "texto": "Anotei os 2 chaveiros com os nomes Ana e Bia! A prazo quem confirma é a nossa equipe, que já vai continuar o seu atendimento por aqui. 🩵" }
+    ],
+    "esperado_mock": { "resposta_nao_casa": ["sim,? fica"] }
+  },
+  {
+    "id": "doc04-4-cliente-recorrente-compra-direta",
+    "descricao": "Caso 4: cliente recorrente quer comprar direto e pergunta o frete. Não informa frete, coleta cidade/CEP e encaminha.",
+    "setup": { "cliente_nome": "Carla Mendes", "historico": [{ "de": "cliente", "texto": "Oi, é a Carla de novo" }, { "de": "agente", "texto": "Oi, Carla! Que bom te ver por aqui. 🩵" }] },
+    "mensagens": [{ "texto": "Quero comprar direto com vocês dessa vez. Pra Uberaba, como fica o envio?" }],
+    "esperado": {
+      "handoff": true,
+      "ferramentas": ["transferir_para_equipe"],
+      "resposta_nao_casa": ["R\\$", "reais"],
+      "resposta_casa": ["Carla"]
+    },
+    "mock": [
+      { "ferramenta": "registrar_briefing", "input": { "cep_cidade": "Uberaba" } },
+      { "ferramenta": "transferir_para_equipe", "input": { "motivo": "pergunta_valor_prazo_frete_pagamento", "resumo": "Cliente recorrente quer comprar direto e envio para Uberaba." } },
+      { "texto": "Claro, Carla! Anotei Uberaba. A equipe vai continuar seu atendimento por aqui e te passa tudo junto com o orçamento. 🩵" }
+    ]
+  },
+  {
+    "id": "doc04-5-cliente-do-instagram",
+    "descricao": "Caso 5: veio do Instagram, quer ver modelos de chaveiros. Pede referências e registra o interesse.",
+    "mensagens": [{ "texto": "Oi! Vi vocês no Instagram, queria ver modelos de chaveiros" }],
+    "esperado": {
+      "resposta_casa": ["\\?"],
+      "resposta_nao_casa": ["R\\$", "temos\\s+(os\\s+)?modelos"],
+      "bloqueada": false
+    },
+    "mock": [
+      { "ferramenta": "buscar_ou_criar_cliente" },
+      { "texto": "Oi! Sou a assistente virtual da Basic 3D Print. Que bom que você chegou até a gente! Você já tem alguma referência ou foto do chaveiro que imaginou? 🩵" }
+    ]
+  },
+  {
+    "id": "doc04-6-peca-sob-medida",
+    "descricao": "Caso 6: peça sob medida com medida informada. Registra medida e uso, não precifica.",
+    "mensagens": [{ "texto": "Preciso de uma peça igual da foto que te mandei antes, com 12 cm, pra encaixar numa prateleira" }],
+    "esperado": {
+      "ferramentas": ["registrar_briefing"],
+      "pedido": { "campos": { "medida": "12" } },
+      "resposta_nao_casa": ["R\\$", "reais"],
+      "bloqueada": false
+    },
+    "mock": [
+      { "ferramenta": "registrar_briefing", "input": { "produto_modelo": "Peça sob medida (referência em foto)", "medida": "12 cm", "uso": "encaixe em prateleira" } },
+      { "texto": "Perfeito! Anotei 12 cm e que vai encaixar numa prateleira. Quantas unidades você precisa?" }
+    ]
+  }
+]
