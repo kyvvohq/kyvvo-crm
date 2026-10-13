@@ -54,12 +54,12 @@ async function novaConversa(tenant, mensagens, { situacao = 'bot', janelaHoras =
   return { conversa, mensagens: ms };
 }
 
-async function rodar(tenant, mensagens, respostas, extra = {}) {
+async function rodar(tenant, mensagens, respostas, extra = {}, deps = {}) {
   const ia = iaFalsa(respostas);
   const envios = [];
   const c = await novaConversa(tenant, mensagens, extra);
   const r = await executarTurno({ pool, tenantId: tenant, conversa: c.conversa, mensagens: c.mensagens }, {
-    ia, enviarTexto: async (p) => { envios.push(p); return true; }, log: () => {},
+    ia, enviarTexto: async (p) => { envios.push(p); return true; }, log: () => {}, ...deps,
   });
   return { ...c, ia, envios, r };
 }
@@ -417,4 +417,45 @@ test('regra de pausa: conversa com humano não roda o agente (via processador)',
   const r = await processarConversa(pool, A, c.conversa.id, { executarAgente: async () => { chamou = true; }, log: () => {} });
   assert.equal(r.pausado, true);
   assert.equal(chamou, false);
+});
+
+test('prometeu encaminhar sem chamar a ferramenta: rede de proteção cria o handoff', opts, async () => {
+  const x = await rodar(A, [{ texto: 'quero falar com alguém' }], [falou('Claro! Vou encaminhar você para a nossa equipe agora mesmo. 🩵')]);
+  const h = await handoffs(A, x.conversa.id);
+  assert.equal(h.length, 1);
+  assert.equal(h[0].motivo, 'outro');
+  assert.match(h[0].resumo, /quero falar com alguém/);
+  assert.equal(x.r.ferramentas.at(-1).implicito, true);
+  // resposta normal sobre briefing não vira handoff
+  const y = await rodar(A, [{ texto: 'quero um chaveiro' }], [falou('A equipe analisa a referência e apresenta uma proposta antes de produzir. Qual o nome?')]);
+  assert.equal((await handoffs(A, y.conversa.id)).length, 0);
+  // quando o modelo já chamou a ferramenta, não duplica
+  const z = await rodar(A, [{ texto: 'reclamação' }], [toolUse('transferir_para_equipe', { motivo: 'reclamacao', resumo: 'x' }), falou('Vou encaminhar seu caso para a equipe. 🩵')]);
+  const hz = await handoffs(A, z.conversa.id);
+  assert.equal(hz.length, 1);
+  assert.equal(hz[0].motivo, 'reclamacao');
+});
+
+test('fora do horário: aviso de recebimento é acrescentado uma vez por período, se o modelo esquecer', opts, async () => {
+  const fora = { agora: () => new Date('2026-10-12T22:00:00Z') }; // 19:00 em São Paulo
+  const aviso = seed.config.mensagem_fora_horario;
+  const c = await novaConversa(A, [{ texto: 'oi, quero um cortador' }]);
+  const d = { enviarTexto: async () => true, log: () => {}, ...fora };
+  const r1 = await executarTurno({ pool, tenantId: A, conversa: c.conversa, mensagens: c.mensagens }, { ...d, ia: iaFalsa([falou('Oi! Sou a assistente virtual da Basic 3D Print. Qual modelo?')]) });
+  assert.ok(r1.resposta.startsWith(aviso));
+  assert.ok(r1.resposta.endsWith("Qual modelo?"));
+  const r2 = await executarTurno({ pool, tenantId: A, conversa: c.conversa, mensagens: c.mensagens }, { ...d, ia: iaFalsa([falou('Anotado! Para qual data?')]) });
+  assert.equal(r2.resposta, 'Anotado! Para qual data?'); // já avisou neste período
+  const c2 = await novaConversa(A, [{ texto: 'oi' }]);
+  const r3 = await executarTurno({ pool, tenantId: A, conversa: c2.conversa, mensagens: c2.mensagens }, { ...d, ia: iaFalsa([falou('Recebi sua mensagem! A equipe responde no próximo período. Qual modelo?')]) });
+  assert.equal(r3.resposta.startsWith(aviso), false); // modelo já avisou: não duplica
+  const { rows: [e] } = await pool.query('select aviso_fora_horario from crm_agente_execucoes where id = $1', [r3.execucaoId]);
+  assert.equal(e.aviso_fora_horario, true);
+});
+
+test('auditoria: guarda o texto original do modelo quando o filtro bloqueia', opts, async () => {
+  const x = await rodar(A, [{ texto: 'quanto é?' }], [falou('Fica R$ 40,00 cada.')]);
+  const { rows: [e] } = await pool.query('select resposta_original, resposta_proposta from crm_agente_execucoes where id = $1', [x.r.execucaoId]);
+  assert.equal(e.resposta_original, 'Fica R$ 40,00 cada.');
+  assert.equal(e.resposta_proposta, ENCAMINHAMENTO);
 });

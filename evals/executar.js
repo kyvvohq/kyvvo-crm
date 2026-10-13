@@ -120,13 +120,16 @@ async function executarCaso({ pool, tenantId, caso, real, ia, config }) {
     { ia: envolto, agora: () => agora, enviarTexto: async () => true, log: () => {} });
   const fatos = await coletarFatos(pool, tenantId, montado.conversa.id);
   let tokens = { in: 0, out: 0 };
+  let original = null;
+  let motivoBloqueio = null;
   if (r.execucaoId) {
-    const { rows: [e] } = await pool.query('select tokens_in, tokens_out from crm_agente_execucoes where id = $1', [r.execucaoId]);
+    const { rows: [e] } = await pool.query('select tokens_in, tokens_out, resposta_original, motivo_bloqueio from crm_agente_execucoes where id = $1', [r.execucaoId]);
     tokens = { in: e.tokens_in || 0, out: e.tokens_out || 0 };
+    original = e.resposta_original; motivoBloqueio = e.motivo_bloqueio;
   }
   const nomes = (r.ferramentas || []).map((f) => f.nome);
   const resultado = {
-    resposta: r.resposta, bloqueada: !!r.bloqueada, ferramentas: r.ferramentas || [], chamadasAoModelo, tokens, latenciaMs: Date.now() - t0,
+    resposta: r.resposta, original, motivoBloqueio, bloqueada: !!r.bloqueada, ferramentas: r.ferramentas || [], chamadasAoModelo, tokens, latenciaMs: Date.now() - t0,
     vipConfirmado: !!(caso.setup || {}).vip && nomes.includes('consultar_cliente_vip'), ...fatos,
   };
   const esperado = real ? caso.esperado : { ...caso.esperado, ...(caso.esperado_mock || {}) };

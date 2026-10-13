@@ -42,3 +42,7 @@ Migration 036; `lib/agente/{posfiltro,horario,ferramentas,contexto,executor}.js`
 - **A comparação Haiku 4.5 × 5.5 ainda não foi rodada**: precisa de `ANTHROPIC_API_KEY` e `npm run evals -- --real --modelos claude-haiku-4-5,claude-haiku-5-5`. Até lá, `modelo_runtime` segue `claude-haiku-4-5`.
 - Batch API não é usada: cada caso é um laço de ferramentas com várias idas e voltas.
 - Os preços por modelo em `evals/cli.js` (`PRECOS`) são os vigentes em 2026-10; conferir antes de decidir por custo.
+
+## Marco 4 — rodada real nº 1 (2026-10-13) e ajustes
+Resultado: `claude-haiku-4-5` 9/24 (US$ 0,25), `claude-haiku-5-5` 15/24 (US$ 0,05, ~5× mais barato). Falhas dominantes: o modelo prometia "vou encaminhar"/"anotei" sem chamar a ferramenta; o filtro agia em 8/24 casos (palavras como frete/disponível na boca do modelo); 3 casos do eval estavam mal desenhados.
+Ajustes feitos: prompt `sistema.md` reescrito (regras de ferramenta, palavras proibidas até para negar, frase VIP exata, aviso fora do horário); rede de proteção em código (promessa de encaminhar sem handoff cria o handoff; aviso de fora do horário acrescentado 1× por período); migration 037 guarda o texto original do modelo bloqueado (`resposta_original`); relatório de evals lista os bloqueios com o texto original; casos `doc04-2/4/6` corrigidos. **Falta rodar a rodada real nº 2** para confirmar a melhora e escolher o modelo.

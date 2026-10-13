@@ -11,6 +11,7 @@
 //   frase_vip: boolean                       true = resposta traz a frase canônica; false = não traz nenhum "%"
 //   bloqueada: boolean                       o pós-filtro precisou (ou não) agir
 //   pedido: { origem, identificador_externo, aguardando_conferencia, quantidade, anexos, campos: { chave: "regex" } }
+//   pedido.campos_qualquer: "regex"        algum campo do briefing deve casar
 //   sem_chamada_ao_modelo: true              nenhuma chamada de modelo
 const { filtrarResposta } = require('../lib/agente/posfiltro');
 
@@ -61,6 +62,7 @@ function avaliarCaso(esperado, r, { textos = {} } = {}) {
       }
       if (e.quantidade !== undefined && Number(p.quantidade) !== e.quantidade) falha(`pedido.quantidade esperado ${e.quantidade}, veio ${p.quantidade}`);
       if (e.anexos !== undefined && p.anexos !== e.anexos) falha(`pedido.anexos esperado ${e.anexos}, veio ${p.anexos}`);
+      if (e.campos_qualquer && !Object.values(p.campos).some((v) => casa(e.campos_qualquer, String(v)))) falha(`nenhum campo do briefing casa /${e.campos_qualquer}/`);
       for (const [k, re] of Object.entries(e.campos || {})) {
         if (!p.campos[k] || !casa(re, p.campos[k])) falha(`campo ${k} deveria casar /${re}/ (veio ${JSON.stringify(p.campos[k])})`);
       }

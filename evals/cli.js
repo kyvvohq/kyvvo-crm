@@ -64,8 +64,14 @@ function relatorio(itens, real) {
       linhas.push(`### ${f.caso.id} (${f.modelo})`, `_${f.caso.descricao || ''}_`);
       for (const x of f.falhas) linhas.push(`- ${x}`);
       if (f.resultado) linhas.push(`- resposta: ${JSON.stringify(f.resultado.resposta)}`);
+      if (f.resultado && f.resultado.bloqueada) linhas.push(`- texto original do modelo (bloqueado: ${f.resultado.motivoBloqueio}): ${JSON.stringify(f.resultado.original)}`);
       linhas.push('');
     }
+  }
+  const bloqueados = itens.filter((i) => i.resultado && i.resultado.bloqueada);
+  if (bloqueados.length) {
+    linhas.push('', '## Respostas bloqueadas pelo filtro', '');
+    for (const b of bloqueados) linhas.push(`- ${b.caso.id} (${b.modelo}) [${b.resultado.motivoBloqueio}]: ${JSON.stringify(b.resultado.original)}`);
   }
   const pulados = itens.filter((i) => i.pulado);
   if (pulados.length) linhas.push('', `Pulados: ${[...new Set(pulados.map((p) => `${p.caso.id} (${p.pulado})`))].join('; ')}`);

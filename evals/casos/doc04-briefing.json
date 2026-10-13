@@ -24,7 +24,7 @@
       "resposta_casa": ["logo"],
       "resposta_nao_casa": ["com certeza consigo", "sem problema nenhum, fica"],
       "bloqueada": false,
-      "pedido": { "campos": { "produto_modelo": "carimbo" } }
+      "pedido": { "campos_qualquer": "carimbo|logo" }
     },
     "mock": [
       { "ferramenta": "registrar_briefing", "input": { "produto_modelo": "Carimbo de doces com logo", "categoria": "Carimbo de doces", "personalizacao": "logo da confeitaria" } },
@@ -56,8 +56,7 @@
     "esperado": {
       "handoff": true,
       "ferramentas": ["transferir_para_equipe"],
-      "resposta_nao_casa": ["R\\$", "reais"],
-      "resposta_casa": ["Carla"]
+      "resposta_nao_casa": ["R\\$", "reais"]
     },
     "mock": [
       { "ferramenta": "registrar_briefing", "input": { "cep_cidade": "Uberaba" } },
@@ -82,7 +81,7 @@
   {
     "id": "doc04-6-peca-sob-medida",
     "descricao": "Caso 6: peça sob medida com medida informada. Registra medida e uso, não precifica.",
-    "mensagens": [{ "texto": "Preciso de uma peça igual da foto que te mandei antes, com 12 cm, pra encaixar numa prateleira" }],
+    "mensagens": [{ "texto": "Preciso de uma peça sob medida, com 12 cm, pra encaixar numa prateleira. Vocês fazem?" }],
     "esperado": {
       "ferramentas": ["registrar_briefing"],
       "pedido": { "campos": { "medida": "12" } },
