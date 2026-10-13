@@ -259,7 +259,7 @@ async function build(opcoes = {}) {
     const [canalRows, mensagensRows, conversasRows, execucoesRows] = await Promise.all([
       pool.query('select phone_number_id, modo, status, numero_exibido from crm_whatsapp_numeros where tenant_id = $1', [tenantId]),
       pool.query(
-        `select telefone_e164, direcao, tipo, autor, status_entrega, criado_em
+        `select telefone_e164, direcao, tipo, autor, status_entrega, processada_em, tentativas, criado_em
            from crm_mensagens_whatsapp where tenant_id = $1 order by criado_em desc limit 10`,
         [tenantId],
       ),
@@ -280,6 +280,13 @@ async function build(opcoes = {}) {
       mensagens_recentes: mensagensRows.rows,
       conversas_recentes: conversasRows.rows,
       execucoes_recentes: execucoesRows.rows,
+      // Só presença, nunca o valor — mensagem chega e grava a conversa mesmo
+      // sem isso (achado ao vivo, 2026-10-13: zero linhas em
+      // crm_agente_execucoes mesmo com mensagem recebida é consistente com
+      // executor.js:criarClienteAnthropic lançando ANTES do 1º
+      // registrarExecucao — silencioso, só aparece no log do container).
+      anthropic_api_key_configurada: Boolean(process.env.ANTHROPIC_API_KEY),
+      meta_whatsapp_token_configurado: Boolean(process.env.META_WHATSAPP_TOKEN),
     };
   });
 
