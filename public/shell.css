@@ -83,6 +83,10 @@ h1, h2, h3, .titulo-display { font-family:var(--font-display); }
 .cabecalho-pagina .descricao { font-size:13.5px; color:var(--muted); margin:0; }
 .cabecalho-pagina .acoes { display:flex; gap:10px; flex-shrink:0; }
 
+.menu-contador { margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:var(--radius-full); background:var(--danger); color:#fff;
+  font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+.menu-contador[hidden] { display:none; }
+.ds-menu[data-ds-menu-recolhido] .menu-contador { display:none; }
 .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius-md); padding:var(--space-5); }
 
 /* Tamanho pequeno (32px) é o padrão do CRM — pedido do Bruno pra usar

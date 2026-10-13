@@ -217,6 +217,10 @@
         <h2 class="bloco-titulo">Precisa de atenção</h2>
         <div class="atencao-grid">
         <section class="card card-lista">
+          <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="message-circle" data-size="17"></span>Falar hoje — encaminhados pelo agente<span class="contador acento" id="cont-encaminhamentos" hidden></span></h2></div>
+          <div id="lista-encaminhamentos"><p class="vazio">Carregando…</p></div>
+        </section>
+        <section class="card card-lista">
           <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="circle-alert" data-size="17"></span>Orçamentos parados<span class="contador" id="cont-orcamentos" hidden></span></h2></div>
           <div id="lista-orcamentos"><p class="vazio">Carregando…</p></div>
         </section>
@@ -317,6 +321,20 @@
       `;
     }
 
+    // Encaminhamentos do agente de atendimento: VIP primeiro, depois quem espera há mais tempo.
+    function esperaTexto(min) {
+      if (min < 1) return 'agora';
+      if (min < 60) return 'há ' + min + ' min';
+      if (min < 1440) return 'há ' + Math.floor(min / 60) + ' h';
+      return 'há ' + Math.floor(min / 1440) + ' d';
+    }
+    function itemEncaminhamentoHtml(e) {
+      return '<div class="item-hoje"><div class="info"><div class="nome">' + escapeHtml(e.cliente_nome)
+        + (e.eh_vip ? ' <span class="ds-badge ds-badge-sm ds-badge-marca">VIP</span>' : '') + '</div>'
+        + '<div class="meta">' + escapeHtml(e.rotulo) + ' · ' + esperaTexto(e.minutos_esperando) + (e.resumo ? ' — ' + escapeHtml(e.resumo.slice(0, 90)) : '') + '</div></div>'
+        + '<a class="ds-btn ds-btn-primario btn-whats" href="/crm/atendimento.html?conversa=' + e.conversa_id + '" style="background:var(--accent)">Abrir</a></div>';
+    }
+
     // Estado vazio das listas de atenção = "tudo em dia" (ícone de check);
     // o contador do título e o modificador is-vazio do cartão acompanham.
     const ICONE_OK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
@@ -361,6 +379,7 @@
       modelosMensagem = Object.fromEntries((await resModelos.json()).map((m) => [m.chave, m]));
       etapas = listaEtapas;
 
+      renderLista('lista-encaminhamentos', (dados.encaminhamentos || []).map(itemEncaminhamentoHtml), 'Ninguém aguardando a equipe.');
       renderLista('lista-orcamentos', dados.orcamentos_parados.map(itemOrcamentoHtml), 'Nenhum orçamento parado.');
       renderLista('lista-pagamentos', dados.pagamentos_pendentes.map(itemPagamentoHtml), 'Nenhum pagamento pendente.');
 

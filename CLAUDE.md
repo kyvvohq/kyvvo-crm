@@ -21,8 +21,10 @@ landing=3000, studio=3001, people=3002, platform=3003, admin=3004).
 ## Comandos
 
 ```bash
-npm start          # node index.js  (precisa DATABASE_URL, CRM_JWT_SECRET, PLATFORM_URL)
-npm test           # node --test test/*.test.js
+npm start          # node index.js  (precisa DATABASE_URL, PLATFORM_URL; o agente de IA também ANTHROPIC_API_KEY)
+npm test           # node --test test/*.test.js  (testes com banco usam DATABASE_URL e pulam sem ele)
+npm run evals      # evals do agente de IA em modo mock (sem rede); com --real chama o modelo de verdade (ver evals/README.md)
+node scripts/seed-agente.js --tenant <uuid> [--modo rascunho]   # configura o agente de uma conta (docs/runbooks/onboarding-whatsapp-basic.md)
 ```
 
 `npm ci` precisa de `NPM_PACKAGES_TOKEN` no ambiente — o `.npmrc` aponta
@@ -31,11 +33,17 @@ npm test           # node --test test/*.test.js
 ## Arquitetura
 
 **`index.js`** monta o Fastify, registra `@fastify/{jwt,static,multipart}`,
-serve `public/` em `/crm/` e os tokens do design system crus de
-`node_modules/@kyvvohq/design-system` em `/ds/`. Todas as rotas de API vivem
+serve `public/` em `/crm/`. O design system (`/ds/`) não é servido por este arquivo — vem do
+proxy da infra; localmente os assets de `/ds/` não existem (dá para baixar de
+https://crm.kyvvo.com.br/ds/ para pré-visualizar telas). Todas as rotas de API vivem
 nesse arquivo (não há `routes/`) — mesmo padrão do kyvvo-people.
 
-**Auth**: o CRM **não tem tabela de usuário/tenant**. `POST /crm/api/login`
+**Auth (atual)**: a sessão é o token RS256 do `kyvvo-platform` verificado via
+`@kyvvohq/platform-client` (`fastify.authenticate`, `lib/resolver-sessao.js`); os claims trazem
+`tenantId` e `userId` (`request.user`). O parágrafo abaixo descreve o desenho inicial e está
+defasado (o CRM não emite mais JWT próprio).
+
+**Auth (desenho inicial, defasado)**: o CRM **não tem tabela de usuário/tenant**. `POST /crm/api/login`
 valida servidor-a-servidor contra o `kyvvo-platform` (`PLATFORM_URL`, `POST
 /api/auth/login` + `GET /api/auth/crm/acesso`) — qualquer usuário Kyvvo com o
 módulo `crm` ativo entra — e então emite um JWT **interno** próprio (12h,
@@ -52,6 +60,23 @@ funcionar de verdade.
 - `etapas.js` — modelo de segmento único do MVP ("Produção sob encomenda" —
   a config da Basic virando padrão de onboarding, seção 5) + heurística de
   "etapa pronto" do Painel Hoje (ver docs/DECISOES-PENDENTES.md #4).
+
+## Agente de atendimento por IA (Fase 2)
+
+Agente de WhatsApp que qualifica, coleta o briefing, cria **pedido rascunho** e encaminha para a equipe — **não orça**
+(valor/prazo/frete/pagamento/estoque/desconto são sempre da equipe, garantido em código). Spec: `docs/basic/prompt-agente.md`;
+decisões e pendências: `docs/agente/pendencias.md`; LGPD: `docs/agente/lgpd.md`; onboarding do número: `docs/runbooks/onboarding-whatsapp-basic.md`.
+
+- **Fluxo**: o kyvvo-platform encaminha o webhook da Meta (segredo `x-webhook-internal-secret`; a assinatura da Meta é validada lá) →
+  `lib/agente/recebimento.js` grava a mensagem (idempotente por `wamid`) e responde 200 → `processador.js` (lock por conversa,
+  varredura a cada 60 s; a própria `crm_mensagens_whatsapp` é a fila, `processada_em` nulo = pendente) → `executor.js` (prompt em camadas
+  com cache, ferramentas server-side, até 4 iterações, **pós-filtro**, gatilhos garantidos em código, rascunho x automático).
+- **Só atua se** `crm_agente_config.modo <> 'desligado'`; senão o bot por lista antigo (`lib/bot-whatsapp.js`) segue intacto.
+- **Isolamento**: o `tenant_id` das ferramentas vem do servidor, nunca do modelo; nenhuma ferramenta recebe id de cliente/pedido.
+- **Modelo**: por conta (`modelo_runtime`, padrão `claude-haiku-5-5`, escolhido por evals reais: 96%). Testes **nunca** chamam a Meta nem a Anthropic reais.
+- **Telas/rotas**: `public/atendimento.html`, `/crm/api/agente/*` (conversas, sugestões, assumir/devolver, métricas, liga/desliga), card no Painel Hoje.
+- **Mudou o prompt, o filtro ou as ferramentas?** Rode `npm run evals -- --real` e compare antes de subir (custa centavos).
+- Mídia recebida fica em disco (`uploads/agente/<tenant>/`) atrás de `lib/armazenamento.js`; S3 só quando houver infra.
 
 ## Banco
 
@@ -80,6 +105,9 @@ fixa "Sem recurso") × coluna = etapa, ambas arrastáveis; etapas totalmente
 editáveis pelo próprio quadro (criar/renomear/apagar/reordenar, mesmo padrão
 do `kyvvo-people/quadro.html`); quantidade de item na criação rápida; máscara
 de moeda e asterisco vermelho nos campos obrigatórios; Painel Hoje.
+
+**Atenção**: as listas "Implementado"/"Não implementado" abaixo estão defasadas — importações, formulários, campanhas,
+segmentos, automações e o agente de IA já existem; confie no `git log` e em `docs/backlog-fase1.md`.
 
 **Não implementado ainda** (ver `docs/backlog-fase1.md`): importação de
 arquivos, formulário de captação público, segmentos salvos, sorteio, CRUD de

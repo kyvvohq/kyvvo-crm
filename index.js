@@ -30,6 +30,8 @@ const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
 } = require('./lib/notificacoes');
+const { criarAgente } = require('./lib/agente');
+const atendimento = require('./lib/agente/atendimento');
 const platform = require('./lib/platform');
 const { resolverClaims } = require('./lib/resolver-sessao');
 
@@ -61,8 +63,10 @@ const PRODUTOS_HANDOFF_DESTINO = {
   people: 'https://people.kyvvo.com.br/people/sso',
 };
 
-async function build() {
+async function build(opcoes = {}) {
   const fastify = Fastify({ logger: true });
+  // Agente de IA (Fase 2). `opcoes.agente` permite injetar dependências nos testes.
+  fastify.decorate('agente', opcoes.agente || criarAgente(pool));
 
   // Sessão não é mais JWT local assinado pelo CRM: o kyvvo-platform é a
   // única autoridade de auth (mesmo corte já feito no Studio/People) —
@@ -135,6 +139,10 @@ async function build() {
     }
     try {
       const body = request.body || {};
+      // Números com agente ligado (crm_agente_config.modo <> 'desligado') são
+      // tratados pelo agente: grava e responde 200; o resto roda em segundo
+      // plano. Os demais seguem no bot por lista abaixo, sem mudança.
+      const { tratados } = await fastify.agente.tratarWebhook(body);
       const change = (((body.entry || [])[0] || {}).changes || [])[0];
       const value = change ? change.value : null;
       const phoneNumberId = value && value.metadata && value.metadata.phone_number_id;
@@ -145,7 +153,7 @@ async function build() {
       const nomeWhatsapp = value && Array.isArray(value.contacts) && value.contacts[0] && value.contacts[0].profile
         ? value.contacts[0].profile.name : null;
 
-      if (entrada && phoneNumberId) {
+      if (entrada && phoneNumberId && !tratados.has(phoneNumberId)) {
         const { rows } = await pool.query('select tenant_id from crm_whatsapp_numeros where phone_number_id = $1', [phoneNumberId]);
         const tenantId = rows[0] && rows[0].tenant_id;
         const telefoneE164 = tenantId ? paraE164(msg.from) : null;
@@ -2064,7 +2072,94 @@ async function build() {
       pagamentos_pendentes: pagamentosPendentes.rows,
       prontos_para_envio: prontosParaEnvio,
       aniversariantes: aniversariantes.rows,
+      // "Com quem preciso falar hoje?": conversas que o agente encaminhou para a equipe
+      encaminhamentos: await atendimento.listarEncaminhamentos(pool, tenantId),
     };
+  });
+
+
+  // --- Atendimento (agente de IA): conversas, sugestões, assumir/devolver ---------------
+  // Tenant sempre do token. Erros de regra de negócio (ErroAtendimento) viram o status certo.
+  const atende = (fn) => async (request, reply) => {
+    try {
+      return await fn(request, reply);
+    } catch (e) {
+      if (e instanceof atendimento.ErroAtendimento) return reply.code(e.status).send({ error: e.message });
+      throw e;
+    }
+  };
+  const depsEnvio = () => ({ enviarTexto: fastify.agente.deps.enviarTexto || enviarTexto, agora: fastify.agente.deps.agora });
+
+  fastify.get('/crm/api/agente/config', { preHandler: fastify.authenticate }, async (request) => atendimento.obterConfig(pool, request.user.tenantId));
+
+  fastify.put('/crm/api/agente/config', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.definirModo(pool, tenantId, userId, (request.body || {}).modo);
+  }));
+
+  // Indicadores do agente: custo (IA + mensagens), bloqueios do filtro, qualidade das sugestões, tempo até o 1º atendimento humano, fila e alertas.
+  fastify.get('/crm/api/agente/metricas', { preHandler: fastify.authenticate }, async (request) =>
+    require('./lib/agente/metricas').calcular(pool, request.user.tenantId, { dias: request.query.dias }));
+
+  fastify.get('/crm/api/agente/resumo', { preHandler: fastify.authenticate }, async (request) => ({
+    encaminhamentos_abertos: await atendimento.contarAbertos(pool, request.user.tenantId),
+  }));
+
+  fastify.get('/crm/api/agente/conversas', { preHandler: fastify.authenticate }, async (request) =>
+    atendimento.listarConversas(pool, request.user.tenantId, { situacao: request.query.situacao }));
+
+  fastify.get('/crm/api/agente/conversas/:id', { preHandler: fastify.authenticate }, atende(async (request) =>
+    atendimento.obterConversa(pool, request.user.tenantId, request.params.id)));
+
+  fastify.post('/crm/api/agente/conversas/:id/assumir', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.assumir(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/agente/conversas/:id/devolver', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.devolverAoAgente(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/agente/conversas/:id/encerrar', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.encerrar(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/agente/conversas/:id/mensagens', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.responderComoHumano(pool, tenantId, userId, request.params.id, (request.body || {}).texto, depsEnvio());
+  }));
+
+  fastify.post('/crm/api/agente/sugestoes/:id/enviar', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.enviarSugestao(pool, tenantId, userId, request.params.id, (request.body || {}).texto, depsEnvio());
+  }));
+
+  fastify.post('/crm/api/agente/sugestoes/:id/descartar', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.descartarSugestao(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/pedidos/:id/revisado', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.marcarPedidoRevisado(pool, tenantId, userId, request.params.id);
+  }));
+
+  // Anexo recebido pelo agente (imagem, STL...) — só do próprio tenant; o front busca com Bearer e abre como blob.
+  fastify.get('/crm/api/agente/anexos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows: [a] } = await pool.query('select * from crm_anexos where tenant_id = $1 and id = $2', [tenantId, request.params.id]);
+    if (!a) return reply.code(404).send({ error: 'Anexo não encontrado' });
+    let buffer;
+    try {
+      buffer = await fastify.agente.deps.armazenamento.ler(tenantId, a.chave_armazenamento);
+    } catch (e) {
+      return reply.code(404).send({ error: 'Arquivo indisponível' });
+    }
+    const nome = encodeURIComponent(a.nome_arquivo || 'arquivo');
+    return reply.header('Content-Type', a.mime || 'application/octet-stream').header('Content-Disposition', "inline; filename*=UTF-8''" + nome)
+      .header('X-Content-Type-Options', 'nosniff').header('Content-Security-Policy', "sandbox; default-src 'none'").send(buffer);
   });
 
   // --- Resumo (card do Painel Hoje, pedido do Bruno 2026-10-03) ---------------
@@ -2231,6 +2326,8 @@ async function start() {
   const fastify = await build();
   try {
     await migrar();
+    fastify.agente.iniciarVarredura();
+    fastify.agente.iniciarRetencao();
     // Checador dos gatilhos de automação sem evento síncrono (pedido parado
     // numa etapa, aniversário do cliente) — granularidade de dia, de hora em
     // hora é sobra. Só em start() (não em build(), usado pelos testes) pra
