@@ -89,6 +89,21 @@ if (localStorage.getItem('crm_sidebar_oculta') === '1') {
 painelSidebar.addEventListener('ds-menu-alternar', (e) => {
   localStorage.setItem('crm_sidebar_oculta', e.detail.recolhido ? '1' : '0');
 });
+// Item "Atendimento" (agente de IA) — injetado aqui para valer em todas as telas; o contador mostra
+// os encaminhamentos abertos ("com quem preciso falar hoje?").
+(function adicionarMenuAtendimento() {
+  const lista = painelSidebar.querySelector('.ds-menu-lista');
+  if (!lista || lista.querySelector('a[href="/crm/atendimento.html"]')) return;
+  const li = document.createElement('li');
+  li.innerHTML = '<a class="ds-menu-link" href="/crm/atendimento.html"><span class="ds-menu-icone">' + icon('message-circle', 18)
+    + '</span><span class="ds-menu-rotulo">Atendimento</span><span class="menu-contador" id="menu-atendimento-contador" hidden></span></a>';
+  const pedidos = lista.querySelector('a[href="/crm/pedidos.html"]');
+  if (pedidos && pedidos.parentElement) pedidos.parentElement.after(li); else lista.appendChild(li);
+  apiFetch('/crm/api/agente/resumo').then((r) => (r.ok ? r.json() : null)).then((d) => {
+    const el = document.getElementById('menu-atendimento-contador');
+    if (d && el && d.encaminhamentos_abertos > 0) { el.textContent = d.encaminhamentos_abertos; el.hidden = false; }
+  }).catch(() => {});
+})();
 document.querySelectorAll('.ds-menu-link[href], .ds-menu-sublink[href]').forEach((item) => {
   if (item.getAttribute('href') !== window.location.pathname) return;
   item.classList.add(item.classList.contains('ds-menu-sublink') ? 'ds-menu-sublink-ativo' : 'ds-menu-link-ativo');

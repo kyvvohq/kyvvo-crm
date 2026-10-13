@@ -58,3 +58,11 @@ Falta a rodada nº 4 só com o 5.5 para confirmar ≥ 90%.
 
 ### Rodada real nº 4 (2026-10-13) — marco 4 encerrado
 `claude-haiku-5-5`: 96% dos casos. Modelo padrão confirmado.
+
+## Marco 5 — concluído
+`lib/agente/atendimento.js` + rotas `/crm/api/agente/*` (config/liga-desliga, conversas, sugestões, assumir, responder, devolver, encerrar, anexos, resumo) e `POST /crm/api/pedidos/:id/revisado`; tela `public/atendimento.html` (lista por situação com o encaminhamento em destaque, thread com anexos, sugestão do agente com Enviar/Editar/Descartar, assumir/devolver, resposta pela equipe, chave do agente); card "Falar hoje — encaminhados pelo agente" no Painel Hoje; item "Atendimento" com contador no menu (injetado pelo `shell.js` em todas as telas). Testes: `test/agente-atendimento.test.js`.
+- Decisão de cada sugestão (aprovada / editada / descartada) fica em `crm_agente_execucoes.decisao` — base para medir qualidade no marco 6.
+- Assumir/responder pelo CRM deixa a conversa em `humano` (agente em silêncio) até "Devolver ao agente"; o eco do app (coexistência) pausa por `limites.pausa_humano_horas`.
+- Sem papéis no CRM: qualquer usuário da conta vê e age nas conversas; qualquer um pode trocar o modo do agente (ligar "Responde sozinho" pede confirmação).
+- Interface conferida no navegador com dados fictícios (Painel Hoje e Atendimento, desktop). Não testada em celular nem com o `@kyvvohq/design-system` instalado localmente (usei os arquivos publicados em /ds/).
+- Resposta da equipe e aprovação enviam só texto; envio de arquivos/imagens pela equipe não existe.

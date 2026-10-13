@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Atendimento</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+<style>
+  .atend-grid { display:grid; grid-template-columns:minmax(300px, 380px) 1fr; gap:var(--space-5); align-items:start; }
+  @media(max-width:900px) { .atend-grid { grid-template-columns:1fr; } .atend-grid.com-conversa .atend-lista-card { display:none; } .atend-grid:not(.com-conversa) .atend-detalhe-card { display:none; } }
+  .atend-lista-card, .atend-detalhe-card { padding:0; overflow:hidden; }
+  .atend-lista { max-height:calc(100vh - 290px); min-height:260px; overflow-y:auto; }
+  .atend-item { display:block; width:100%; text-align:left; background:transparent; color:var(--text); border:none; border-top:1px solid var(--border);
+    padding:12px 16px; height:auto; cursor:pointer; font-family:var(--font-ui); }
+  .atend-item:first-child { border-top:none; }
+  .atend-item:hover { background:var(--surface-muted); }
+  .atend-item.ativo { background:var(--accent-tint); }
+  .atend-item .linha1 { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .atend-item .nome { font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .atend-item .hora { font-size:11.5px; color:var(--muted); flex-shrink:0; }
+  .atend-item .previa { font-size:12.5px; color:var(--muted-strong); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .atend-item .selos { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+  .atend-abas { padding:0 8px; }
+  .atend-detalhe { display:flex; flex-direction:column; min-height:420px; max-height:calc(100vh - 220px); }
+  .atend-topo { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  .atend-topo h2 { margin:0; font-size:17px; }
+  .atend-topo .sub { font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .atend-topo .acoes { display:flex; gap:8px; flex-wrap:wrap; }
+  .atend-corpo { padding:16px 20px; overflow-y:auto; flex:1 1 auto; display:flex; flex-direction:column; gap:14px; }
+  .atend-corpo > * { flex-shrink:0; }
+  .atend-abas .ds-aba { padding:0 10px; }
+  .atend-voltar { display:none; }
+  @media(max-width:900px) { .atend-voltar { display:inline-flex; } }
+  .atend-msg-autor { font-size:11px; font-weight:600; color:var(--muted); margin:0 2px 2px; }
+  .atend-anexo { display:inline-flex; align-items:center; gap:6px; margin-top:6px; font-size:12.5px; }
+  .atend-anexo-img { max-width:220px; max-height:180px; border-radius:var(--radius-md); display:block; margin-top:6px; }
+  .atend-pedido dl { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:8px 0 0; font-size:13px; }
+  .atend-pedido dt { color:var(--muted); }
+  .atend-pedido dd { margin:0; color:var(--text); }
+  .atend-caixa { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; background:var(--surface-muted); }
+  .atend-caixa h3 { margin:0 0 8px; font-size:13.5px; }
+  .atend-caixa .acoes { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .atend-caixa textarea { width:100%; box-sizing:border-box; }
+  .atend-rodape { border-top:1px solid var(--border); padding:12px 20px; }
+  .modo-agente { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .modo-agente label { font-size:13px; color:var(--muted-strong); }
+</style>
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="ds-topbar-acoes">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/relatorios.html"><span class="ds-menu-icone" data-icon="chart-column"></span><span class="ds-menu-rotulo">Relatórios</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/plano-cobranca.html">Plano e cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+        <div class="painel-main">
+      <div class="cabecalho-pagina">
+        <div class="textos">
+          <div class="linha-titulo"><h1>Atendimento</h1><span class="contagem" id="contagem-abertos" hidden></span></div>
+          <p class="descricao">Conversas do agente de WhatsApp: veja o que ele sugeriu, assuma quando precisar e responda pela equipe.</p>
+        </div>
+        <div class="acoes modo-agente" id="modo-agente"></div>
+      </div>
+      <div id="aviso-agente"></div>
+
+      <div class="atend-grid" id="atend-grid">
+        <div class="card atend-lista-card">
+          <div class="ds-abas-lista atend-abas" role="tablist" id="atend-abas"></div>
+          <div class="atend-lista" id="atend-lista"><p class="vazio" style="padding:16px">Carregando…</p></div>
+        </div>
+        <div class="card atend-detalhe-card">
+          <div class="atend-detalhe" id="atend-detalhe"><p class="vazio" style="padding:24px">Escolha uma conversa à esquerda.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="CRM"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    const ABAS = [
+      { chave: 'todas', rotulo: 'Todas' },
+      { chave: 'aguardando_equipe', rotulo: 'Fila' },
+      { chave: 'bot', rotulo: 'Agente' },
+      { chave: 'humano', rotulo: 'Equipe' },
+      { chave: 'encerrada', rotulo: 'Encerradas' },
+    ];
+    const ROTULO_SITUACAO = { bot: 'Agente atendendo', aguardando_equipe: 'Aguardando equipe', humano: 'Equipe atendendo', encerrada: 'Encerrada' };
+    const BADGE_SITUACAO = { bot: 'ds-badge-info', aguardando_equipe: 'ds-badge-aviso', humano: 'ds-badge-sucesso', encerrada: '' };
+    const ROTULO_AUTOR = { agente: 'Agente', humano: 'Equipe', sistema: 'Sistema' };
+
+    let conversas = [];
+    let aba = 'todas';
+    let selecionada = new URLSearchParams(location.search).get('conversa');
+    let detalhe = null;
+    let configAgente = null;
+
+    function tempoRelativo(iso) {
+      if (!iso) return '';
+      const min = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+      if (min < 1) return 'agora';
+      if (min < 60) return min + ' min';
+      if (min < 1440) return Math.floor(min / 60) + ' h';
+      return Math.floor(min / 1440) + ' d';
+    }
+    const badge = (texto, classe) => '<span class="ds-badge ds-badge-sm ' + (classe || '') + '">' + escapeHtml(texto) + '</span>';
+
+    // --- Chave do agente (desligado / rascunho / automático) ---
+    function renderModo() {
+      const el = document.getElementById('modo-agente');
+      const aviso = document.getElementById('aviso-agente');
+      if (!configAgente || !configAgente.configurado) {
+        el.innerHTML = '';
+        aviso.innerHTML = '<div class="ds-alerta ds-alerta-info"><div class="ds-alerta-corpo"><p class="ds-alerta-texto">O agente de atendimento ainda não foi configurado para esta conta. Quando for ativado, as conversas aparecem aqui.</p></div></div>';
+        return;
+      }
+      aviso.innerHTML = configAgente.modo === 'desligado'
+        ? '<div class="ds-alerta ds-alerta-aviso"><div class="ds-alerta-corpo"><p class="ds-alerta-texto">O agente está <strong>desligado</strong>: as mensagens recebidas seguem no atendimento antigo por lista.</p></div></div>'
+        : '';
+      el.innerHTML = '<label for="sel-modo">Agente</label><div class="ds-select"><select id="sel-modo">'
+        + [['desligado', 'Desligado'], ['rascunho', 'Sugere, a equipe aprova'], ['automatico', 'Responde sozinho']]
+          .map(([v, r]) => '<option value="' + v + '"' + (configAgente.modo === v ? ' selected' : '') + '>' + r + '</option>').join('')
+        + '</select></div>';
+      document.getElementById('sel-modo').addEventListener('change', (e) => trocarModo(e.target.value));
+    }
+    async function aplicarModo(modo) {
+      const res = await apiFetch('/crm/api/agente/config', { method: 'PUT', body: JSON.stringify({ modo }) });
+      const corpo = await res.json();
+      if (!res.ok) avisar('Não foi possível alterar', escapeHtml(corpo.error || 'Erro inesperado'));
+      await carregarConfig();
+    }
+    function trocarModo(modo) {
+      if (modo === 'automatico') {
+        confirmarAcao('Deixar o agente responder sozinho?', 'Ele passa a enviar as respostas direto para as clientes, sem aprovação. Valor, prazo e frete continuam sempre com a equipe.',
+          () => aplicarModo(modo), { textoConfirmar: 'Ligar resposta automática' });
+        document.getElementById('confirmar-acao-cancelar').addEventListener('click', renderModo);
+        return;
+      }
+      if (modo === 'desligado') {
+        confirmarAcao('Desligar o agente?', 'As novas mensagens voltam para o atendimento antigo por lista. Conversas em andamento ficam como estão.',
+          () => aplicarModo(modo), { textoConfirmar: 'Desligar' });
+        document.getElementById('confirmar-acao-cancelar').addEventListener('click', renderModo);
+        return;
+      }
+      aplicarModo(modo);
+    }
+    async function carregarConfig() {
+      configAgente = await (await apiFetch('/crm/api/agente/config')).json();
+      renderModo();
+    }
+
+    // --- Lista ---
+    function renderAbas() {
+      const contagem = (chave) => chave === 'todas' ? conversas.length : conversas.filter((c) => c.situacao === chave).length;
+      document.getElementById('atend-abas').innerHTML = ABAS.map((a) =>
+        '<button type="button" class="ds-aba" role="tab" aria-selected="' + (a.chave === aba) + '" data-aba="' + a.chave + '">' + a.rotulo
+        + '<span class="ds-aba-contagem">' + contagem(a.chave) + '</span></button>').join('');
+      document.querySelectorAll('[data-aba]').forEach((b) => b.addEventListener('click', () => { aba = b.dataset.aba; renderAbas(); renderLista(); }));
+    }
+    function renderLista() {
+      const itens = aba === 'todas' ? conversas : conversas.filter((c) => c.situacao === aba);
+      const el = document.getElementById('atend-lista');
+      if (!itens.length) { el.innerHTML = '<p class="vazio" style="padding:16px">Nenhuma conversa por aqui.</p>'; return; }
+      el.innerHTML = itens.map((c) => {
+        const selos = [];
+        if (c.handoff_status === 'aberto') selos.push(badge(c.handoff_rotulo || 'Encaminhada', 'ds-badge-aviso'));
+        if (c.eh_vip) selos.push(badge('VIP', 'ds-badge-marca'));
+        if (c.sugestao_pendente) selos.push(badge('Sugestão do agente', 'ds-badge-info'));
+        selos.push(badge(ROTULO_SITUACAO[c.situacao] || c.situacao, BADGE_SITUACAO[c.situacao]));
+        return '<button type="button" class="atend-item' + (c.id === selecionada ? ' ativo' : '') + '" data-conversa="' + c.id + '">'
+          + '<div class="linha1"><span class="nome">' + escapeHtml(c.cliente_nome || whatsappParaExibicao(c.telefone_e164)) + '</span><span class="hora">' + tempoRelativo(c.ultima_em) + '</span></div>'
+          + '<div class="previa">' + (c.ultimo_autor && c.ultimo_autor !== 'cliente' ? 'Você/agente: ' : '') + escapeHtml(c.ultima_mensagem || '') + '</div>'
+          + '<div class="selos">' + selos.join('') + '</div></button>';
+      }).join('');
+      el.querySelectorAll('[data-conversa]').forEach((b) => b.addEventListener('click', () => abrirConversa(b.dataset.conversa)));
+    }
+    async function carregarLista() {
+      conversas = await (await apiFetch('/crm/api/agente/conversas')).json();
+      const abertos = conversas.filter((c) => c.handoff_status === 'aberto').length;
+      const cont = document.getElementById('contagem-abertos');
+      cont.hidden = !abertos;
+      cont.textContent = abertos + (abertos === 1 ? ' aguardando' : ' aguardando');
+      renderAbas();
+      renderLista();
+    }
+
+    // --- Conversa ---
+    async function abrirAnexo(id) {
+      const res = await apiFetch('/crm/api/agente/anexos/' + id);
+      if (!res.ok) { avisar('Arquivo indisponível', 'Não foi possível abrir este arquivo.'); return; }
+      window.open(URL.createObjectURL(await res.blob()), '_blank', 'noopener');
+    }
+    function msgHtml(m) {
+      const dir = m.direcao === 'recebida' ? 'recebida' : 'enviada';
+      const autor = ROTULO_AUTOR[m.autor];
+      let anexo = '';
+      if (m.anexo_id) {
+        anexo = (m.anexo_mime || '').startsWith('image/') ? '<img class="atend-anexo-img" data-anexo-img="' + m.anexo_id + '" alt="' + escapeHtml(m.anexo_nome || 'imagem') + '">' : '';
+        anexo += '<button type="button" class="ds-btn ds-btn-ghost ds-btn-sm atend-anexo" data-anexo="' + m.anexo_id + '">' + icon('download', 14) + escapeHtml(m.anexo_nome || 'Abrir arquivo') + '</button>';
+      }
+      return '<div class="ds-conversa-modal-msg ds-conversa-modal-msg-' + dir + '">'
+        + (autor ? '<p class="atend-msg-autor">' + autor + '</p>' : '')
+        + '<p class="ds-conversa-modal-msg-texto">' + escapeHtml(m.conteudo) + anexo + '</p>'
+        + '<p class="ds-conversa-modal-msg-hora">' + formatarDataHoraConversa(m.criado_em) + '</p></div>';
+    }
+    function pedidoHtml(p) {
+      if (!p) return '';
+      const linhas = p.campos.map((c) => '<dt>' + escapeHtml(c.label) + '</dt><dd>' + escapeHtml(c.valor) + '</dd>');
+      if (p.item) linhas.push('<dt>Quantidade</dt><dd>' + p.item.quantidade + '</dd>');
+      if (p.identificador_externo) linhas.push('<dt>ID ' + escapeHtml(p.origem) + '</dt><dd>' + escapeHtml(p.identificador_externo) + (p.aguardando_conferencia ? ' ' + badge('aguardando conferência', 'ds-badge-aviso') : '') + '</dd>');
+      if (p.observacoes) linhas.push('<dt>Observações</dt><dd>' + escapeHtml(p.observacoes) + '</dd>');
+      return '<div class="atend-caixa atend-pedido"><h3>Pedido rascunho nº ' + p.numero + ' ' + badge('criado pelo agente', 'ds-badge-info') + '</h3>'
+        + (linhas.length ? '<dl>' + linhas.join('') + '</dl>' : '<p class="vazio" style="padding:0">Ainda sem informações.</p>')
+        + '<div class="acoes"><a class="ds-btn ds-btn-secundario ds-btn-sm" href="/crm/pedidos.html?abrir_pedido=' + p.id + '">Abrir pedido</a>'
+        + '<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" data-revisado="' + p.id + '">Marcar como revisado</button></div></div>';
+    }
+    function sugestaoHtml(s) {
+      if (!s) return '';
+      return '<div class="atend-caixa"><h3>Sugestão do agente</h3>'
+        + (s.bloqueada ? '<div class="ds-alerta ds-alerta-aviso" style="margin-bottom:10px"><div class="ds-alerta-corpo"><p class="ds-alerta-texto">O agente tentou responder algo que só a equipe pode dizer (valor, prazo, frete, pagamento, desconto ou disponibilidade). O texto abaixo é o encaminhamento padrão.</p>'
+          + (s.original ? '<details><summary>Ver o que o agente tentou escrever (não foi enviado)</summary><p style="white-space:pre-wrap">' + escapeHtml(s.original) + '</p></details>' : '') + '</div></div>' : '')
+        + '<textarea class="ds-textarea" id="sug-texto" rows="4">' + escapeHtml(s.texto) + '</textarea>'
+        + '<div class="acoes"><button type="button" class="ds-btn ds-btn-primario" data-sug-enviar="' + s.execucao_id + '">Enviar</button>'
+        + '<button type="button" class="ds-btn ds-btn-secundario" data-sug-descartar="' + s.execucao_id + '">Descartar</button></div>'
+        + '<p class="vazio" style="padding:6px 0 0">Você pode editar o texto antes de enviar.</p></div>';
+    }
+    function renderDetalhe() {
+      const el = document.getElementById('atend-detalhe');
+      document.getElementById('atend-grid').classList.toggle('com-conversa', !!detalhe);
+      if (!detalhe) { el.innerHTML = '<p class="vazio" style="padding:24px">Escolha uma conversa à esquerda.</p>'; return; }
+      const { conversa, mensagens, sugestao, handoff, pedido } = detalhe;
+      const acoes = [];
+      if (conversa.situacao !== 'humano') acoes.push('<button type="button" class="ds-btn ds-btn-primario ds-btn-sm" id="btn-assumir">Assumir conversa</button>');
+      else acoes.push('<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-devolver">Devolver ao agente</button>');
+      if (conversa.situacao !== 'encerrada') acoes.push('<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-encerrar">Encerrar</button>');
+      const janela = conversa.janela_aberta
+        ? ''
+        : '<div class="ds-alerta ds-alerta-aviso"><div class="ds-alerta-corpo"><p class="ds-alerta-texto">A janela de 24 h desta conversa fechou: só dá para responder quando a cliente escrever de novo.</p></div></div>';
+      el.innerHTML =
+        '<div class="atend-topo"><div><button type="button" class="ds-btn ds-btn-ghost ds-btn-sm atend-voltar" id="btn-voltar">' + icon('arrow-left', 14) + ' Voltar</button>'
+        + '<h2>' + escapeHtml(conversa.cliente_nome || whatsappParaExibicao(conversa.telefone)) + '</h2>'
+        + '<div class="sub">' + escapeHtml(whatsappParaExibicao(conversa.telefone)) + ' · ' + badge(ROTULO_SITUACAO[conversa.situacao] || conversa.situacao, BADGE_SITUACAO[conversa.situacao]) + '</div></div>'
+        + '<div class="acoes">' + acoes.join('') + '</div></div>'
+        + '<div class="atend-corpo" id="atend-corpo">'
+        + (handoff ? '<div class="ds-alerta ds-alerta-aviso"><div class="ds-alerta-corpo"><p class="ds-alerta-titulo">' + escapeHtml(handoff.rotulo) + (handoff.eh_vip ? ' · cliente VIP' : '') + '</p>'
+          + '<p class="ds-alerta-texto">' + escapeHtml(handoff.resumo || '') + '</p></div></div>' : '')
+        + pedidoHtml(pedido)
+        + '<div class="ds-conversa-modal-mensagens" style="overflow:visible;flex:none">' + (mensagens.length ? mensagens.map(msgHtml).join('') : '<p class="vazio">Sem mensagens.</p>') + '</div>'
+        + sugestaoHtml(sugestao)
+        + '</div>'
+        + '<div class="atend-rodape">' + janela
+        + '<textarea class="ds-textarea" id="resp-texto" rows="2" placeholder="Responder como equipe (o agente pausa nesta conversa)"' + (conversa.janela_aberta ? '' : ' disabled') + '></textarea>'
+        + '<div class="acoes" style="margin-top:8px"><button type="button" class="ds-btn ds-btn-primario ds-btn-sm" id="btn-responder"' + (conversa.janela_aberta ? '' : ' disabled') + '>Enviar como equipe</button></div></div>';
+      ligarDetalhe();
+    }
+    function ligarDetalhe() {
+      const q = (s) => document.querySelector(s);
+      const acao = async (url, corpo) => {
+        const res = await apiFetch(url, { method: 'POST', ...(corpo ? { body: JSON.stringify(corpo) } : {}) });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) { avisar('Não foi possível concluir', escapeHtml(dados.error || 'Erro inesperado')); return false; }
+        await recarregar();
+        return true;
+      };
+      const id = detalhe.conversa.id;
+      q('#btn-voltar') && q('#btn-voltar').addEventListener('click', () => { selecionada = null; detalhe = null; renderLista(); renderDetalhe(); });
+      q('#btn-assumir') && q('#btn-assumir').addEventListener('click', () => acao('/crm/api/agente/conversas/' + id + '/assumir'));
+      q('#btn-devolver') && q('#btn-devolver').addEventListener('click', () => acao('/crm/api/agente/conversas/' + id + '/devolver'));
+      q('#btn-encerrar') && q('#btn-encerrar').addEventListener('click', () =>
+        confirmarAcao('Encerrar esta conversa?', 'O encaminhamento é marcado como resolvido. Se a cliente escrever de novo, a conversa reabre.', () => acao('/crm/api/agente/conversas/' + id + '/encerrar'), { textoConfirmar: 'Encerrar' }));
+      q('#btn-responder') && q('#btn-responder').addEventListener('click', async () => {
+        const texto = q('#resp-texto').value.trim();
+        if (!texto) return;
+        q('#btn-responder').disabled = true;
+        if (!(await acao('/crm/api/agente/conversas/' + id + '/mensagens', { texto }))) q('#btn-responder').disabled = false;
+      });
+      document.querySelectorAll('[data-sug-enviar]').forEach((b) => b.addEventListener('click', () => {
+        b.disabled = true;
+        acao('/crm/api/agente/sugestoes/' + b.dataset.sugEnviar + '/enviar', { texto: q('#sug-texto').value }).then((ok) => { if (!ok) b.disabled = false; });
+      }));
+      document.querySelectorAll('[data-sug-descartar]').forEach((b) => b.addEventListener('click', () => acao('/crm/api/agente/sugestoes/' + b.dataset.sugDescartar + '/descartar')));
+      document.querySelectorAll('[data-revisado]').forEach((b) => b.addEventListener('click', () =>
+        confirmarAcao('Marcar o pedido como revisado?', 'Ele deixa de ser rascunho do agente e segue como um pedido normal.', () => acao('/crm/api/pedidos/' + b.dataset.revisado + '/revisado'), { textoConfirmar: 'Marcar como revisado' })));
+      document.querySelectorAll('[data-anexo]').forEach((b) => b.addEventListener('click', () => abrirAnexo(b.dataset.anexo)));
+      document.querySelectorAll('[data-anexo-img]').forEach(async (img) => {
+        const res = await apiFetch('/crm/api/agente/anexos/' + img.dataset.anexoImg);
+        if (res.ok) img.src = URL.createObjectURL(await res.blob()); else img.remove();
+      });
+      const corpo = q('#atend-corpo');
+      if (corpo) corpo.scrollTop = corpo.scrollHeight;
+    }
+    async function abrirConversa(id) {
+      selecionada = id;
+      history.replaceState(null, '', '?conversa=' + id);
+      const res = await apiFetch('/crm/api/agente/conversas/' + id);
+      if (!res.ok) { detalhe = null; renderDetalhe(); return; }
+      detalhe = await res.json();
+      renderLista();
+      renderDetalhe();
+    }
+    async function recarregar() {
+      await carregarLista();
+      if (selecionada) await abrirConversa(selecionada);
+    }
+
+    // Atualiza a lista a cada 20 s; reabre a conversa só se chegou algo novo e a equipe não está digitando.
+    setInterval(async () => {
+      if (document.hidden) return;
+      const antes = selecionada && conversas.find((c) => c.id === selecionada);
+      await carregarLista();
+      const depois = selecionada && conversas.find((c) => c.id === selecionada);
+      const digitando = ['sug-texto', 'resp-texto'].includes(document.activeElement && document.activeElement.id);
+      if (depois && antes && depois.ultima_em !== antes.ultima_em && !digitando) abrirConversa(selecionada);
+    }, 20000);
+
+    (async () => {
+      await carregarConfig();
+      await carregarLista();
+      if (selecionada) abrirConversa(selecionada);
+    })();
+  </script>
+</body>
+</html>

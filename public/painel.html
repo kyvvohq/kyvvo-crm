@@ -147,6 +147,10 @@
       </div>
 
       <div class="painel-hoje-grid">
+        <div class="card" id="card-encaminhamentos">
+          <h2 class="secao-titulo"><span data-icon="message-circle" data-size="17"></span>Falar hoje — encaminhados pelo agente</h2>
+          <div id="lista-encaminhamentos"><p class="vazio">Carregando…</p></div>
+        </div>
         <div class="card">
           <h2 class="secao-titulo"><span data-icon="circle-alert" data-size="17"></span>Orçamentos parados</h2>
           <div id="lista-orcamentos"><p class="vazio">Carregando…</p></div>
@@ -241,6 +245,20 @@
       `;
     }
 
+    // Encaminhamentos do agente de atendimento: VIP primeiro, depois quem espera há mais tempo.
+    function esperaTexto(min) {
+      if (min < 1) return 'agora';
+      if (min < 60) return 'há ' + min + ' min';
+      if (min < 1440) return 'há ' + Math.floor(min / 60) + ' h';
+      return 'há ' + Math.floor(min / 1440) + ' d';
+    }
+    function itemEncaminhamentoHtml(e) {
+      return '<div class="item-hoje"><div class="info"><div class="nome">' + escapeHtml(e.cliente_nome)
+        + (e.eh_vip ? ' <span class="ds-badge ds-badge-sm ds-badge-marca">VIP</span>' : '') + '</div>'
+        + '<div class="meta">' + escapeHtml(e.rotulo) + ' · ' + esperaTexto(e.minutos_esperando) + (e.resumo ? ' — ' + escapeHtml(e.resumo.slice(0, 90)) : '') + '</div></div>'
+        + '<a class="ds-btn ds-btn-primario btn-whats" href="/crm/atendimento.html?conversa=' + e.conversa_id + '" style="background:var(--accent)">Abrir</a></div>';
+    }
+
     function renderLista(elId, itens, vazioMsg) {
       const el = document.getElementById(elId);
       el.innerHTML = itens.length ? itens.join('') : `<p class="vazio">${vazioMsg}</p>`;
@@ -273,6 +291,7 @@
       modelosMensagem = Object.fromEntries((await resModelos.json()).map((m) => [m.chave, m]));
       etapas = await resEtapas.json();
 
+      renderLista('lista-encaminhamentos', (dados.encaminhamentos || []).map(itemEncaminhamentoHtml), 'Ninguém aguardando a equipe. 🎉');
       renderLista('lista-orcamentos', dados.orcamentos_parados.map(itemOrcamentoHtml), 'Nenhum orçamento parado. 🎉');
       renderLista('lista-pagamentos', dados.pagamentos_pendentes.map(itemPagamentoHtml), 'Nenhum pagamento pendente.');
 

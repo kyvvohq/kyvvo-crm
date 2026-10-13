@@ -30,6 +30,7 @@ const {
   dispararNotificacaoEvento,
 } = require('./lib/notificacoes');
 const { criarAgente } = require('./lib/agente');
+const atendimento = require('./lib/agente/atendimento');
 const platform = require('./lib/platform');
 const { resolverClaims } = require('./lib/resolver-sessao');
 
@@ -2041,7 +2042,90 @@ async function build(opcoes = {}) {
       pagamentos_pendentes: pagamentosPendentes.rows,
       prontos_para_envio: prontosParaEnvio,
       aniversariantes: aniversariantes.rows,
+      // "Com quem preciso falar hoje?": conversas que o agente encaminhou para a equipe
+      encaminhamentos: await atendimento.listarEncaminhamentos(pool, tenantId),
     };
+  });
+
+
+  // --- Atendimento (agente de IA): conversas, sugestões, assumir/devolver ---------------
+  // Tenant sempre do token. Erros de regra de negócio (ErroAtendimento) viram o status certo.
+  const atende = (fn) => async (request, reply) => {
+    try {
+      return await fn(request, reply);
+    } catch (e) {
+      if (e instanceof atendimento.ErroAtendimento) return reply.code(e.status).send({ error: e.message });
+      throw e;
+    }
+  };
+  const depsEnvio = () => ({ enviarTexto: fastify.agente.deps.enviarTexto || enviarTexto, agora: fastify.agente.deps.agora });
+
+  fastify.get('/crm/api/agente/config', { preHandler: fastify.authenticate }, async (request) => atendimento.obterConfig(pool, request.user.tenantId));
+
+  fastify.put('/crm/api/agente/config', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.definirModo(pool, tenantId, userId, (request.body || {}).modo);
+  }));
+
+  fastify.get('/crm/api/agente/resumo', { preHandler: fastify.authenticate }, async (request) => ({
+    encaminhamentos_abertos: await atendimento.contarAbertos(pool, request.user.tenantId),
+  }));
+
+  fastify.get('/crm/api/agente/conversas', { preHandler: fastify.authenticate }, async (request) =>
+    atendimento.listarConversas(pool, request.user.tenantId, { situacao: request.query.situacao }));
+
+  fastify.get('/crm/api/agente/conversas/:id', { preHandler: fastify.authenticate }, atende(async (request) =>
+    atendimento.obterConversa(pool, request.user.tenantId, request.params.id)));
+
+  fastify.post('/crm/api/agente/conversas/:id/assumir', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.assumir(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/agente/conversas/:id/devolver', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.devolverAoAgente(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/agente/conversas/:id/encerrar', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.encerrar(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/agente/conversas/:id/mensagens', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.responderComoHumano(pool, tenantId, userId, request.params.id, (request.body || {}).texto, depsEnvio());
+  }));
+
+  fastify.post('/crm/api/agente/sugestoes/:id/enviar', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.enviarSugestao(pool, tenantId, userId, request.params.id, (request.body || {}).texto, depsEnvio());
+  }));
+
+  fastify.post('/crm/api/agente/sugestoes/:id/descartar', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.descartarSugestao(pool, tenantId, userId, request.params.id);
+  }));
+
+  fastify.post('/crm/api/pedidos/:id/revisado', { preHandler: fastify.authenticate }, atende(async (request) => {
+    const { tenantId, userId } = request.user;
+    return atendimento.marcarPedidoRevisado(pool, tenantId, userId, request.params.id);
+  }));
+
+  // Anexo recebido pelo agente (imagem, STL...) — só do próprio tenant; o front busca com Bearer e abre como blob.
+  fastify.get('/crm/api/agente/anexos/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { rows: [a] } = await pool.query('select * from crm_anexos where tenant_id = $1 and id = $2', [tenantId, request.params.id]);
+    if (!a) return reply.code(404).send({ error: 'Anexo não encontrado' });
+    let buffer;
+    try {
+      buffer = await fastify.agente.deps.armazenamento.ler(tenantId, a.chave_armazenamento);
+    } catch (e) {
+      return reply.code(404).send({ error: 'Arquivo indisponível' });
+    }
+    const nome = encodeURIComponent(a.nome_arquivo || 'arquivo');
+    return reply.header('Content-Type', a.mime || 'application/octet-stream').header('Content-Disposition', "inline; filename*=UTF-8''" + nome)
+      .header('X-Content-Type-Options', 'nosniff').header('Content-Security-Policy', "sandbox; default-src 'none'").send(buffer);
   });
 
   // --- Resumo (card do Painel Hoje, pedido do Bruno 2026-10-03) ---------------
