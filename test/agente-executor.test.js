@@ -11,7 +11,10 @@ const temBanco = !!process.env.DATABASE_URL;
 const opts = temBanco ? {} : { skip: 'sem DATABASE_URL' };
 const { pool, migrar } = require('../lib/db');
 const { semearAgente } = require('../lib/agente/seed');
-const { executarTurno } = require('../lib/agente/executor');
+const { executarTurno: executarTurnoReal } = require('../lib/agente/executor');
+// Relógio fixo dentro do horário de atendimento: os testes não dependem da hora em que rodam.
+const DENTRO = new Date('2026-10-12T15:00:00Z');
+const executarTurno = (turno, deps = {}) => executarTurnoReal(turno, { agora: () => DENTRO, ...deps });
 const { executarFerramenta, FERRAMENTAS } = require('../lib/agente/ferramentas');
 const { processarConversa } = require('../lib/agente/processador');
 
@@ -354,7 +357,8 @@ test('modo automático: envia dentro da janela; fora dela não envia e encaminha
   await pool.query("update crm_agente_config set modo = 'automatico' where tenant_id = $1", [A]);
   await pool.query("insert into crm_whatsapp_numeros (phone_number_id, tenant_id) values ($1, $2) on conflict do nothing", [`pn-auto-${A.slice(0, 6)}`, A]);
   try {
-    const ok = await rodar(A, [{ texto: 'oi' }], [falou('Oi! Sou a assistente virtual da Basic 3D Print. Como posso ajudar?')]);
+    const agoraReal = { agora: () => new Date() }; // a janela de 24 h é relativa ao relógio do banco
+    const ok = await rodar(A, [{ texto: 'oi' }], [falou('Oi! Sou a assistente virtual da Basic 3D Print. Como posso ajudar?')], {}, agoraReal);
     assert.equal(ok.envios.length, 1);
     assert.equal(ok.envios[0].to, ok.conversa.telefone_e164);
     assert.equal(ok.envios[0].phoneNumberId, `pn-auto-${A.slice(0, 6)}`);
@@ -362,7 +366,7 @@ test('modo automático: envia dentro da janela; fora dela não envia e encaminha
     assert.equal(saida.autor, 'agente');
     assert.equal(saida.tokens_in, 120);
 
-    const velha = await rodar(A, [{ texto: 'oi de novo' }], [falou('Oi! Posso ajudar?')], { janelaHoras: -1 });
+    const velha = await rodar(A, [{ texto: 'oi de novo' }], [falou('Oi! Posso ajudar?')], { janelaHoras: -1 }, agoraReal);
     assert.equal(velha.envios.length, 0);
     assert.equal((await handoffs(A, velha.conversa.id))[0].motivo, 'janela_expirada');
   } finally {
@@ -420,11 +424,11 @@ test('regra de pausa: conversa com humano não roda o agente (via processador)',
 });
 
 test('prometeu encaminhar sem chamar a ferramenta: rede de proteção cria o handoff', opts, async () => {
-  const x = await rodar(A, [{ texto: 'quero falar com alguém' }], [falou('Claro! Vou encaminhar você para a nossa equipe agora mesmo. 🩵')]);
+  const x = await rodar(A, [{ texto: 'preciso de ajuda com uma coisa' }], [falou('Claro! Vou encaminhar você para a nossa equipe agora mesmo. 🩵')]);
   const h = await handoffs(A, x.conversa.id);
   assert.equal(h.length, 1);
   assert.equal(h[0].motivo, 'outro');
-  assert.match(h[0].resumo, /quero falar com alguém/);
+  assert.match(h[0].resumo, /preciso de ajuda/);
   assert.equal(x.r.ferramentas.at(-1).implicito, true);
   // resposta normal sobre briefing não vira handoff
   const y = await rodar(A, [{ texto: 'quero um chaveiro' }], [falou('A equipe analisa a referência e apresenta uma proposta antes de produzir. Qual o nome?')]);
@@ -458,4 +462,72 @@ test('auditoria: guarda o texto original do modelo quando o filtro bloqueia', op
   const { rows: [e] } = await pool.query('select resposta_original, resposta_proposta from crm_agente_execucoes where id = $1', [x.r.execucaoId]);
   assert.equal(e.resposta_original, 'Fica R$ 40,00 cada.');
   assert.equal(e.resposta_proposta, ENCAMINHAMENTO);
+});
+
+const { detectarGatilhos, extrairIdShopee, perguntaComercial } = require('../lib/agente/gatilhos');
+
+test('gatilhos: detecta os casos de encaminhamento obrigatório e ignora conversa comum', () => {
+  const m = (t, o) => detectarGatilhos(t, o)[0];
+  assert.equal(m('Prefiro falar com uma atendente de verdade'), 'pedido_humano');
+  assert.equal(m('o pedido chegou quebrado'), 'produto_danificado_ou_diferente');
+  assert.equal(m('quero reembolso, que absurdo'), 'reclamacao');
+  assert.equal(m('Preciso pra amanhã cedo'), 'urgencia');
+  assert.equal(m('tem desconto pra quantidade?'), 'negociacao_desconto');
+  assert.equal(m('cadê meu pedido?'), 'andamento_pedido');
+  assert.equal(m('meu pedido está atrasado'), 'pedido_atrasado');
+  assert.equal(m('tem desconto?', { vipConfirmado: true }), undefined);
+  for (const ok of ['Oi, quero um cortador de coração', 'Pode ser dia 30 de novembro? Moro em Uberlândia', 'Quero 3 chaveiros com os nomes Ana e Bia', 'Meu CEP é 38400-000']) {
+    assert.deepEqual(detectarGatilhos(ok), [], ok);
+  }
+  assert.equal(perguntaComercial('Qual o prazo?'), true);
+  assert.equal(perguntaComercial('quero um chaveiro'), false);
+});
+
+test('gatilhos: ID Shopee só com contexto e formato plausível', () => {
+  assert.equal(extrairIdShopee('Comprei pela Shopee, meu pedido é 26100705xvf3pw'), '26100705XVF3PW');
+  assert.equal(extrairIdShopee('meu telefone é 34999998888'), null);
+  assert.equal(extrairIdShopee('quero um chaveiro, código ABCDEFGHIJKL'), null); // sem dígito
+  assert.equal(extrairIdShopee('oi 26100705XVF3PW'), null); // sem contexto
+});
+
+test('modelo que só responde em texto: o código garante o handoff do gatilho e registra o ID Shopee', opts, async () => {
+  const urg = await rodar(A, [{ texto: 'Preciso do pedido amanhã cedo, dá?' }], [falou('Entendi! Qual produto você precisa?')]);
+  const h = await handoffs(A, urg.conversa.id);
+  assert.equal(h.length, 1);
+  assert.equal(h[0].motivo, 'urgencia');
+  assert.match(urg.r.resposta, /equipe já foi avisada/); // a cliente fica sabendo
+  assert.equal(urg.r.ferramentas.at(-1).implicito, true);
+
+  const rec = await rodar(A, [{ texto: 'Meu pedido chegou quebrado!' }], [falou('Sinto muito! A equipe vai cuidar disso. Pode mandar uma foto?')]);
+  assert.equal((await handoffs(A, rec.conversa.id))[0].motivo, 'produto_danificado_ou_diferente');
+  assert.doesNotMatch(rec.r.resposta, /já foi avisada/); // já disse "equipe": não repete
+
+  const shp = await rodar(A, [{ texto: 'Comprei na shopee, ID 99887766ABCD12' }], [falou('Recebi o ID! A equipe confere.')]);
+  const { rows: [p] } = await pool.query("select origem, aguardando_conferencia from crm_pedidos where tenant_id = $1 and identificador_externo = '99887766ABCD12'", [A]);
+  assert.deepEqual(p, { origem: 'Shopee', aguardando_conferencia: true });
+  assert.equal(shp.r.ferramentas.some((f) => f.nome === 'registrar_id_shopee' && f.implicito), true);
+});
+
+test('pergunta comercial: encaminha só depois que há briefing mínimo (produto + quantidade)', opts, async () => {
+  const sem = await rodar(A, [{ texto: 'Qual o prazo de entrega?' }], [falou('Me conta o modelo e a quantidade, por favor?')]);
+  assert.equal((await handoffs(A, sem.conversa.id)).length, 0);
+  const com = await rodar(A, [{ texto: 'Ok. E qual o valor total?' }], [
+    toolUse('registrar_briefing', { produto_modelo: 'Cortador de estrela', quantidade: 3 }),
+    falou('Anotado! A equipe te passa isso junto com o orçamento.'),
+  ]);
+  assert.equal((await handoffs(A, com.conversa.id))[0].motivo, 'pergunta_valor_prazo_frete_pagamento');
+});
+
+test('VIP verificado: pedido de desconto não vira encaminhamento automático', opts, async () => {
+  const x = await novaConversa(A, [{ texto: 'sou VIP, tenho desconto?' }], { nome: 'Vera Lima' });
+  const { rows: [tag] } = await pool.query("select id from crm_tags where tenant_id = $1 and nome = 'VIP'", [A]);
+  const cli = await executarFerramenta(pool, { tenantId: A, conversaId: x.conversa.id, config: (await pool.query('select * from crm_agente_config where tenant_id = $1', [A])).rows[0], estado: {} }, 'buscar_ou_criar_cliente', {});
+  assert.equal(cli.ok, true);
+  const { rows: [c] } = await pool.query('select cliente_id from crm_conversas_whatsapp where id = $1', [x.conversa.id]);
+  await pool.query('insert into crm_clientes_tags (cliente_id, tag_id) values ($1, $2)', [c.cliente_id, tag.id]);
+  const ia = iaFalsa([toolUse('consultar_cliente_vip', {}), falou(FRASE_VIP)]);
+  const conv = (await pool.query('select * from crm_conversas_whatsapp where id = $1', [x.conversa.id])).rows[0];
+  const r = await executarTurno({ pool, tenantId: A, conversa: conv, mensagens: x.mensagens }, { ia, enviarTexto: async () => true, log: () => {} });
+  assert.equal(r.resposta, FRASE_VIP);
+  assert.equal((await handoffs(A, x.conversa.id)).length, 0);
 });

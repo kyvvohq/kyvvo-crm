@@ -39,7 +39,8 @@
     "textos": {
       "encaminhamento": "Para te passar uma informação certinha e não correr o risco de te orientar errado, vou encaminhar seu caso para nossa equipe verificar. 🩵",
       "desconto_vip": "Como cliente do grupo VIP, você tem 10% de desconto, que a equipe aplica no orçamento.",
-      "somente_texto": "Recebi seu envio! Pode me escrever por texto o que você precisa? Assim consigo anotar certinho para a equipe. 🩵"
+      "somente_texto": "Recebi seu envio! Pode me escrever por texto o que você precisa? Assim consigo anotar certinho para a equipe. 🩵",
+      "equipe_avisada": "A equipe já foi avisada e continua o seu atendimento por aqui. 🩵"
     }
   },
   "campos_pedido": [
