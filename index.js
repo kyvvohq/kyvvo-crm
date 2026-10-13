@@ -259,7 +259,7 @@ async function build(opcoes = {}) {
     const [canalRows, mensagensRows, conversasRows, execucoesRows] = await Promise.all([
       pool.query('select phone_number_id, modo, status, numero_exibido from crm_whatsapp_numeros where tenant_id = $1', [tenantId]),
       pool.query(
-        `select telefone_e164, direcao, tipo, autor, status_entrega, processada_em, tentativas, criado_em
+        `select telefone_e164, direcao, tipo, autor, conteudo, status_entrega, processada_em, tentativas, criado_em
            from crm_mensagens_whatsapp where tenant_id = $1 order by criado_em desc limit 10`,
         [tenantId],
       ),
