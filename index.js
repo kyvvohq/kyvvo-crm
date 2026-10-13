@@ -323,9 +323,19 @@ async function build(opcoes = {}) {
     const { rows: [conversa] } = await pool.query(
       'select id from crm_conversas_whatsapp where tenant_id = $1 and telefone_e164 = $2', [tenantId, telefone]);
     if (!conversa) return reply.code(404).send({ error: 'Conversa não encontrada' });
+    // Reseta tentativas E processada_em (não só tentativas) — senão a
+    // mensagem já sai do filtro `processada_em is null` de
+    // processador.js:pendentes mesmo que o turno anterior não tenha
+    // realmente entregue a resposta (ex.: gerou proposta mas falhou no
+    // envio — achado ao vivo, 2026-10-13). Só a última mensagem da cliente,
+    // não o histórico inteiro.
     await pool.query(
-      `update crm_mensagens_whatsapp set tentativas = 0
-         where tenant_id = $1 and telefone_e164 = $2 and processada_em is null`,
+      `update crm_mensagens_whatsapp set tentativas = 0, processada_em = null
+         where id = (
+           select id from crm_mensagens_whatsapp
+            where tenant_id = $1 and telefone_e164 = $2 and autor = 'cliente'
+            order by criado_em desc limit 1
+         )`,
       [tenantId, telefone],
     );
     const resultado = await processarConversa(pool, tenantId, conversa.id, fastify.agente.deps);
