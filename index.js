@@ -249,6 +249,40 @@ async function build(opcoes = {}) {
     }
   });
 
+  // Diagnóstico de "bot não responde" — tudo numa chamada: canal (número +
+  // modo/status), últimas mensagens (chegou? foi enviada resposta?) e
+  // últimas execuções do agente (rodou? bloqueou no filtro? qual motivo?).
+  // Sem isso cada suspeita vira um round-trip de SQL manual no banco.
+  fastify.get('/crm/admin-interno/diagnostico-whatsapp/:tenantId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { tenantId } = request.params;
+    const [canalRows, mensagensRows, conversasRows, execucoesRows] = await Promise.all([
+      pool.query('select phone_number_id, modo, status, numero_exibido from crm_whatsapp_numeros where tenant_id = $1', [tenantId]),
+      pool.query(
+        `select telefone_e164, direcao, tipo, autor, status_entrega, criado_em
+           from crm_mensagens_whatsapp where tenant_id = $1 order by criado_em desc limit 10`,
+        [tenantId],
+      ),
+      pool.query(
+        `select telefone_e164, situacao, ultima_msg_cliente_em, janela_expira_em, pausada_ate, atualizado_em
+           from crm_conversas_whatsapp where tenant_id = $1 order by atualizado_em desc limit 5`,
+        [tenantId],
+      ),
+      pool.query(
+        `select modelo, resposta_proposta is not null as tem_proposta, resposta_enviada is not null as tem_enviada,
+                bloqueada_por_filtro, motivo_bloqueio, decisao, criado_em
+           from crm_agente_execucoes where tenant_id = $1 order by criado_em desc limit 10`,
+        [tenantId],
+      ),
+    ]);
+    return {
+      canais: canalRows.rows,
+      mensagens_recentes: mensagensRows.rows,
+      conversas_recentes: conversasRows.rows,
+      execucoes_recentes: execucoesRows.rows,
+    };
+  });
+
   // --- Conversas (histórico de mensagens do bot, crm_mensagens_whatsapp) ---
   // Configurações > WhatsApp > Conversas. Uma linha por telefone (a mensagem
   // mais recente, pra prévia da lista) — a thread completa vem só ao abrir
