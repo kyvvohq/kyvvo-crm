@@ -49,7 +49,9 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ steps.sshkey.outputs.value }}
-          source: ".npmrc,index.js,package.json,package-lock.json,version.json,lib/**,db/**,public/**"
+          # scripts/** e docs/basic/conhecimento/** entram pro seed do agente rodar dentro do container
+          # (docker compose exec crm node scripts/seed-agente.js ...)
+          source: ".npmrc,index.js,package.json,package-lock.json,version.json,lib/**,db/**,public/**,scripts/**,docs/basic/conhecimento/**"
           target: "/opt/kyvvo/crm"
 
       - name: Regenerar env do SSM + recriar container + checar saúde
