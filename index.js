@@ -32,6 +32,7 @@ const {
 } = require('./lib/notificacoes');
 const { criarAgente } = require('./lib/agente');
 const atendimento = require('./lib/agente/atendimento');
+const { processarConversa } = require('./lib/agente/processador');
 const platform = require('./lib/platform');
 const { resolverClaims } = require('./lib/resolver-sessao');
 
@@ -308,6 +309,24 @@ async function build(opcoes = {}) {
     } catch (erro) {
       return { ok: false, erro: erro.message, status: erro.status || null };
     }
+  });
+
+  // Força o reprocessamento de uma conversa travada (tentativas esgotadas)
+  // com os MESMOS deps de produção (fastify.agente.deps) — diferente da
+  // varredura periódica, devolve o erro de verdade na resposta em vez de só
+  // logar no console do container (que não dá pra ver de fora).
+  fastify.post('/crm/admin-interno/reprocessar/:tenantId/:conversaId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { tenantId, conversaId } = request.params;
+    await pool.query(
+      `update crm_mensagens_whatsapp set tentativas = 0
+         where tenant_id = $1 and processada_em is null and telefone_e164 = (
+           select telefone_e164 from crm_conversas_whatsapp where tenant_id = $1 and id = $2
+         )`,
+      [tenantId, conversaId],
+    );
+    const resultado = await processarConversa(pool, tenantId, conversaId, fastify.agente.deps);
+    return resultado;
   });
 
   // --- Conversas (histórico de mensagens do bot, crm_mensagens_whatsapp) ---
