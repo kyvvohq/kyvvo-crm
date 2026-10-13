@@ -290,6 +290,26 @@ async function build(opcoes = {}) {
     };
   });
 
+  // Presença da chave não garante que ela funciona (expirada/revogada/typo
+  // no SSM) — só uma chamada real decide. Nunca devolve/loga a chave, só o
+  // resultado (ok ou a mensagem de erro da Anthropic).
+  fastify.get('/crm/admin-interno/testar-anthropic', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    if (!process.env.ANTHROPIC_API_KEY) return { ok: false, erro: 'ANTHROPIC_API_KEY não configurada' };
+    try {
+      const Anthropic = require('@anthropic-ai/sdk');
+      const client = new Anthropic();
+      const resp = await client.messages.create({
+        model: 'claude-haiku-5-5',
+        max_tokens: 8,
+        messages: [{ role: 'user', content: 'oi' }],
+      });
+      return { ok: true, modelo: resp.model };
+    } catch (erro) {
+      return { ok: false, erro: erro.message, status: erro.status || null };
+    }
+  });
+
   // --- Conversas (histórico de mensagens do bot, crm_mensagens_whatsapp) ---
   // Configurações > WhatsApp > Conversas. Uma linha por telefone (a mensagem
   // mais recente, pra prévia da lista) — a thread completa vem só ao abrir
