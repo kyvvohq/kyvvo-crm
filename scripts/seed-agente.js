@@ -21,7 +21,12 @@ function args() {
   if (!o.tenant) throw new Error('--tenant obrigatório');
   const arquivo = path.resolve(o.seed || path.join(__dirname, '..', 'db', 'seeds', 'basic.json'));
   const seed = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
+  const conhecimento = {};
+  for (const [tipo, rel] of Object.entries(seed.conhecimento || {})) {
+    conhecimento[tipo] = fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+  }
   await semearAgente(pool, o.tenant, seed, {
+    conhecimento,
     modo: o.modo || 'desligado',
     phoneNumberId: o['phone-number-id'] || null,
     numeroExibido: o.numero || null,

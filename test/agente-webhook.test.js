@@ -177,7 +177,7 @@ test('eco do app (coexistência) coloca a conversa em humano e o agente fica em 
 test('falha do agente não perde a mensagem: tentativas sobem e a varredura reprocessa', opts, async () => {
   await pool.query("update crm_conversas_whatsapp set situacao = 'bot', pausada_ate = null where tenant_id = $1", [T1]);
   let falhar = true; const vistas = [];
-  const deps = { ...app.agente.deps, executarAgente: async (ctx) => { if (falhar) throw new Error('modelo fora do ar'); vistas.push(ctx.mensagens.map((x) => x.conteudo)); } };
+  const deps = { ...app.agente.deps, executarAgente: async (ctx) => { if (ctx.tenantId !== T1) return; if (falhar) throw new Error('modelo fora do ar'); vistas.push(ctx.mensagens.map((x) => x.conteudo)); } };
   const { rows: [conv] } = await pool.query('select id from crm_conversas_whatsapp where tenant_id = $1 and telefone_e164 = $2', [T1, E164]);
   await pool.query(
     "insert into crm_mensagens_whatsapp (tenant_id, telefone_e164, direcao, conteudo, wamid, autor, criado_em) values ($1, $2, 'recebida', 'segunda', 'wamid.F2', 'cliente', now() - interval '2 minutes'), ($1, $2, 'recebida', 'primeira', 'wamid.F1', 'cliente', now() - interval '3 minutes')",

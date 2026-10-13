@@ -27,3 +27,12 @@ Migration 035, `lib/agente/{entrada,recebimento,processador,index}.js`, `lib/arm
 - Pausa após resposta humana: `limites.pausa_humano_horas` (padrão 12 h) — definir com a conta.
 - Limite de mídia 20 MB (`AGENTE_MIDIA_MAX_BYTES`); STL maior que isso é recusado e registrado em `midia.erro`.
 - Perguntar ao time do platform: ele espera o 200 do CRM antes de responder à Meta?
+
+## Marco 3 — concluído
+Migration 036; `lib/agente/{posfiltro,horario,ferramentas,contexto,executor}.js`; base de conhecimento higienizada em `docs/basic/conhecimento/*.md` (originais intactos em `fontes/`) carregada pelo seed; `@anthropic-ai/sdk` adicionado. Testes em `test/agente-executor.test.js` (modelo mockado, sem rede).
+- `anexar_midia` não é ferramenta do modelo: o código anexa imagens/documentos ao pedido rascunho e abre o encaminhamento `arquivo_recebido`, sem avaliar viabilidade (o modelo só vê "[imagem recebida e anexada]").
+- `enviarTexto` (@kyvvohq/whatsapp) devolve só true/false, sem `wamid`: mensagens do agente ficam sem `wamid` e não recebem atualização de status de entrega. Se quisermos status/cobrança por mensagem enviada, o módulo compartilhado precisa devolver o id.
+- Rascunho de pedido aparece no quadro como qualquer pedido da etapa inicial (`crm_pedidos.rascunho = true`); falta decidir o gesto "revisado" que limpa a flag (marco 5).
+- Pós-filtro é deliberadamente estrito (bloqueia até a palavra "frete" na boca do agente): o custo é um encaminhamento a mais; acompanhar a taxa de bloqueio nos evals.
+- Rate limit por número e retenção de logs ainda não implementados (marco 6).
+- Modelo padrão `claude-haiku-4-5`; `claude-haiku-5-5` entra na comparação do marco 4.
