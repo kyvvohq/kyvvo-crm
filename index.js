@@ -236,6 +236,19 @@ async function build(opcoes = {}) {
     return config;
   });
 
+  // Troca o modo pelo admin (sem usuário do tenant logado, por isso
+  // ator_id fica null em crm_eventos — definirModo já trata esse caso).
+  fastify.put('/crm/admin-interno/agente-config/:tenantId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { modo } = request.body || {};
+    try {
+      return await atendimento.definirModo(pool, request.params.tenantId, null, modo);
+    } catch (erro) {
+      if (erro instanceof atendimento.ErroAtendimento) return reply.code(erro.status).send({ error: erro.message });
+      throw erro;
+    }
+  });
+
   // --- Conversas (histórico de mensagens do bot, crm_mensagens_whatsapp) ---
   // Configurações > WhatsApp > Conversas. Uma linha por telefone (a mensagem
   // mais recente, pra prévia da lista) — a thread completa vem só ao abrir
