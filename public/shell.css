@@ -226,3 +226,56 @@ a.acao:hover { color:var(--accent-dark); }
 .acoes-cliente-desabilitado span { width:32px; height:32px; border-radius:50%; background:var(--surface-muted);
   color:var(--border-strong); flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; opacity:.6; }
 .acoes-cliente-desabilitado img { opacity:.5; filter:grayscale(1); }
+
+/* Ícone de e-mail de aniversário (Aniversariantes do mês, único bloco que
+   usa este 4º ícone) — mesmo visual de "desabilitado" acima, mas
+   independente do telefone: cliente pode ter telefone e não ter e-mail
+   (ou o contrário), então não faz parte do wrapper -desabilitado. */
+.acoes-cliente .acao-email-desabilitado { width:32px; height:32px; border-radius:50%; background:var(--surface-muted);
+  color:var(--border-strong); flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; opacity:.6; }
+
+/* Modal de edição de pedido (abrirModalPedido, shell.js) — compartilhado
+   entre Quadro e Pedidos (2026-10-09, antes eram duas implementações
+   separadas e divergentes). 4 colunas, sem barra de rolagem em desktop. */
+.ds-modal-card-pedido { max-width:780px; max-height:96vh; padding:var(--space-5) var(--space-6) var(--space-5); }
+.ds-modal-card-pedido .ds-modal-titulo { font-size:20px; }
+.ds-modal-card-pedido .ds-modal-corpo { margin-top:var(--space-3); }
+.pedido-resumo { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--space-4); margin-bottom:var(--space-4); }
+.pedido-meta { display:flex; align-items:center; gap:var(--space-2); min-width:0; }
+.pedido-meta-texto { font-size:13px; color:var(--muted-strong); }
+.pedido-total { display:flex; flex-direction:column; align-items:flex-end; line-height:1.15; }
+.pedido-total span { font-size:12px; color:var(--muted-strong); }
+.pedido-total strong { font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--text); letter-spacing:-.01em; }
+.pedido-aviso { display:flex; align-items:center; gap:8px; margin-bottom:var(--space-4); padding:8px 12px; border-radius:var(--radius-md);
+  background:var(--accent-tint); color:var(--accent-strong); font-size:13px; line-height:1.35; }
+.pedido-aviso svg:first-child { flex:none; }
+.pedido-aviso span { flex:1; }
+.pedido-aviso-fechar { flex:none; background:none; border:none; cursor:pointer; color:inherit; opacity:.6; display:flex; padding:0; }
+.pedido-aviso-fechar:hover { opacity:1; }
+.pedido-grade { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:18px 16px; }
+.pedido-grade > .s2 { grid-column:span 2; }
+.pedido-grade .ds-rotulo { margin:0; }
+.pedido-grade .ds-textarea { height:100px; min-height:0; resize:none; }
+.pedido-itens { height:100px; box-sizing:border-box; border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface-muted); overflow:hidden; display:flex; flex-direction:column; }
+.pedido-itens-cabecalho { display:flex; padding:5px 12px; font-size:11px; font-weight:600; text-transform:uppercase;
+  letter-spacing:.03em; color:var(--muted-strong); border-bottom:1px solid var(--border); flex-shrink:0; }
+.pedido-itens-cabecalho .col-qtd { flex:0 0 48px; }
+.pedido-itens-cabecalho .col-desc { flex:1; }
+.pedido-itens-corpo { overflow-y:auto; padding:0 12px; }
+.pedido-item-linha { display:flex; padding:5px 0; font-size:13px; color:var(--text); }
+.pedido-item-linha + .pedido-item-linha { border-top:1px solid var(--border); }
+.pedido-item-linha .col-qtd { flex:0 0 48px; color:var(--muted-strong); }
+.pedido-item-linha .col-desc { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pedido-itens-vazio { margin:0; padding:8px 12px; font-size:12px; color:var(--muted-strong); }
+.ds-modal-card-pedido .modal-erro:empty { min-height:0; margin:0; }
+.ds-modal-card-pedido .modal-erro { margin-top:10px; }
+.ds-modal-card-pedido .ds-form { gap:var(--space-5); }
+@media (max-width:720px) {
+  .pedido-grade { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .ds-modal-card-pedido { padding:var(--space-5) var(--space-4); }
+}
+@media (max-width:380px) {
+  .pedido-grade { grid-template-columns:minmax(0,1fr); }
+  .pedido-grade > .s2 { grid-column:auto; }
+}

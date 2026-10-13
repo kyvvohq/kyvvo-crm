@@ -13,21 +13,92 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .painel-hoje-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-5); }
-  @media(max-width:860px) { .painel-hoje-grid { grid-template-columns:1fr; } }
-  .secao-titulo { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--text); margin:0 0 14px; }
+  /* Painel = segunda tela mais importante do CRM (a primeira é o Quadro):
+     responde "o que preciso fazer hoje?" e leva pro Quadro. Ordem: Resumo
+     (KPIs + funil de etapas) -> Precisa de atenção -> Aniversariantes. */
+  .secao-titulo { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--text); margin:0; }
   .secao-titulo svg { color:var(--muted-strong); }
+  .secao-cabecalho { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .link-secundario { font-size:13px; font-weight:600; color:var(--accent-strong); text-decoration:none; white-space:nowrap; }
+  .link-secundario:hover { text-decoration:underline; }
+
+  /* Contador ao lado do título do cartão (some quando é zero). */
+  .contador { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 7px;
+    border-radius:var(--radius-full); font-size:12px; font-weight:700; background:var(--warning-bg); color:var(--warning-text); }
+  .contador[hidden] { display:none; }
+  .contador.acento { background:var(--accent-tint); color:var(--accent-strong); }
+  .contador.neutro { background:var(--surface-muted); color:var(--muted-strong); }
+
+  /* Resumo: 3 KPIs no mesmo molde (ícone + rótulo + valor + apoio). */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+  .kpi { display:flex; align-items:center; justify-content:flex-start; gap:14px; width:100%; height:auto; padding:14px 16px;
+    text-align:left; background:var(--surface-muted); color:inherit; border:1px solid var(--border); border-radius:var(--radius-md);
+    font-family:var(--font-ui); font-weight:400; text-decoration:none; }
+  .kpi:hover { background:var(--accent-tint); border-color:var(--accent); }
+  .kpi-icone { flex:none; display:flex; align-items:center; justify-content:center; width:40px; height:40px;
+    border-radius:var(--radius-full); background:var(--card); border:1px solid var(--border); color:var(--accent-strong); }
+  .kpi-textos { min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .kpi-rotulo { font-size:12px; font-weight:600; color:var(--muted-strong); }
+  .kpi-valor { font-family:var(--font-display); font-size:24px; font-weight:700; line-height:1.1; color:var(--text); }
+  .kpi-meta { font-size:12.5px; color:var(--muted); }
+
+  /* Funil de etapas — cada etapa leva pra lista de pedidos dela; o link do
+     cabeçalho leva pro Quadro. Zeradas ficam apagadas pra as ativas se destacarem. */
+  .funil-bloco { margin-top:var(--space-5); padding-top:var(--space-5); border-top:1px solid var(--border); }
+  .funil-cabecalho { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .funil-titulo { margin:0; font-size:13px; font-weight:700; color:var(--text); }
+  .funil-titulo .sub { font-weight:500; color:var(--muted); margin-left:8px; }
+  .funil { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; }
+  .etapa { display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:4px; height:auto;
+    padding:12px 14px; text-align:left; background:var(--card); color:inherit; border:1px solid var(--border);
+    border-left-width:3px; border-radius:var(--radius-md); font-family:var(--font-ui); font-weight:400; }
+  .etapa:hover { background:var(--accent-tint); border-color:var(--accent); }
+  .etapa[data-tipo="aberta"] { border-left-color:var(--accent); }
+  .etapa[data-tipo="ganha"] { border-left-color:var(--success); }
+  .etapa[data-tipo="perdida"] { border-left-color:var(--danger); }
+  .etapa[data-zero="1"] { border-left-color:var(--border-strong); }
+  .etapa-nome { font-size:12.5px; color:var(--muted-strong); }
+  .etapa-qtd { font-family:var(--font-display); font-size:22px; font-weight:700; line-height:1.1; color:var(--text); }
+  .etapa[data-zero="1"] .etapa-qtd { color:var(--muted); }
+
+  /* Precisa de atenção */
+  .bloco { display:flex; flex-direction:column; gap:12px; }
+  .bloco-titulo { margin:0; font-size:12px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--muted-strong); }
+  .atencao-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:var(--space-5); align-items:start; }
+  @media(max-width:480px) { .atencao-grid { grid-template-columns:1fr; } }
+  .card-lista.is-vazio .secao-titulo { color:var(--muted-strong); }
+  .vazio-ok { display:flex; align-items:center; gap:8px; padding:0; }
+  .vazio-ok svg { flex:none; color:var(--success); }
+
   .item-hoje { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 0;
     border-top:1px solid var(--border); }
-  .item-hoje:first-of-type { border-top:none; }
-  .item-hoje .info { min-width:0; }
+  .item-hoje:first-of-type { border-top:none; padding-top:0; }
+  .item-hoje .info { min-width:0; flex:1; }
   .item-hoje .nome { font-size:13.5px; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .item-hoje .meta { font-size:12px; color:var(--muted); margin-top:2px; }
+  .item-hoje .meta { font-size:12px; color:var(--muted); margin-top:3px; }
   .item-hoje .btn-whats { flex-shrink:0; height:32px; padding:0 12px; font-size:12.5px; background:#25D366; }
   .item-hoje .btn-whats:hover { background:#1DA851; }
-  .item-hoje .data-pedido { flex-shrink:0; background:transparent; color:var(--accent); font-weight:600; font-size:12.5px;
-    padding:0 6px; height:auto; text-decoration:underline; }
-  .item-hoje .data-pedido:hover { color:var(--accent-dark); }
+  .item-hoje .data-pedido { flex-shrink:0; background:var(--surface-muted); color:var(--muted-strong); font-weight:600; font-size:12px;
+    padding:0 9px; height:24px; border-radius:var(--radius-full); text-decoration:none; }
+  .item-hoje .data-pedido:hover { background:var(--accent-tint); color:var(--accent-strong); }
+  /* Itens com data + ações (Orçamentos parados / Pagamentos pendentes): 2 linhas,
+     porque num cartão de 1/3 da tela o nome ficava espremido pela data e pelos ícones.
+     linha 1 = nome + ações, linha 2 = apoio + data do pedido. */
+  .item-hoje.dupla { display:grid; grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"nome acao" "meta data";
+    column-gap:12px; row-gap:6px; align-items:center; }
+  .item-hoje.dupla .nome { grid-area:nome; }
+  .item-hoje.dupla .acao { grid-area:acao; justify-self:end; }
+  .item-hoje.dupla .meta { grid-area:meta; margin-top:0; display:flex; align-items:center; gap:6px; white-space:nowrap; min-width:0; }
+  .item-hoje.dupla .data-pedido { grid-area:data; justify-self:end; }
+  .tag-etapa { display:inline-block; padding:1px 8px; border-radius:var(--radius-full);
+    background:var(--surface-muted); color:var(--muted-strong); font-size:11.5px; font-weight:600; }
+  .atraso { color:var(--warning-text); font-weight:600; flex:none; }
+  .tag-etapa { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Aniversariantes do mês: lista longa, então corre em colunas. */
+  .lista-colunas { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); column-gap:var(--space-6); }
+  .lista-colunas .item-hoje { border-top:none; border-bottom:1px solid var(--border); padding:11px 0; }
+  .lista-colunas > .vazio { grid-column:1 / -1; }
 
   /* Kebab (Orçamentos parados) — mesmo padrão já usado em pedidos.html. */
   .menu-acoes-wrap { position:relative; display:inline-block; flex-shrink:0; }
@@ -38,21 +109,6 @@
   .menu-acoes button { display:block; width:100%; text-align:left; background:transparent; color:var(--text); padding:8px 10px; border-radius:6px; font-size:13px; height:auto; }
   .menu-acoes button:hover { background:var(--surface-muted); }
   .menu-acoes button.perigo { color:var(--danger); }
-
-  /* Card "Resumo" — tiles clicáveis (abrem o relatório detalhado) +
-     sublista de "pedidos por etapa" dentro do próprio tile. */
-  .resumo-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:4px; }
-  .resumo-tile { background:var(--surface-muted); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 16px;
-    text-align:left; height:auto; display:block; color:inherit; font-family:var(--font-ui); }
-  .resumo-tile:hover { background:var(--accent-tint); border-color:var(--accent); }
-  .resumo-tile .rotulo { font-size:11px; font-weight:600; letter-spacing:.4px; color:var(--muted); text-transform:uppercase; }
-  .resumo-tile .valor { font-size:20px; font-weight:700; color:var(--text); margin-top:4px; }
-  .resumo-tile .valor-secundario { font-size:12.5px; color:var(--muted-strong); margin-top:2px; }
-  .resumo-etapas { display:flex; flex-direction:column; gap:6px; }
-  .resumo-etapas .resumo-etapa-linha { display:flex; justify-content:space-between; align-items:center; gap:8px;
-    background:transparent; color:var(--text-secondary); border:none; padding:4px 0; height:auto; font-size:13px; text-align:left; width:100%; }
-  .resumo-etapas .resumo-etapa-linha:hover { color:var(--accent-strong); }
-  .resumo-etapas .resumo-etapa-linha .contagem { font-weight:700; color:var(--text); }
 </style>
 </head>
 <body>
@@ -135,6 +191,10 @@
       <div class="cabecalho-pagina">
         <div class="textos">
           <div class="linha-titulo"><h1 id="saudacao">Painel Hoje</h1></div>
+          <p class="descricao" id="data-hoje"></p>
+        </div>
+        <div class="acoes">
+          <a class="ds-btn ds-btn-primario" href="/crm/quadro.html"><span data-icon="kanban" data-size="15"></span>Abrir Quadro</a>
         </div>
       </div>
 
@@ -142,32 +202,43 @@
            Hoje, sempre visível pra quem tem CRM. Cada métrica abre o
            relatório detalhado já filtrado. -->
       <div class="card" id="card-resumo">
-        <h2 class="secao-titulo"><span data-icon="chart-column" data-size="17"></span>Resumo</h2>
-        <div class="resumo-grid" id="resumo-grid"><p class="vazio">Carregando…</p></div>
+        <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="chart-column" data-size="17"></span>Resumo</h2></div>
+        <div class="kpis" id="resumo-kpis"><p class="vazio">Carregando…</p></div>
+        <div class="funil-bloco">
+          <div class="funil-cabecalho">
+            <h3 class="funil-titulo">Pedidos por etapa<span class="sub" id="funil-sub"></span></h3>
+            <a class="link-secundario" href="/crm/quadro.html">Ver no Quadro →</a>
+          </div>
+          <div class="funil" id="resumo-funil"></div>
+        </div>
       </div>
 
-      <div class="painel-hoje-grid">
-        <div class="card" id="card-encaminhamentos">
-          <h2 class="secao-titulo"><span data-icon="message-circle" data-size="17"></span>Falar hoje — encaminhados pelo agente</h2>
+      <section class="bloco">
+        <h2 class="bloco-titulo">Precisa de atenção</h2>
+        <div class="atencao-grid">
+        <section class="card card-lista">
+          <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="message-circle" data-size="17"></span>Falar hoje — encaminhados pelo agente<span class="contador acento" id="cont-encaminhamentos" hidden></span></h2></div>
           <div id="lista-encaminhamentos"><p class="vazio">Carregando…</p></div>
-        </div>
-        <div class="card">
-          <h2 class="secao-titulo"><span data-icon="circle-alert" data-size="17"></span>Orçamentos parados</h2>
+        </section>
+        <section class="card card-lista">
+          <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="circle-alert" data-size="17"></span>Orçamentos parados<span class="contador" id="cont-orcamentos" hidden></span></h2></div>
           <div id="lista-orcamentos"><p class="vazio">Carregando…</p></div>
-        </div>
-        <div class="card">
-          <h2 class="secao-titulo"><span data-icon="circle-dollar-sign" data-size="17"></span>Pagamentos pendentes</h2>
+        </section>
+        <section class="card card-lista">
+          <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="circle-dollar-sign" data-size="17"></span>Pagamentos pendentes<span class="contador" id="cont-pagamentos" hidden></span></h2></div>
           <div id="lista-pagamentos"><p class="vazio">Carregando…</p></div>
-        </div>
-        <div class="card">
-          <h2 class="secao-titulo"><span data-icon="package-check" data-size="17"></span>Prontos pra envio/retirada</h2>
+        </section>
+        <section class="card card-lista">
+          <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="package-check" data-size="17"></span>Prontos pra envio/retirada<span class="contador acento" id="cont-prontos" hidden></span></h2></div>
           <div id="lista-prontos"><p class="vazio">Carregando…</p></div>
+        </section>
         </div>
-        <div class="card">
-          <h2 class="secao-titulo"><span data-icon="cake" data-size="17"></span>Aniversariantes do mês</h2>
-          <div id="lista-aniversariantes"><p class="vazio">Carregando…</p></div>
-        </div>
-      </div>
+      </section>
+
+      <section class="card card-lista">
+        <div class="secao-cabecalho"><h2 class="secao-titulo"><span data-icon="cake" data-size="17"></span>Aniversariantes do mês<span class="contador neutro" id="cont-aniversariantes" hidden></span></h2></div>
+        <div class="lista-colunas" id="lista-aniversariantes"><p class="vazio">Carregando…</p></div>
+      </section>
     </div>
   </div>
 
@@ -177,6 +248,10 @@
   <script src="/crm/shell.js"></script>
   <script>
     document.getElementById('saudacao').textContent = `Olá, ${(localStorage.getItem('crm_nome') || '').split(' ')[0] || ''}`;
+    (() => {
+      const d = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      document.getElementById('data-hoje').textContent = d.charAt(0).toUpperCase() + d.slice(1);
+    })();
 
     function itemHtml({ nome, telefone, meta, mensagem }) {
       return `
@@ -196,13 +271,11 @@
     // pedidos.html/quadro.html.
     function itemOrcamentoHtml(o) {
       return `
-        <div class="item-hoje">
-          <div class="info">
-            <div class="nome">${escapeHtml(o.cliente_nome)}</div>
-            <div class="meta">${escapeHtml(o.etapa_nome)} há ${o.dias_parado} dia${o.dias_parado === 1 ? '' : 's'}</div>
-          </div>
-          <button type="button" class="data-pedido" data-abrir-pedido="${o.id}">${formatarData(o.criado_em)}</button>
-          <div class="menu-acoes-wrap">
+        <div class="item-hoje dupla">
+          <div class="nome">${escapeHtml(o.cliente_nome)}</div>
+          <div class="meta"><span class="tag-etapa">${escapeHtml(o.etapa_nome)}</span><span class="atraso">há ${o.dias_parado} dia${o.dias_parado === 1 ? '' : 's'}</span></div>
+          <button type="button" class="data-pedido" data-abrir-pedido="${o.id}" title="Abrir pedido">${formatarData(o.criado_em)}</button>
+          <div class="menu-acoes-wrap acao">
             <button type="button" class="btn-acoes" data-abrir-menu-orcamento="${o.id}" aria-haspopup="true" aria-expanded="false">⋯</button>
             <div class="menu-acoes" data-menu-orcamento="${o.id}" hidden>
               <button type="button" data-editar-orcamento="${o.id}">Editar</button>
@@ -219,13 +292,11 @@
     // usados nos Aniversariantes do mês (acoesClienteHtml, shell.js).
     function itemPagamentoHtml(p) {
       return `
-        <div class="item-hoje">
-          <div class="info">
-            <div class="nome">${escapeHtml(p.cliente_nome)}</div>
-            <div class="meta">${formatarMoeda(p.valor_total - p.valor_recebido)} pendente</div>
-          </div>
-          <button type="button" class="data-pedido" data-abrir-pedido="${p.id}">${formatarData(p.criado_em)}</button>
-          ${acoesClienteHtml(p.cliente_telefone, p.cliente_nome, preencherModelo('pagamento_pendente', p.cliente_nome))}
+        <div class="item-hoje dupla">
+          <div class="nome">${escapeHtml(p.cliente_nome)}</div>
+          <div class="meta">${formatarMoeda(p.valor_total - p.valor_recebido)} pendente</div>
+          <button type="button" class="data-pedido" data-abrir-pedido="${p.id}" title="Abrir pedido">${formatarData(p.criado_em)}</button>
+          <div class="acao">${acoesClienteHtml(p.cliente_telefone, p.cliente_nome, preencherModelo('pagamento_pendente', p.cliente_nome))}</div>
         </div>
       `;
     }
@@ -238,9 +309,14 @@
         <div class="item-hoje">
           <div class="info">
             <div class="nome">${escapeHtml(a.nome)}</div>
-            <div class="meta">Dia ${a.dia_nascimento} 🎂</div>
+            <div class="meta">Dia ${a.dia_nascimento}</div>
           </div>
-          ${acoesClienteHtml(a.telefone, a.nome, preencherModelo('aniversario', a.nome))}
+          ${acoesClienteHtml(a.telefone, a.nome, preencherModelo('aniversario', a.nome), {
+            id: a.id,
+            email: a.email,
+            assunto: preencherModelo('aniversario_email', a.nome, 'assunto'),
+            corpo: preencherModelo('aniversario_email', a.nome),
+          })}
         </div>
       `;
     }
@@ -259,21 +335,33 @@
         + '<a class="ds-btn ds-btn-primario btn-whats" href="/crm/atendimento.html?conversa=' + e.conversa_id + '" style="background:var(--accent)">Abrir</a></div>';
     }
 
-    function renderLista(elId, itens, vazioMsg) {
+    // Estado vazio das listas de atenção = "tudo em dia" (ícone de check);
+    // o contador do título e o modificador is-vazio do cartão acompanham.
+    const ICONE_OK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+    function renderLista(elId, itens, vazioMsg, comCheck = true) {
       const el = document.getElementById(elId);
-      el.innerHTML = itens.length ? itens.join('') : `<p class="vazio">${vazioMsg}</p>`;
+      el.innerHTML = itens.length ? itens.join('') : `<p class="vazio${comCheck ? ' vazio-ok' : ''}">${comCheck ? ICONE_OK : ''}<span>${vazioMsg}</span></p>`;
+      const cont = document.getElementById(`cont-${elId.replace('lista-', '')}`);
+      if (cont) { cont.textContent = itens.length; cont.hidden = itens.length === 0; }
+      el.closest('.card-lista').classList.toggle('is-vazio', itens.length === 0);
     }
 
     // US25: mensagem vem do modelo cadastrado pra cada situação
     // (crm_modelos_mensagem), não mais fixa no código — só {{nome}} por
-    // enquanto (primeiro nome da pessoa).
+    // enquanto (primeiro nome da pessoa). `campo` = 'texto' (padrão, usado
+    // pelo WhatsApp) ou 'assunto' (só 'aniversario_email' tem — e-mail
+    // precisa de assunto além do corpo).
     let modelosMensagem = {};
-    function preencherModelo(chave, nomeCompleto) {
-      const texto = (modelosMensagem[chave] && modelosMensagem[chave].texto) || '';
-      return texto.replace(/\{\{nome\}\}/g, (nomeCompleto || '').split(' ')[0] || '');
+    function preencherModelo(chave, nomeCompleto, campo = 'texto') {
+      const valor = (modelosMensagem[chave] && modelosMensagem[chave][campo]) || '';
+      return valor.replace(/\{\{nome\}\}/g, (nomeCompleto || '').split(' ')[0] || '');
     }
 
     let etapas = [];
+    let etapasPromise = null;
+    function obterEtapas() {
+      return etapasPromise || (etapasPromise = apiFetch('/crm/api/etapas').then((r) => r.json()));
+    }
     function proximaEtapa(etapaAtualId) {
       const atual = etapas.find((e) => e.id === etapaAtualId);
       if (!atual) return null;
@@ -282,17 +370,17 @@
     }
 
     async function carregar() {
-      const [resPainel, resModelos, resEtapas] = await Promise.all([
+      const [resPainel, resModelos, listaEtapas] = await Promise.all([
         apiFetch('/crm/api/painel-hoje'),
         apiFetch('/crm/api/modelos-mensagem'),
-        apiFetch('/crm/api/etapas'),
+        obterEtapas(),
       ]);
       const dados = await resPainel.json();
       modelosMensagem = Object.fromEntries((await resModelos.json()).map((m) => [m.chave, m]));
-      etapas = await resEtapas.json();
+      etapas = listaEtapas;
 
-      renderLista('lista-encaminhamentos', (dados.encaminhamentos || []).map(itemEncaminhamentoHtml), 'Ninguém aguardando a equipe. 🎉');
-      renderLista('lista-orcamentos', dados.orcamentos_parados.map(itemOrcamentoHtml), 'Nenhum orçamento parado. 🎉');
+      renderLista('lista-encaminhamentos', (dados.encaminhamentos || []).map(itemEncaminhamentoHtml), 'Ninguém aguardando a equipe.');
+      renderLista('lista-orcamentos', dados.orcamentos_parados.map(itemOrcamentoHtml), 'Nenhum orçamento parado.');
       renderLista('lista-pagamentos', dados.pagamentos_pendentes.map(itemPagamentoHtml), 'Nenhum pagamento pendente.');
 
       renderLista('lista-prontos', dados.prontos_para_envio.map((p) => itemHtml({
@@ -302,7 +390,7 @@
         mensagem: preencherModelo('pedido_pronto', p.cliente_nome),
       })), 'Nada pronto pra envio agora.');
 
-      renderLista('lista-aniversariantes', dados.aniversariantes.map(itemAniversarioHtml), 'Nenhum aniversariante este mês.');
+      renderLista('lista-aniversariantes', dados.aniversariantes.map(itemAniversarioHtml), 'Nenhum aniversariante este mês.', false);
 
       ligarEventosOrcamentos();
     }
@@ -311,37 +399,48 @@
     // 2026-10-03: sempre ativo, sem toggle por tenant; o controle de acesso
     // já existente pro produto CRM em si é suficiente).
     async function carregarResumo() {
-      const res = await apiFetch('/crm/api/painel-hoje/resumo');
+      const [res, listaEtapas] = await Promise.all([apiFetch('/crm/api/painel-hoje/resumo'), obterEtapas()]);
       const dados = await res.json();
 
       const linkLista = (filtros) => `/crm/relatorios.html?lista=1&${new URLSearchParams(filtros).toString()}`;
+      const kpi = ({ icone, rotulo, valor, meta, tag, attrs }) => `
+        <${tag} class="kpi" ${attrs}>
+          <span class="kpi-icone">${icon(icone, 18)}</span>
+          <span class="kpi-textos">
+            <span class="kpi-rotulo">${rotulo}</span>
+            <span class="kpi-valor">${valor}</span>
+            ${meta ? `<span class="kpi-meta">${meta}</span>` : ''}
+          </span>
+        </${tag}>`;
 
-      document.getElementById('resumo-grid').innerHTML = `
-        <div class="resumo-tile">
-          <div class="rotulo">Pedidos por etapa</div>
-          <div class="resumo-etapas">
-            ${dados.pedidos_por_etapa.map((e) => `
-              <button type="button" class="resumo-etapa-linha" data-ir-lista='${JSON.stringify({ etapa_id: e.etapa_id })}'>
-                <span>${escapeHtml(e.etapa_nome)}</span><span class="contagem">${e.quantidade}</span>
-              </button>
-            `).join('')}
-          </div>
-        </div>
-        <button type="button" class="resumo-tile" data-ir-lista='${JSON.stringify({ apenas_hoje: '1' })}'>
-          <div class="rotulo">Pedidos hoje</div>
-          <div class="valor">${dados.novos_pedidos_dia}</div>
-          <div class="valor-secundario">${formatarMoeda(dados.valor_total_dia)}</div>
+      document.getElementById('resumo-kpis').innerHTML = [
+        kpi({ icone: 'list', rotulo: 'Pedidos hoje', valor: dados.novos_pedidos_dia, meta: formatarMoeda(dados.valor_total_dia),
+          tag: 'button', attrs: `type="button" data-ir-lista='${JSON.stringify({ apenas_hoje: '1' })}'` }),
+        kpi({ icone: 'package', rotulo: 'Próximos da entrega', valor: dados.pedidos_proximos_entrega, meta: 'Próximos 7 dias',
+          tag: 'button', attrs: `type="button" data-ir-lista='${JSON.stringify({ proximos_entrega_dias: '7' })}'` }),
+        kpi({ icone: 'bot', rotulo: 'Atendimentos do bot hoje', valor: dados.atendimentos_bot_dia, meta: 'Ver conversas',
+          tag: 'a', attrs: 'href="/crm/whatsapp.html?aba=conversas"' }),
+      ].join('');
+
+      // Funil: abertas na ordem do Quadro, depois "ganha" (entregue) e
+      // "perdida" por último — sem isso "Perdido" aparecia no meio do fluxo.
+      const infoEtapa = new Map(listaEtapas.map((e) => [e.id, e]));
+      const peso = { aberta: 0, ganha: 1, perdida: 2 };
+      const porEtapa = [...dados.pedidos_por_etapa].sort((a, b) => {
+        const ea = infoEtapa.get(a.etapa_id) || {};
+        const eb = infoEtapa.get(b.etapa_id) || {};
+        return (peso[ea.tipo] ?? 0) - (peso[eb.tipo] ?? 0) || (ea.ordem ?? 0) - (eb.ordem ?? 0);
+      });
+      const emAndamento = porEtapa.reduce((s, e) => s + ((infoEtapa.get(e.etapa_id) || {}).tipo === 'aberta' ? e.quantidade : 0), 0);
+      document.getElementById('funil-sub').textContent = `${emAndamento} em andamento`;
+      document.getElementById('resumo-funil').innerHTML = porEtapa.map((e) => `
+        <button type="button" class="etapa" data-tipo="${(infoEtapa.get(e.etapa_id) || {}).tipo || 'aberta'}" data-zero="${e.quantidade === 0 ? 1 : 0}"
+          data-ir-lista='${JSON.stringify({ etapa_id: e.etapa_id })}'>
+          <span class="etapa-nome">${escapeHtml(e.etapa_nome)}</span>
+          <span class="etapa-qtd">${e.quantidade}</span>
         </button>
-        <a class="resumo-tile" href="/crm/whatsapp.html?aba=conversas">
-          <div class="rotulo">Atendimentos do bot hoje</div>
-          <div class="valor">${dados.atendimentos_bot_dia}</div>
-        </a>
-        <button type="button" class="resumo-tile" data-ir-lista='${JSON.stringify({ proximos_entrega_dias: '7' })}'>
-          <div class="rotulo">Pedidos próximos da entrega</div>
-          <div class="valor">${dados.pedidos_proximos_entrega}</div>
-          <div class="valor-secundario">Próximos 7 dias</div>
-        </button>
-      `;
+      `).join('');
+
       document.querySelectorAll('[data-ir-lista]').forEach((el) => {
         el.addEventListener('click', () => { window.location.href = linkLista(JSON.parse(el.dataset.irLista)); });
       });
@@ -380,6 +479,7 @@
             body: JSON.stringify({ etapa_id: proxima.id }),
           });
           carregar();
+          carregarResumo();
         });
       });
       document.querySelectorAll('#lista-orcamentos [data-cancelar-orcamento]').forEach((btn) => {
@@ -392,6 +492,7 @@
             body: JSON.stringify({ motivo }),
           });
           carregar();
+          carregarResumo();
         });
       });
     }

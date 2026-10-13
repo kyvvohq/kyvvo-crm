@@ -152,6 +152,23 @@
           </div>
         </div>
 
+        <div class="config-geral-grupo">
+          <div class="textos">
+            <h3>Mensagem aviso pedido</h3>
+            <p>Aviso mostrado no topo do modal de pedido quando a origem não é marketplace (Shopee/TikTok/Mercado Livre). Pode ser fechado por pedido — desligando aqui, some de todos.</p>
+          </div>
+          <div class="campos" style="flex:1 1 320px;align-items:flex-start">
+            <div class="ds-campo" style="flex:1 1 260px">
+              <label class="ds-rotulo" for="cfg-mensagem-aviso">Mensagem</label>
+              <textarea class="ds-textarea" id="cfg-mensagem-aviso" rows="2" style="min-height:0"></textarea>
+            </div>
+            <div class="ds-campo" style="flex:0 0 auto">
+              <label class="ds-rotulo" for="cfg-mensagem-aviso-ativa">Ativo</label>
+              <label class="ds-switch"><input type="checkbox" role="switch" id="cfg-mensagem-aviso-ativa"><span class="ds-switch-trilho"></span></label>
+            </div>
+          </div>
+        </div>
+
         <div class="config-geral-acoes">
           <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-geral">Salvar</button>
         </div>
@@ -173,6 +190,8 @@
       document.getElementById('cfg-horario-fim').value = cfg.horario_atendimento_fim;
       document.getElementById('cfg-retomada-horas').value = cfg.bot_retomada_horas;
       document.getElementById('cfg-quadro-dias').value = cfg.quadro_dias_ultima_coluna;
+      document.getElementById('cfg-mensagem-aviso').value = cfg.mensagem_aviso_pedido;
+      document.getElementById('cfg-mensagem-aviso-ativa').checked = cfg.mensagem_aviso_pedido_ativo;
     }
     carregar();
 
@@ -186,6 +205,8 @@
         horario_atendimento_fim: Number(document.getElementById('cfg-horario-fim').value),
         bot_retomada_horas: Number(document.getElementById('cfg-retomada-horas').value),
         quadro_dias_ultima_coluna: Number(document.getElementById('cfg-quadro-dias').value),
+        mensagem_aviso_pedido: document.getElementById('cfg-mensagem-aviso').value.trim(),
+        mensagem_aviso_pedido_ativo: document.getElementById('cfg-mensagem-aviso-ativa').checked,
       };
       const res = await apiFetch('/crm/api/configuracoes-gerais', { method: 'PATCH', body: JSON.stringify(body) });
       if (!res.ok) {

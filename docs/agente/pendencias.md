@@ -1,5 +1,7 @@
 # Agente de IA — pendências
 
+> **Numeração das migrations:** após o merge com a master (que ganhou 030–034 enquanto esta branch era desenvolvida), as migrations do agente foram renumeradas de 031–038 para **035–042**. Onde este documento diz "migration 031–034" leia 035–038; 035→039; 036→040; 037→041; 038→042.
+
 Atualizada ao fim de cada marco. Origem: `docs/basic/prompt-agente.md`.
 
 ## Do spec
