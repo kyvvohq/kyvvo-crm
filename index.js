@@ -2067,6 +2067,10 @@ async function build(opcoes = {}) {
     return atendimento.definirModo(pool, tenantId, userId, (request.body || {}).modo);
   }));
 
+  // Indicadores do agente: custo (IA + mensagens), bloqueios do filtro, qualidade das sugestões, tempo até o 1º atendimento humano, fila e alertas.
+  fastify.get('/crm/api/agente/metricas', { preHandler: fastify.authenticate }, async (request) =>
+    require('./lib/agente/metricas').calcular(pool, request.user.tenantId, { dias: request.query.dias }));
+
   fastify.get('/crm/api/agente/resumo', { preHandler: fastify.authenticate }, async (request) => ({
     encaminhamentos_abertos: await atendimento.contarAbertos(pool, request.user.tenantId),
   }));
@@ -2283,6 +2287,7 @@ async function start() {
   try {
     await migrar();
     fastify.agente.iniciarVarredura();
+    fastify.agente.iniciarRetencao();
     // Checador dos gatilhos de automação sem evento síncrono (pedido parado
     // numa etapa, aniversário do cliente) — granularidade de dia, de hora em
     // hora é sobra. Só em start() (não em build(), usado pelos testes) pra

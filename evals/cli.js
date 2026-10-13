@@ -15,8 +15,7 @@ const path = require('path');
 const { carregarCasos } = require('./carregador');
 const { executarSuite } = require('./executar');
 
-// US$ por 1M de tokens (entrada, saída) — tabela de preços vigente em 2026-10; conferir antes de decidir por custo.
-const PRECOS = { 'claude-haiku-4-5': [1.0, 5.0], 'claude-haiku-5-5': [0.1, 0.5] };
+const { custoUsd } = require('../lib/agente/precos'); // tabela de preços compartilhada com a observabilidade
 
 function args() {
   const o = { real: false, modelos: null, casos: null };
@@ -45,8 +44,7 @@ function resumir(itens) {
     }
   }
   return [...porModelo.values()].map((m) => {
-    const p = PRECOS[m.modelo];
-    return { ...m, custo: p ? (m.tin * p[0] + m.tout * p[1]) / 1e6 : null, latMedia: m.rodados ? Math.round(m.latencia / m.rodados) : 0 };
+    return { ...m, custo: custoUsd(m.modelo, m.tin, m.tout), latMedia: m.rodados ? Math.round(m.latencia / m.rodados) : 0 };
   });
 }
 

@@ -66,3 +66,25 @@ Falta a rodada nº 4 só com o 5.5 para confirmar ≥ 90%.
 - Sem papéis no CRM: qualquer usuário da conta vê e age nas conversas; qualquer um pode trocar o modo do agente (ligar "Responde sozinho" pede confirmação).
 - Interface conferida no navegador com dados fictícios (Painel Hoje e Atendimento, desktop). Não testada em celular nem com o `@kyvvohq/design-system` instalado localmente (usei os arquivos publicados em /ds/).
 - Resposta da equipe e aprovação enviam só texto; envio de arquivos/imagens pela equipe não existe.
+
+## Marco 6 — concluído
+Observabilidade (`lib/agente/metricas.js`, `GET /crm/api/agente/metricas`, card "Indicadores" em Atendimento): custo da IA (tokens x preço por modelo, `lib/agente/precos.js`) e mensagens enviadas por categoria da Meta, custo por conversa, taxa de bloqueio do filtro, qualidade das sugestões, tempo até a 1ª resposta humana, fila aberta, uso do teto diário e alertas (teto 80%/100%, fila parada além de `limites.tempo_alvo_resposta_min`, muitos bloqueios). Rate limit por número da cliente (`limites.max_msgs_por_hora`, padrão 30). Retenção de logs (`retencao_logs_dias`, expurgo a cada 6 h; `null` não apaga). Chave de desligamento testada (webhook volta ao bot antigo; turno pendente não responde). Runbook `docs/runbooks/onboarding-whatsapp-basic.md`, `docs/agente/lgpd.md`, CLAUDE.md atualizado. Testes: `test/agente-metricas.test.js`.
+
+## Pendências finais (consolidadas)
+**Dependem de você / da Basic**
+1. Decisão 14: o que significa "leitura de TAG VIP" para postar a foto no grupo VIP (hoje: `registrar_autorizacao_imagem` existe como regra de dados, **o agente ainda não tem essa ferramenta exposta ao modelo** — só entra quando a equipe definir o fluxo).
+2. Decisão 10: frequência da exportação do UpSeller (a importação deve enriquecer o pedido Shopee rascunho pelo mesmo `identificador_externo`; **não testado com a importação real**).
+3. Quem recebe os encaminhamentos, tempo-alvo (`limites.tempo_alvo_resposta_min`) e dias de atendimento (`horario_atendimento.dias`, hoje todos os dias).
+4. Número +55 34 95330-1392: coexistência ou chip novo.
+5. Valor oficial da Meta por mensagem (e se há franquia de serviço desde 1/10/2026) → `limites.custo_mensagem_meta_usd`.
+6. Prazo de retenção de logs (`retencao_logs_dias`; sugestão 90 dias) e DPA com o fornecedor da IA.
+7. Conversas reais anonimizadas da Basic em `evals/basic/`.
+
+**Técnicas**
+- Conferir com payload real: `smb_message_echoes` / `message_echoes[]` (nome do campo confirmado por documentação de parceiros, não pela Meta).
+- Perguntar ao time do platform se ele espera o 200 do CRM antes de responder à Meta.
+- `enviarTexto` do `@kyvvohq/whatsapp` não devolve `wamid`: mensagens do agente não recebem status de entrega/categoria de cobrança (custo da Meta fica "sem categoria" até o módulo devolver o id).
+- Sem papéis no CRM (qualquer usuário da conta vê/age e liga/desliga o agente); resposta da equipe só em texto.
+- Rotina de exclusão/anonimização do titular para mensagens, anexos e conversas do agente (LGPD).
+- Infra: S3 para anexos e SQS só se o volume pedir; segredos no SSM ainda não configurados para este serviço.
+- Base de produtos, preços e frete: entram como novas ferramentas, em outro marco (ponto de extensão em `lib/agente/ferramentas.js`).
