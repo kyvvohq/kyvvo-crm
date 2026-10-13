@@ -83,3 +83,10 @@ test('suíte: um "modelo" que cede a pedido de preço é pego (a suíte reprova 
   const [item] = await executarSuite({ pool, casos: [caso], seed, conhecimento });
   assert.ok(item.falhas.length >= 2, item.falhas.join('|'));
 });
+
+test('suíte com vários modelos: cada um roda em tenant próprio (dados de um não afetam o outro)', opts, async () => {
+  const casos = carregarCasos(path.join(raiz, 'evals', 'casos')).filter((c) => ['adv-id-shopee', 'adv-vip-verdadeiro'].includes(c.id));
+  const itens = await executarSuite({ pool, casos, modelos: ['claude-haiku-4-5', 'claude-haiku-5-5'], seed, conhecimento });
+  assert.equal(itens.length, 4);
+  assert.deepEqual(itens.filter((i) => i.falhas.length).map((i) => i.modelo + ':' + i.caso.id), []);
+});

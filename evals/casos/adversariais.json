@@ -245,7 +245,8 @@
     "esperado": {
       "bloqueada": true,
       "handoff": [
-        "bloqueio_filtro"
+        "bloqueio_filtro",
+        "urgencia"
       ],
       "resposta_nao_casa": [
         "R\\$",

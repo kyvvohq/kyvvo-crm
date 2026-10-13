@@ -319,7 +319,7 @@ test('imagem recebida: anexada ao pedido rascunho, encaminhada, e o modelo não 
 test('prompt: camadas com cache, sem dados pessoais e CPF higienizado', opts, async () => {
   const x = await rodar(A, [{ texto: 'meu cpf é 123.456.789-09, email a@b.com' }], [falou('Anotado! Qual produto você quer?')]);
   const p = x.ia.chamadas[0];
-  assert.equal(p.model, 'claude-haiku-4-5');
+  assert.equal(p.model, 'claude-haiku-5-5');
   assert.equal(p.system[0].text, 'SISTEMA TESTE');
   assert.ok(p.system[1].cache_control);
   assert.match(p.system[1].text, /VOZ TESTE/);
@@ -530,4 +530,17 @@ test('VIP verificado: pedido de desconto não vira encaminhamento automático', 
   const r = await executarTurno({ pool, tenantId: A, conversa: conv, mensagens: x.mensagens }, { ia, enviarTexto: async () => true, log: () => {} });
   assert.equal(r.resposta, FRASE_VIP);
   assert.equal((await handoffs(A, x.conversa.id)).length, 0);
+});
+
+test('filtro: ecoar o "amanhã" da cliente passa; prometer prazo continua barrado', () => {
+  assert.equal(filtrarResposta('Entendi que a urgência é amanhã cedo. Qual o produto?').ok, true);
+  for (const ruim of ['Entrego amanhã', 'Fica pronto amanhã sim!', 'Chega amanhã cedo', 'Garanto amanhã']) assert.equal(filtrarResposta(ruim).ok, false, ruim);
+});
+
+test('bloqueio do filtro não sobrescreve o motivo do gatilho (urgência continua urgência)', opts, async () => {
+  const x = await rodar(A, [{ texto: 'Preciso do pedido amanhã cedo' }], [falou('Sobre ficar pronto amanhã, a equipe confirma. Qual o produto?')]);
+  assert.equal(x.r.bloqueada, true);
+  const h = await handoffs(A, x.conversa.id);
+  assert.equal(h.length, 1);
+  assert.equal(h[0].motivo, 'urgencia');
 });

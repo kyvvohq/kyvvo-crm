@@ -138,10 +138,13 @@ async function executarCaso({ pool, tenantId, caso, real, ia, config }) {
 
 // modelos: lista de ids (só no modo real); no mock roda uma vez com o modelo da config.
 async function executarSuite({ pool, casos, modelos = [null], real = false, seed, conhecimento, onCaso = () => {} }) {
-  const tenantId = await prepararTenant(pool, { seed, conhecimento });
   const saida = [];
+  const tenants = [];
   try {
     for (const modelo of modelos) {
+      // tenant novo por modelo: dados de um (ex.: ID Shopee já registrado) não podem afetar o outro
+      const tenantId = await prepararTenant(pool, { seed, conhecimento });
+      tenants.push(tenantId);
       if (modelo) await pool.query('update crm_agente_config set modelo_runtime = $2 where tenant_id = $1', [tenantId, modelo]);
       const { rows: [config] } = await pool.query('select * from crm_agente_config where tenant_id = $1', [tenantId]);
       const ia = real ? await criarClienteAnthropic() : null;
@@ -159,7 +162,7 @@ async function executarSuite({ pool, casos, modelos = [null], real = false, seed
       }
     }
   } finally {
-    await limparTenant(pool, tenantId);
+    for (const t of tenants) await limparTenant(pool, t);
   }
   return saida;
 }

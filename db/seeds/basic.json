@@ -1,7 +1,7 @@
 {
   "_comentario": "Configuração inicial do agente para a Basic 3D Print. É dado, não código: outra conta usa outro arquivo no mesmo formato. Número de WhatsApp e tenant entram por argumento do script (scripts/seed-agente.js), nunca aqui.",
   "config": {
-    "modelo_runtime": "claude-haiku-4-5",
+    "modelo_runtime": "claude-haiku-5-5",
     "horario_atendimento": {
       "inicio": "08:00",
       "fim": "18:00",
