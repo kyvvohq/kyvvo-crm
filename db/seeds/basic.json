@@ -27,7 +27,8 @@
     },
     "limites": {
       "max_turnos": 20,
-      "max_mensagens_conversa": 40
+      "max_mensagens_conversa": 40,
+      "delay_resposta_segundos": 240
     },
     "flags": {
       "status_automatico": false
@@ -37,10 +38,10 @@
       "desconto_percentual": 10
     },
     "textos": {
-      "encaminhamento": "Para te passar uma informação certinha e não correr o risco de te orientar errado, vou encaminhar seu caso para nossa equipe verificar. 🩵",
+      "encaminhamento": "Para te passar uma informação certinha e não correr o risco de te orientar errado, vou encaminhar seu caso para nossa equipe verificar.",
       "desconto_vip": "Como cliente do grupo VIP, você tem 10% de desconto, que a equipe aplica no orçamento.",
-      "somente_texto": "Recebi seu envio! Pode me escrever por texto o que você precisa? Assim consigo anotar certinho para a equipe. 🩵",
-      "equipe_avisada": "A equipe já foi avisada e continua o seu atendimento por aqui. 🩵"
+      "somente_texto": "Recebi seu envio! Pode me escrever por texto o que você precisa? Assim consigo anotar certinho para a equipe.",
+      "equipe_avisada": "A equipe já foi avisada e continua o seu atendimento por aqui."
     }
   },
   "campos_pedido": [

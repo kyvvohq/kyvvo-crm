@@ -115,3 +115,38 @@ test('GET /crm/api/pedidos/:id: 404 quando não encontrado', async () => {
   assert.equal(res.statusCode, 404);
   await app.close();
 });
+
+// Valor do pedido editável (pedido do Bruno, 2026-10-14) — separado de
+// /pagamento, que só mexe em valor_recebido/status.
+test('PATCH /crm/api/pedidos/:id/valor: atualiza valor_total e registra evento com de/para', async () => {
+  const app = await build();
+  const chamadas = [];
+  pool.query = async (sql, params) => {
+    chamadas.push({ sql, params });
+    if (/select valor_total, cliente_id/.test(sql)) return { rows: [{ valor_total: '100.00', cliente_id: 'cli-1' }] };
+    if (/^update crm_pedidos/.test(sql)) return { rows: [{ id: 'ped-xyz', valor_total: params[0], cliente_id: 'cli-1' }] };
+    if (/insert into crm_eventos/.test(sql)) return { rows: [] };
+    throw new Error(`query inesperada: ${sql}`);
+  };
+  const token = await tokenTenant(app);
+  const res = await app.inject({ method: 'PATCH', url: '/crm/api/pedidos/ped-xyz/valor', headers: { authorization: `Bearer ${token}` }, payload: { valor_total: 150.5 } });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.json().valor_total, 150.5);
+  const evento = chamadas.find((c) => /insert into crm_eventos/.test(c.sql));
+  assert.match(evento.sql, /'pedido_valor_alterado'/);
+  assert.deepEqual(JSON.parse(evento.params[3]), { de: 100, para: 150.5 });
+  await app.close();
+});
+
+test('PATCH /crm/api/pedidos/:id/valor: valor negativo é 400, pedido inexistente é 404', async () => {
+  const app = await build();
+  const token = await tokenTenant(app);
+
+  const negativo = await app.inject({ method: 'PATCH', url: '/crm/api/pedidos/ped-xyz/valor', headers: { authorization: `Bearer ${token}` }, payload: { valor_total: -5 } });
+  assert.equal(negativo.statusCode, 400);
+
+  pool.query = async () => ({ rows: [] });
+  const naoExiste = await app.inject({ method: 'PATCH', url: '/crm/api/pedidos/nao-existe/valor', headers: { authorization: `Bearer ${token}` }, payload: { valor_total: 10 } });
+  assert.equal(naoExiste.statusCode, 404);
+  await app.close();
+});

@@ -30,6 +30,13 @@ test('rotas novas de prioridade/cancelamento de pedido também exigem token', as
   await app.close();
 });
 
+test('rota nova de valor do pedido também exige token', async () => {
+  const app = await build();
+  const res = await app.inject({ method: 'PATCH', url: '/crm/api/pedidos/qualquer-id/valor', payload: { valor_total: 50 } });
+  assert.equal(res.statusCode, 401);
+  await app.close();
+});
+
 test('admin-interno de whatsapp-numeros: exige ADMIN_INTERNAL_TOKEN, não JWT', async () => {
   const app = await build();
   const semToken = await app.inject({ method: 'GET', url: '/crm/admin-interno/whatsapp-numeros' });

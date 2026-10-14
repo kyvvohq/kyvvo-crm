@@ -25,6 +25,12 @@ const PN_OFF = `pn-off-${T1.slice(0, 8)}`;
 const FONE = '5534988880001';
 const E164 = '+5534988880001';
 const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'db', 'seeds', 'basic.json'), 'utf8'));
+// Este arquivo testa o tratamento SÍNCRONO do webhook (tratarWebhook ->
+// processarConversa na hora, coletado em `processamentos`) — sem isso, o
+// delay_resposta_segundos da Basic faria tratarWebhook pular o processamento
+// e esperar a varredura periódica, que não roda neste teste (iniciarVarredura
+// é um stub acima). O atraso em si tem teste próprio (ver 'atraso de resposta').
+delete seed.config.limites.delay_resposta_segundos;
 
 let dir; let app; let chamadas; let processamentos; let midias;
 
@@ -193,6 +199,28 @@ test('falha do agente não perde a mensagem: tentativas sobem e a varredura repr
   assert.deepEqual(vistas, [['primeira', 'segunda']]); // ordem preservada, um turno só
   m = await pool.query("select processada_em from crm_mensagens_whatsapp where tenant_id = $1 and wamid = 'wamid.F1'", [T1]);
   assert.ok(m.rows[0].processada_em);
+});
+
+test('conta com delay_resposta_segundos configurado não processa na hora, só na varredura depois do atraso', opts, async () => {
+  await pool.query("update crm_agente_config set limites = limites || '{\"delay_resposta_segundos\": 240}'::jsonb where tenant_id = $1", [T1]);
+  try {
+    chamadas.length = 0;
+    const res = await enviar(payload(PN1, { mensagens: [texto('wamid.DELAY1', 'quero um ejetor')] }));
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(chamadas, []); // tratarWebhook não chamou processarConversa na hora
+    let m = await pool.query("select processada_em from crm_mensagens_whatsapp where tenant_id = $1 and wamid = 'wamid.DELAY1'", [T1]);
+    assert.equal(m.rows[0].processada_em, null);
+
+    // Simula o tempo passando (em vez de esperar de verdade): a varredura só
+    // pega mensagem mais velha que esperaSegundos.
+    await pool.query("update crm_mensagens_whatsapp set criado_em = now() - interval '5 minutes' where tenant_id = $1 and wamid = 'wamid.DELAY1'", [T1]);
+    await varrerPendentes(pool, app.agente.deps, { esperaSegundos: 240 });
+    assert.deepEqual(chamadas, [['quero um ejetor']]);
+    m = await pool.query("select processada_em from crm_mensagens_whatsapp where tenant_id = $1 and wamid = 'wamid.DELAY1'", [T1]);
+    assert.ok(m.rows[0].processada_em);
+  } finally {
+    await pool.query("update crm_agente_config set limites = limites - 'delay_resposta_segundos' where tenant_id = $1", [T1]);
+  }
 });
 
 test('entrada.js: tipos normalizados e statuses extraídos', () => {

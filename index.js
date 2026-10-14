@@ -1590,6 +1590,28 @@ async function build(opcoes = {}) {
     return rows[0];
   });
 
+  // Valor do pedido (pedido do Bruno, 2026-10-14) — editável na ficha do
+  // pedido, separado de /pagamento (que mexe em valor_recebido/status, nunca
+  // no valor do pedido em si).
+  fastify.patch('/crm/api/pedidos/:id/valor', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, userId } = request.user;
+    const valorTotal = Number((request.body || {}).valor_total);
+    if (!Number.isFinite(valorTotal) || valorTotal < 0) return reply.code(400).send({ error: 'valor_total deve ser um número maior ou igual a zero' });
+
+    const { rows: antes } = await pool.query('select valor_total, cliente_id from crm_pedidos where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!antes[0]) return reply.code(404).send({ error: 'Pedido não encontrado' });
+
+    const { rows } = await pool.query(
+      `update crm_pedidos set valor_total = $1, atualizado_em = now() where id = $2 and tenant_id = $3 returning *`,
+      [valorTotal, request.params.id, tenantId]
+    );
+    await pool.query(
+      `insert into crm_eventos (tenant_id, cliente_id, pedido_id, tipo, dados, ator_id) values ($1, $2, $3, 'pedido_valor_alterado', $4, $5)`,
+      [tenantId, antes[0].cliente_id, rows[0].id, JSON.stringify({ de: Number(antes[0].valor_total), para: valorTotal }), userId || null]
+    );
+    return rows[0];
+  });
+
   // Cancelamento de pedido — kebab menu da lista de Pedidos pede confirmação
   // no front antes de chamar isto (ver GitHub issue da tela de lista).
   // Reaproveita a etapa tipo 'perdida' já existente (mesmo conceito do
