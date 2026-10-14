@@ -2,7 +2,9 @@
 //   node scripts/seed-agente.js --tenant <uuid> [--seed db/seeds/basic.json]
 //        [--modo desligado|rascunho|automatico] [--phone-number-id <id>]
 //        [--numero "+55 34 95330-1392"] [--canal-modo api|coexistencia]
-// Precisa de DATABASE_URL. O número da conta entra por argumento, nunca por código.
+// Sem --modo, preserva o modo já em uso na conta (não desliga o bot ao
+// reaplicar config/conhecimento novos) — só assume 'desligado' na primeira
+// vez. Precisa de DATABASE_URL. O número da conta entra por argumento, nunca por código.
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -25,9 +27,18 @@ function args() {
   for (const [tipo, rel] of Object.entries(seed.conhecimento || {})) {
     conhecimento[tipo] = fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
   }
+  // Sem --modo, preserva o modo já em uso em vez de assumir 'desligado' —
+  // reaplicar o seed (config/conhecimento novos) numa conta já em produção
+  // não pode desligar o bot sem querer. Só cai em 'desligado' na primeira
+  // vez (conta ainda sem linha em crm_agente_config).
+  let modo = o.modo;
+  if (!modo) {
+    const { rows } = await pool.query('select modo from crm_agente_config where tenant_id = $1', [o.tenant]);
+    modo = rows[0] ? rows[0].modo : 'desligado';
+  }
   await semearAgente(pool, o.tenant, seed, {
     conhecimento,
-    modo: o.modo || 'desligado',
+    modo,
     phoneNumberId: o['phone-number-id'] || null,
     numeroExibido: o.numero || null,
     canalModo: o['canal-modo'] || 'api',

@@ -8,7 +8,7 @@ Nunca inventar preço, prazo, disponibilidade, capacidade de produção, frete, 
 - Envia foto: tratar como referência e confirmar se a cliente quer igual ou com alteração.
 - Envia logo: perguntar o produto, o tamanho e a quantidade, salvo se já estiver claro.
 - Pergunta prazo: colher modelo, quantidade e data desejada; registrar e encaminhar. Nunca informar prazo.
-- Pergunta frete: pedir CEP ou cidade como dado para a equipe; nunca informar frete.
+- Pergunta frete, prazo ou urgência: perguntar se é de Uberlândia ou outra cidade; de Uberlândia, perguntar o horário que precisa da peça, de outra cidade, pedir o CEP (ver fluxo). Nunca informar frete ou prazo.
 - Quer comprar pela Shopee: se já tem o ID do pedido, registrar; a equipe confere.
 - Quer comprar direto ou fechar: coletar os dados do briefing e encaminhar.
 - Pede algo sob medida: entender medidas, função e restrições de uso antes de encaminhar.

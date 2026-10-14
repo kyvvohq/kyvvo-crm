@@ -455,8 +455,9 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
       <div class="pedido-meta">
         <span class="badge">${escapeHtml(p.origem || 'Sem origem')}</span>
         ${itensPedido.length ? `<span class="pedido-meta-texto">${itensPedido.length} ${itensPedido.length === 1 ? 'item' : 'itens'}</span>` : ''}
+        ${p.cliente_telefone ? `<button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-pedido-ver-conversa">${icon('message-circle', 14)}Ver conversa</button>` : ''}
       </div>
-      <div class="pedido-total"><span>Valor do pedido</span><strong>${formatarMoeda(p.valor_total)}</strong></div>
+      <div class="pedido-total"><span>Valor do pedido</span><input class="ds-input" id="e-valor-total" inputmode="decimal" placeholder="0,00"></div>
     </div>
     ${mostrarAviso ? `
     <div class="pedido-aviso" id="pedido-aviso-canal-proprio">
@@ -529,6 +530,9 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
 
   document.getElementById('btn-cancelar-edicao').addEventListener('click', fecharModal);
 
+  const btnVerConversa = document.getElementById('btn-pedido-ver-conversa');
+  if (btnVerConversa) btnVerConversa.addEventListener('click', () => abrirModalConversa(p.cliente_telefone, p.cliente_nome));
+
   const btnFecharAviso = document.getElementById('btn-fechar-pedido-aviso');
   if (btnFecharAviso) {
     btnFecharAviso.addEventListener('click', () => {
@@ -537,6 +541,10 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
       apiFetch(`/crm/api/pedidos/${p.id}/entrega`, { method: 'PATCH', body: JSON.stringify({ aviso_canal_proprio_fechado: true }) }).catch(() => {});
     });
   }
+
+  const campoValorTotal = document.getElementById('e-valor-total');
+  campoValorTotal.value = Number(p.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  aplicarMascaraMoeda(campoValorTotal);
 
   const campoRecebido = document.getElementById('e-recebido');
   campoRecebido.value = Number(p.valor_recebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -557,6 +565,7 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
       etapa: document.getElementById('e-etapa').value,
       prioridade: document.getElementById('e-prioridade').value,
       status: document.getElementById('e-status').value,
+      valorTotal: campoValorTotal.value,
       recebido: campoRecebido.value,
       tipoEntrega: document.getElementById('e-tipo-entrega').value,
       frete: campoFreteEdicao.value,
@@ -605,6 +614,11 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
     if (novaPrioridade !== (p.prioridade || null)) {
       const res = await apiFetch(`/crm/api/pedidos/${p.id}/prioridade`, { method: 'PATCH', body: JSON.stringify({ prioridade: novaPrioridade }) });
       if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao atualizar prioridade'; return; }
+    }
+    const novoValorTotal = valorMoedaParaNumero(campoValorTotal);
+    if (novoValorTotal !== Number(p.valor_total || 0)) {
+      const res = await apiFetch(`/crm/api/pedidos/${p.id}/valor`, { method: 'PATCH', body: JSON.stringify({ valor_total: novoValorTotal }) });
+      if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar valor do pedido'; return; }
     }
     const res = await apiFetch(`/crm/api/pedidos/${p.id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: novoStatus, valor_recebido: novoRecebido }) });
     if (!res.ok) { document.getElementById('e-erro').textContent = 'Falha ao salvar pagamento'; return; }
