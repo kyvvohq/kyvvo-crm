@@ -519,6 +519,18 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
             </div>` : '<p class="pedido-itens-vazio">Nenhum item registrado.</p>'}
           </div>
         </div>
+        ${Array.isArray(p.arquivos) && p.arquivos.length ? `
+        <div class="ds-campo s2">
+          <span class="ds-rotulo">Anexos (${p.arquivos.length})</span>
+          <div class="pedido-anexos">
+            ${p.arquivos.map((a) => {
+              const ehImagem = (a.tipo_mime || '').startsWith('image/');
+              return ehImagem
+                ? `<button type="button" class="pedido-anexo pedido-anexo-imagem" data-pedido-anexo="${a.id}" title="${escapeHtml(a.nome_arquivo || 'Abrir arquivo')}"><img data-pedido-anexo-img="${a.id}" alt="${escapeHtml(a.nome_arquivo || 'imagem')}"></button>`
+                : `<button type="button" class="ds-btn ds-btn-ghost ds-btn-sm pedido-anexo" data-pedido-anexo="${a.id}">${icon('download', 14)}${escapeHtml(a.nome_arquivo || 'Abrir arquivo')}</button>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
       </div>
       <div class="modal-erro" id="e-erro"></div>
       <div class="ds-form-acoes">
@@ -532,6 +544,19 @@ function abrirModalPedido(p, { etapas, tiposEntrega, configGeral, onSalvo }) {
 
   const btnVerConversa = document.getElementById('btn-pedido-ver-conversa');
   if (btnVerConversa) btnVerConversa.addEventListener('click', () => abrirModalConversa(p.cliente_telefone, p.cliente_nome));
+
+  // Anexos do pedido (fotos/arquivos que a cliente mandou pro bot) — imagem
+  // já abre em miniatura; qualquer tipo abre/baixa num clique (mesmo padrão
+  // de atendimento.html > abrirAnexo, só que na rota de arquivo do pedido).
+  document.querySelectorAll('[data-pedido-anexo-img]').forEach(async (img) => {
+    const res = await apiFetch(`/crm/api/pedidos/${p.id}/arquivos/${img.dataset.pedidoAnexoImg}`);
+    if (res.ok) img.src = URL.createObjectURL(await res.blob()); else img.closest('.pedido-anexo').remove();
+  });
+  document.querySelectorAll('[data-pedido-anexo]').forEach((btn) => btn.addEventListener('click', async () => {
+    const res = await apiFetch(`/crm/api/pedidos/${p.id}/arquivos/${btn.dataset.pedidoAnexo}`);
+    if (!res.ok) { document.getElementById('e-erro').textContent = 'Arquivo indisponível'; return; }
+    window.open(URL.createObjectURL(await res.blob()), '_blank', 'noopener');
+  }));
 
   const btnFecharAviso = document.getElementById('btn-fechar-pedido-aviso');
   if (btnFecharAviso) {

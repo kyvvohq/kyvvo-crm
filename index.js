@@ -1297,7 +1297,11 @@ async function build(opcoes = {}) {
               coalesce((
                 select json_agg(json_build_object('descricao', coalesce(pr.nome, i.descricao), 'quantidade', i.quantidade))
                 from crm_pedidos_itens i left join crm_produtos pr on pr.id = i.produto_id where i.pedido_id = p.id
-              ), '[]') as itens`;
+              ), '[]') as itens,
+              coalesce((
+                select json_agg(json_build_object('id', a.id, 'nome_arquivo', a.nome_arquivo, 'tipo_mime', a.tipo_mime) order by a.criado_em)
+                from crm_pedidos_arquivos a where a.pedido_id = p.id
+              ), '[]') as arquivos`;
     const dosJoins = `from crm_pedidos p
        join crm_clientes c on c.id = p.cliente_id
        left join crm_recursos r on r.id = p.recurso_id
@@ -1332,7 +1336,11 @@ async function build(opcoes = {}) {
               coalesce((
                 select json_agg(json_build_object('descricao', coalesce(pr.nome, i.descricao), 'quantidade', i.quantidade))
                 from crm_pedidos_itens i left join crm_produtos pr on pr.id = i.produto_id where i.pedido_id = p.id
-              ), '[]') as itens
+              ), '[]') as itens,
+              coalesce((
+                select json_agg(json_build_object('id', a.id, 'nome_arquivo', a.nome_arquivo, 'tipo_mime', a.tipo_mime) order by a.criado_em)
+                from crm_pedidos_arquivos a where a.pedido_id = p.id
+              ), '[]') as arquivos
        from crm_pedidos p
        join crm_clientes c on c.id = p.cliente_id
        left join crm_recursos r on r.id = p.recurso_id
