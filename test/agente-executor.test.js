@@ -311,6 +311,17 @@ test('imagem recebida: anexada ao pedido rascunho, encaminhada, e o modelo não 
   assert.ok(a.pedido_id);
   const { rows: arq } = await pool.query('select caminho_arquivo from crm_pedidos_arquivos where pedido_id = $1', [a.pedido_id]);
   assert.equal(arq[0].caminho_arquivo, `agente/${A}/2026-10-12/x-logo.png`);
+  // Mesma agregação usada em GET /crm/api/pedidos e /crm/api/pedidos/:id
+  // (index.js) — o usuário do CRM precisa ver/baixar o anexo na ficha do pedido.
+  const { rows: [{ arquivos }] } = await pool.query(
+    `select coalesce((
+       select json_agg(json_build_object('id', ar.id, 'nome_arquivo', ar.nome_arquivo, 'tipo_mime', ar.tipo_mime) order by ar.criado_em)
+       from crm_pedidos_arquivos ar where ar.pedido_id = p.id
+     ), '[]') as arquivos
+     from crm_pedidos p where p.id = $1`, [a.pedido_id]);
+  assert.equal(arquivos.length, 1);
+  assert.equal(arquivos[0].nome_arquivo, 'logo.png');
+  assert.equal(arquivos[0].tipo_mime, 'image/png');
   assert.equal((await handoffs(A, c0.conversa.id))[0].motivo, 'arquivo_recebido');
   assert.equal(typeof ia.chamadas[0].messages[0].content, 'string'); // só texto, sem bloco de imagem
   assert.match(ia.chamadas[0].messages[0].content, /anexado ao pedido/);

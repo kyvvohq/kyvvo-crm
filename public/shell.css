@@ -269,6 +269,9 @@ a.acao:hover { color:var(--accent-dark); }
 .pedido-item-linha .col-qtd { flex:0 0 48px; color:var(--muted-strong); }
 .pedido-item-linha .col-desc { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .pedido-itens-vazio { margin:0; padding:8px 12px; font-size:12px; color:var(--muted-strong); }
+.pedido-anexos { display:flex; flex-wrap:wrap; gap:8px; }
+.pedido-anexo-imagem { padding:0; border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden; width:72px; height:72px; background:var(--surface-muted); cursor:pointer; }
+.pedido-anexo-imagem img { width:100%; height:100%; object-fit:cover; display:block; }
 .ds-modal-card-pedido .modal-erro:empty { min-height:0; margin:0; }
 .ds-modal-card-pedido .modal-erro { margin-top:10px; }
 .ds-modal-card-pedido .ds-form { gap:var(--space-5); }
