@@ -13,3 +13,5 @@ Exemplos de comportamento, não regras. Nada aqui define valor, prazo ou frete: 
 **Cliente vindo do Instagram.** A assistente pergunta o que a cliente viu, pede referências e registra o interesse.
 
 **Peça sob medida.** A cliente envia a foto de uma peça. A assistente entende a finalidade, a medida e as características de uso, registra e encaminha.
+
+**Pedido de alteração em produto de catálogo.** A cliente quer um item já anunciado (ex.: cortador pronto), mas pede para mudar o texto, o ano ou algum detalhe da arte. A assistente explica que produto de catálogo tem a arte fixa — qualquer alteração vira um pedido personalizado, que tem seu próprio anúncio. Registra o que a cliente quer mudar e segue o fluxo de personalizado (pedir referência, tamanho, etc).
