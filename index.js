@@ -201,7 +201,13 @@ async function build(opcoes = {}) {
 
   fastify.get('/crm/admin-interno/whatsapp-numeros', async (request, reply) => {
     if (!autenticarAdminInterno(request, reply)) return;
-    const { rows } = await pool.query('select phone_number_id, tenant_id, numero_exibido, criado_em from crm_whatsapp_numeros order by criado_em desc');
+    // modo/status (035) incluídos a partir de 2026-10-20 — faltavam aqui,
+    // mas já existem na tabela; o admin precisa pra aba WhatsApp do
+    // detalhe do tenant (achado ao vivo: Bruno viu "não conectado" num
+    // tenant com número ativo de verdade porque isto devolvia só o nome).
+    const { rows } = await pool.query(
+      'select phone_number_id, tenant_id, numero_exibido, modo, status, criado_em from crm_whatsapp_numeros order by criado_em desc'
+    );
     return { numeros: rows };
   });
 
@@ -235,6 +241,16 @@ async function build(opcoes = {}) {
     if (!autenticarAdminInterno(request, reply)) return;
     const config = await atendimento.obterConfig(pool, request.params.tenantId);
     return config;
+  });
+
+  // Indicadores do agente pro admin (pedido do Bruno, 2026-10-20: "o
+  // consumo de IA no portal admin não bate com o que a Basic vê em
+  // Atendimento > Indicadores") — mesma função de lib/agente/metricas.js
+  // usada por GET /crm/api/agente/metricas (tenant logado), só que sem
+  // exigir o JWT do tenant. Fonte única de cálculo: não duplica a query.
+  fastify.get('/crm/admin-interno/agente/metricas/:tenantId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    return require('./lib/agente/metricas').calcular(pool, request.params.tenantId, { dias: request.query.dias });
   });
 
   // Troca o modo pelo admin (sem usuário do tenant logado, por isso

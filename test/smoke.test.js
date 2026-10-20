@@ -51,6 +51,13 @@ test('admin-interno de whatsapp-numeros: exige ADMIN_INTERNAL_TOKEN, não JWT', 
   await app.close();
 });
 
+test('admin-interno de agente/metricas: exige ADMIN_INTERNAL_TOKEN, não JWT', async () => {
+  const app = await build();
+  const semToken = await app.inject({ method: 'GET', url: '/crm/admin-interno/agente/metricas/00000000-0000-0000-0000-000000000000' });
+  assert.equal(semToken.statusCode, 401);
+  await app.close();
+});
+
 test('admin-interno de whatsapp-numeros: vincular, trocar tenant e desvincular', async () => {
   process.env.ADMIN_INTERNAL_TOKEN = 'segredo-admin-interno-teste';
   const app = await build();
