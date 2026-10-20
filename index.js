@@ -1940,8 +1940,8 @@ async function build(opcoes = {}) {
   // Canais disponíveis pro assistente: WhatsApp (número vinculado + modelos
   // aprovados na Meta) e e-mail (provedor configurado no servidor).
   fastify.get('/crm/api/campanhas/canais', { preHandler: fastify.authenticate }, async (request) => {
-    const { rows } = await pool.query('select numero_exibido from crm_whatsapp_numeros where tenant_id = $1 limit 1', [request.user.tenantId]);
-    const modelos = rows[0] ? await listarTemplates() : [];
+    const { rows } = await pool.query('select numero_exibido, meta_waba_id from crm_whatsapp_numeros where tenant_id = $1 limit 1', [request.user.tenantId]);
+    const modelos = rows[0] ? await listarTemplates({ wabaId: rows[0].meta_waba_id }) : [];
     return {
       whatsapp: { conectado: !!rows[0], numero: rows[0] ? rows[0].numero_exibido : null, modelos: modelos.filter((m) => m.status === 'APPROVED') },
       email: { disponivel: !!(process.env.PLATFORM_EMAIL_TOKEN || process.env.RESEND_API_KEY) },
@@ -2106,8 +2106,9 @@ async function build(opcoes = {}) {
     return rows;
   });
 
-  fastify.get('/crm/api/automacoes/templates-whatsapp', { preHandler: fastify.authenticate }, async () => {
-    return listarTemplates();
+  fastify.get('/crm/api/automacoes/templates-whatsapp', { preHandler: fastify.authenticate }, async (request) => {
+    const { rows } = await pool.query('select meta_waba_id from crm_whatsapp_numeros where tenant_id = $1 limit 1', [request.user.tenantId]);
+    return listarTemplates({ wabaId: rows[0] ? rows[0].meta_waba_id : undefined });
   });
 
   fastify.post('/crm/api/automacoes', { preHandler: fastify.authenticate }, async (request, reply) => {
