@@ -307,6 +307,33 @@ async function build(opcoes = {}) {
     };
   });
 
+  // Diagnóstico de "automação não disparou" (achado ao vivo, 2026-10-20:
+  // Bruno moveu pedido de etapa, automação configurada, número vinculado
+  // ativo — e nada chegou). enviarAutomacao (lib/automacoes.js) é
+  // best-effort e silencioso em quase todo caminho de falha (sem número
+  // vinculado, por exemplo, só dá `return` sem logar nem gravar disparo) —
+  // esta rota junta tudo que precisa pra achar ONDE no funil ela parou:
+  // a automação está ativa e configurada certo? bateu o gatilho pra essa
+  // etapa? e se bateu, o que o disparo registrou (enviado/erro/bloqueado)?
+  fastify.get('/crm/admin-interno/diagnostico-automacao/:tenantId', async (request, reply) => {
+    if (!autenticarAdminInterno(request, reply)) return;
+    const { tenantId } = request.params;
+    const [automacoesRows, disparosRows] = await Promise.all([
+      pool.query(
+        `select a.id, a.nome, a.gatilho, a.ativo, a.whatsapp_template, e.nome as etapa_nome
+           from crm_automacoes a left join crm_etapas e on e.id = a.etapa_id
+          where a.tenant_id = $1 order by a.criado_em desc`,
+        [tenantId],
+      ),
+      pool.query(
+        `select telefone_e164, template_nome, gatilho, status, mensagem_texto, pedido_id, criado_em
+           from crm_whatsapp_disparos where tenant_id = $1 order by criado_em desc limit 20`,
+        [tenantId],
+      ),
+    ]);
+    return { automacoes: automacoesRows.rows, disparos_recentes: disparosRows.rows };
+  });
+
   // Presença da chave não garante que ela funciona (expirada/revogada/typo
   // no SSM) — só uma chamada real decide. Nunca devolve/loga a chave, só o
   // resultado (ok ou a mensagem de erro da Anthropic).
