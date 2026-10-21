@@ -366,9 +366,13 @@
     });
     document.getElementById('btn-nova-automacao').addEventListener('click', () => abrirModalNovaAutomacao());
 
-    // --- Consumo e histórico (saldo + disparos de automação) -------------------
+    // --- Consumo e histórico (saldo + disparos de automação/campanha) ----------
     const STATUS_DISPARO_LABEL = { enviado: 'Enviado', erro: 'Erro', bloqueado_24h: 'Bloqueado (24h)', sem_creditos: 'Sem créditos' };
     const STATUS_DISPARO_TONE = { enviado: 'sucesso', erro: 'erro', bloqueado_24h: 'aviso', sem_creditos: 'aviso' };
+    // Rótulo do gatilho especificamente pra esta tabela — mais curto que
+    // ROTULO_GATILHO (usado pela lista de Regras) e cobre também os disparos
+    // avulsos de campanhas (lib/campanhas.js), que não são "regras" configuráveis.
+    const ROTULO_GATILHO_HISTORICO = { ...ROTULO_GATILHO, aniversario_cliente: 'Aniversário', sorteio: 'Sorteio', campanha: 'Campanha' };
 
     function formatarDataAbreviada(iso) {
       if (!iso) return '—';
@@ -417,7 +421,7 @@
           <span role="cell" data-rotulo="Data" style="white-space:nowrap">${formatarDataAbreviada(d.criado_em)}</span>
           <span role="cell" data-rotulo="Telefone">${escapeHtml(whatsappParaExibicao(d.telefone_e164))}</span>
           <span role="cell" data-rotulo="Mensagem" title="${escapeHtml(d.mensagem_texto || '')}">${escapeHtml(truncarTexto(d.mensagem_texto, 60))}</span>
-          <span role="cell" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO[d.gatilho] || d.gatilho || '—')}${d.etapa_nome ? ' + ' + escapeHtml(d.etapa_nome) : ''}</span>
+          <span role="cell" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO_HISTORICO[d.gatilho] || d.gatilho || '—')}${d.etapa_nome ? ' + ' + escapeHtml(d.etapa_nome) : ''}</span>
           <span role="cell" data-rotulo="Status"><span class="ds-badge ds-badge-sm${STATUS_DISPARO_TONE[d.status] ? ' ds-badge-' + STATUS_DISPARO_TONE[d.status] : ''}">${STATUS_DISPARO_LABEL[d.status] || d.status}</span></span>
         </div>
       `).join('');

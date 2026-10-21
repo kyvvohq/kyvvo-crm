@@ -6,11 +6,35 @@ const {
 } = require('../lib/campanhas');
 
 // Pool falso: responde só as queries que lib/campanhas.js + helpers fazem.
-function poolFalso({ clientes = [], phoneNumberId = 'pn1', envioRecente = [], disparosUltimas24h = 0 } = {}) {
+// saldoPlano=1000 por padrão — crédito de sobra, pra não quebrar os testes
+// que já existiam antes da trava de créditos nas campanhas (2026-10-21,
+// mesmo raciocínio de test/automacoes.test.js). ciclo_renovado_em nasce
+// "já renovado" (agora), então lib/creditos.js nunca tenta buscar o plano do
+// tenant no platform (sem rede nos testes).
+function poolFalso({ clientes = [], phoneNumberId = 'pn1', envioRecente = [], disparosUltimas24h = 0, saldoPlano = 1000, saldoComprado = 0 } = {}) {
   const log = { envios: [], disparos: [], sorteios: [], updatesSegmento: [] };
+  const creditos = { saldoPlano, saldoComprado, renovadoEm: new Date() };
   return {
     log,
+    creditos,
     query: async (sql, params) => {
+      if (/^select ciclo_renovado_em from crm_creditos/.test(sql)) {
+        return { rows: creditos.renovadoEm ? [{ ciclo_renovado_em: creditos.renovadoEm }] : [] };
+      }
+      if (/^insert into crm_creditos \(tenant_id, saldo_plano, saldo_comprado, ciclo_renovado_em\)/.test(sql)) {
+        creditos.saldoPlano = params[1];
+        creditos.renovadoEm = new Date();
+        return { rows: [] };
+      }
+      if (/^select saldo_plano, saldo_comprado from crm_creditos/.test(sql)) {
+        return { rows: [{ saldo_plano: creditos.saldoPlano, saldo_comprado: creditos.saldoComprado }] };
+      }
+      if (/^update crm_creditos set/.test(sql)) {
+        if (creditos.saldoPlano > 0) creditos.saldoPlano -= 1;
+        else if (creditos.saldoComprado > 0) creditos.saldoComprado -= 1;
+        else return { rows: [] };
+        return { rows: [{ saldo_plano: creditos.saldoPlano, saldo_comprado: creditos.saldoComprado }] };
+      }
       if (/^select phone_number_id from crm_whatsapp_numeros/.test(sql)) return { rows: phoneNumberId ? [{ phone_number_id: phoneNumberId }] : [] };
       if (/^select 1 from crm_whatsapp_envios/.test(sql)) return { rows: envioRecente.includes(params[0]) ? [{}] : [] };
       if (/^insert into crm_whatsapp_envios/.test(sql)) return { rows: [] };
@@ -127,6 +151,27 @@ test('WhatsApp: respeita a trava de 24h no disparo, mas não no aviso do sorteio
   const r2 = await enviarParaClientes(pool2, { tenantId: 't1', campanha, clientes, finalidade: 'sorteio', deps });
   assert.deepEqual(r2, { enviados: 2, erros: 0, ignorados: 0 });
   assert.ok(pool2.log.disparos.every((d) => d.gatilho === 'sorteio'));
+});
+
+test('WhatsApp: sem créditos (plano e comprado zerados), bloqueia sem chamar a Meta', async () => {
+  const campanha = { id: 'k2', canal: 'whatsapp', whatsapp_template: 'promo' };
+  let chamouMeta = false;
+  const deps = { listarTemplates: async () => [{ nome: 'promo', status: 'APPROVED', corpo: 'Oi {{1}}', parametros_corpo: ['1'], parametros_nomeados: false }], enviarTemplate: async () => { chamouMeta = true; return true; } };
+  const clientes = [cliente(1)];
+
+  const pool = poolFalso({ saldoPlano: 0, saldoComprado: 0 });
+  const r = await enviarParaClientes(pool, { tenantId: 't1', campanha, clientes, deps });
+  assert.deepEqual(r, { enviados: 0, erros: 0, ignorados: 1 });
+  assert.equal(chamouMeta, false);
+  assert.ok(pool.log.disparos.some((d) => d.status === 'sem_creditos' && d.gatilho === 'campanha'));
+});
+
+test('WhatsApp: envio com sucesso debita 1 crédito', async () => {
+  const campanha = { id: 'k3', canal: 'whatsapp', whatsapp_template: 'promo' };
+  const deps = { listarTemplates: async () => [{ nome: 'promo', status: 'APPROVED', corpo: 'Oi {{1}}', parametros_corpo: ['1'], parametros_nomeados: false }], enviarTemplate: async () => true };
+  const pool = poolFalso({ saldoPlano: 2 });
+  await enviarParaClientes(pool, { tenantId: 't1', campanha, clientes: [cliente(1)], deps });
+  assert.equal(pool.creditos.saldoPlano, 1);
 });
 
 test('WhatsApp sem número vinculado lança antes de enviar qualquer coisa', async () => {
