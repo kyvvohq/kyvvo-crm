@@ -205,8 +205,12 @@ async function build(opcoes = {}) {
     // mas já existem na tabela; o admin precisa pra aba WhatsApp do
     // detalhe do tenant (achado ao vivo: Bruno viu "não conectado" num
     // tenant com número ativo de verdade porque isto devolvia só o nome).
+    // meta_waba_id incluído no mesmo dia — é o que buscarWabaId
+    // (lib/automacoes.js) lê pra saber de qual WABA listar os templates
+    // aprovados na hora de enviar; precisa aparecer aqui pra conferir se
+    // está certo quando uma automação não dispara.
     const { rows } = await pool.query(
-      'select phone_number_id, tenant_id, numero_exibido, modo, status, criado_em from crm_whatsapp_numeros order by criado_em desc'
+      'select phone_number_id, tenant_id, numero_exibido, meta_waba_id, modo, status, criado_em from crm_whatsapp_numeros order by criado_em desc'
     );
     return { numeros: rows };
   });
