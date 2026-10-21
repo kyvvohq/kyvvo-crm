@@ -329,9 +329,17 @@ async function build(opcoes = {}) {
           where a.tenant_id = $1 order by a.criado_em desc`,
         [tenantId],
       ),
+      // join com crm_clientes pelo pedido (achado ao vivo, 2026-10-21: o
+      // texto gravado em mensagem_texto veio com o nome em branco — "Oi ,
+      // sentimos..." — precisa saber se é dado de teste sem nome ou
+      // descompasso de verdade no nome do parâmetro).
       pool.query(
-        `select telefone_e164, template_nome, gatilho, status, mensagem_texto, pedido_id, criado_em
-           from crm_whatsapp_disparos where tenant_id = $1 order by criado_em desc limit 20`,
+        `select d.telefone_e164, d.template_nome, d.gatilho, d.status, d.mensagem_texto, d.pedido_id, d.criado_em,
+                c.nome as cliente_nome
+           from crm_whatsapp_disparos d
+           left join crm_pedidos p on p.id = d.pedido_id
+           left join crm_clientes c on c.id = p.cliente_id
+          where d.tenant_id = $1 order by d.criado_em desc limit 20`,
         [tenantId],
       ),
     ]);
