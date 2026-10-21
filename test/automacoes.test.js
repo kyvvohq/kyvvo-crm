@@ -62,7 +62,7 @@ function poolFalso({ phoneNumberId, envioRecente, disparosExistentes = [], saldo
       if (/^insert into crm_whatsapp_disparos/.test(sql)) {
         disparos.push({
           tenantId: params[0], telefoneE164: params[1], templateNome: params[2],
-          gatilho: params[3], status: params[4], mensagemTexto: params[5], pedidoId: params[6],
+          gatilho: params[3], status: params[4], mensagemTexto: params[5], pedidoId: params[6], etapaNome: params[7],
         });
         return { rows: [] };
       }
@@ -201,6 +201,7 @@ test('checarPedidosParados: pedido além do prazo_alerta_dias da etapa dispara a
   assert.equal(pool.disparos.length, 1);
   assert.equal(pool.disparos[0].pedidoId, 'pedido-3');
   assert.equal(pool.disparos[0].gatilho, 'pedido_parado');
+  assert.equal(pool.disparos[0].etapaNome, 'Aguardando pagamento'); // ver "+ Etapa" em Consumo e histórico
 });
 
 test('checarPedidosParados: não repete aviso pro mesmo pedido na mesma estadia', async () => {

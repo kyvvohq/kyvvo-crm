@@ -2175,16 +2175,21 @@ async function build(opcoes = {}) {
   // POST /crm/plataforma-interno/creditos/confirmar (acima).
   fastify.get('/crm/api/automacoes/consumo', { preHandler: fastify.authenticate }, async (request) => {
     const { tenantId } = request.user;
+    const { data, cliente, numero } = request.query || {};
+    const dataFiltro = typeof data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : null;
     const [saldo, disparosRows] = await Promise.all([
       creditos.obterSaldo(pool, tenantId),
       pool.query(
-        `select d.telefone_e164, d.template_nome, d.gatilho, d.status, d.mensagem_texto, d.pedido_id, d.criado_em,
-                c.nome as cliente_nome
+        `select d.telefone_e164, d.template_nome, d.gatilho, d.status, d.mensagem_texto, d.pedido_id, d.etapa_nome, d.criado_em
            from crm_whatsapp_disparos d
            left join crm_pedidos p on p.id = d.pedido_id
            left join crm_clientes c on c.id = p.cliente_id
-          where d.tenant_id = $1 order by d.criado_em desc limit 50`,
-        [tenantId]
+          where d.tenant_id = $1
+            and ($2::date is null or d.criado_em::date = $2::date)
+            and ($3::text is null or c.nome ilike '%' || $3 || '%')
+            and ($4::text is null or d.telefone_e164 ilike '%' || $4 || '%')
+          order by d.criado_em desc limit 50`,
+        [tenantId, dataFiltro, cliente || null, numero || null]
       ),
     ]);
     return { saldo_plano: saldo.saldoPlano, saldo_comprado: saldo.saldoComprado, saldo_total: saldo.saldoTotal, disparos: disparosRows.rows };

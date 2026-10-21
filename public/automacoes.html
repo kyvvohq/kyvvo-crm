@@ -113,7 +113,7 @@
 
       <div class="ds-abas" data-ds-abas>
         <div class="ds-abas-lista">
-          <button type="button" class="ds-aba" id="aba-au-automacoes" aria-controls="painel-au-automacoes" aria-selected="true">Automações</button>
+          <button type="button" class="ds-aba" id="aba-au-automacoes" aria-controls="painel-au-automacoes" aria-selected="true">Regras</button>
           <button type="button" class="ds-aba" id="aba-au-consumo" aria-controls="painel-au-consumo" aria-selected="false">Consumo e histórico</button>
           <button type="button" class="ds-aba" id="aba-au-comprar" aria-controls="painel-au-comprar" aria-selected="false">Comprar créditos</button>
         </div>
@@ -152,11 +152,19 @@
 
         <div class="ds-abas-painel" id="painel-au-consumo" aria-labelledby="aba-au-consumo" hidden>
           <div class="card" id="consumo-saldo">Carregando…</div>
-          <div class="ds-tabela" role="table" aria-label="Histórico de disparos" style="margin-top:16px;--ds-colunas: 100px minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 120px">
+          <div class="ds-tabela" role="table" aria-label="Histórico de disparos" style="margin-top:16px;--ds-colunas: 110px 130px minmax(0,1.6fr) minmax(0,1fr) 120px">
+            <div class="ds-filtros">
+              <div class="ds-pesquisa">
+                <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input class="ds-pesquisa-input" type="search" id="cons-f-cliente" placeholder="Buscar cliente…" aria-label="Buscar por cliente">
+              </div>
+              <input class="ds-input" type="search" id="cons-f-numero" placeholder="Buscar número…" aria-label="Buscar por número">
+              <input class="ds-input" type="date" id="cons-f-data" aria-label="Filtrar por data">
+            </div>
             <div class="ds-tabela-cabecalho" role="row">
               <span role="columnheader">Data</span>
-              <span role="columnheader">Cliente</span>
-              <span role="columnheader">Modelo</span>
+              <span role="columnheader">Telefone</span>
+              <span role="columnheader">Mensagem</span>
               <span role="columnheader">Gatilho</span>
               <span role="columnheader">Status</span>
             </div>
@@ -362,8 +370,31 @@
     const STATUS_DISPARO_LABEL = { enviado: 'Enviado', erro: 'Erro', bloqueado_24h: 'Bloqueado (24h)', sem_creditos: 'Sem créditos' };
     const STATUS_DISPARO_TONE = { enviado: 'sucesso', erro: 'erro', bloqueado_24h: 'aviso', sem_creditos: 'aviso' };
 
+    function formatarDataAbreviada(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const dia = String(d.getDate()).padStart(2, '0');
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const hora = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${dia}/${mes} ${hora}:${min}`;
+    }
+
+    function truncarTexto(texto, limite) {
+      if (!texto) return '—';
+      return texto.length > limite ? texto.slice(0, limite).trimEnd() + '…' : texto;
+    }
+
     async function carregarConsumo() {
-      const res = await apiFetch('/crm/api/automacoes/consumo');
+      const params = new URLSearchParams();
+      const buscaCliente = document.getElementById('cons-f-cliente').value.trim();
+      const buscaNumero = document.getElementById('cons-f-numero').value.trim();
+      const filtroData = document.getElementById('cons-f-data').value;
+      if (buscaCliente) params.set('cliente', buscaCliente);
+      if (buscaNumero) params.set('numero', buscaNumero);
+      if (filtroData) params.set('data', filtroData);
+
+      const res = await apiFetch(`/crm/api/automacoes/consumo?${params}`);
       if (!res.ok) {
         document.getElementById('consumo-saldo').textContent = 'Não foi possível carregar o consumo agora.';
         return;
@@ -378,19 +409,31 @@
       `;
       const linhas = document.getElementById('consumo-disparos-linhas');
       if (!dados.disparos.length) {
-        linhas.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-texto">Nenhum disparo de automação ainda.</p></div>';
+        linhas.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-texto">Nenhum disparo encontrado.</p></div>';
         return;
       }
       linhas.innerHTML = dados.disparos.map((d) => `
         <div class="ds-tabela-linha" role="row">
-          <span role="cell" data-rotulo="Data">${formatarDataHora(d.criado_em)}</span>
-          <span role="cell" data-rotulo="Cliente">${escapeHtml(d.cliente_nome || whatsappParaExibicao(d.telefone_e164))}</span>
-          <span role="cell" data-rotulo="Modelo">${escapeHtml(d.template_nome || '—')}</span>
-          <span role="cell" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO[d.gatilho] || d.gatilho || '—')}</span>
+          <span role="cell" data-rotulo="Data" style="white-space:nowrap">${formatarDataAbreviada(d.criado_em)}</span>
+          <span role="cell" data-rotulo="Telefone">${escapeHtml(whatsappParaExibicao(d.telefone_e164))}</span>
+          <span role="cell" data-rotulo="Mensagem" title="${escapeHtml(d.mensagem_texto || '')}">${escapeHtml(truncarTexto(d.mensagem_texto, 60))}</span>
+          <span role="cell" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO[d.gatilho] || d.gatilho || '—')}${d.etapa_nome ? ' + ' + escapeHtml(d.etapa_nome) : ''}</span>
           <span role="cell" data-rotulo="Status"><span class="ds-badge ds-badge-sm${STATUS_DISPARO_TONE[d.status] ? ' ds-badge-' + STATUS_DISPARO_TONE[d.status] : ''}">${STATUS_DISPARO_LABEL[d.status] || d.status}</span></span>
         </div>
       `).join('');
     }
+
+    document.getElementById('cons-f-data').addEventListener('change', carregarConsumo);
+    let debounceConsumoCliente;
+    document.getElementById('cons-f-cliente').addEventListener('input', () => {
+      clearTimeout(debounceConsumoCliente);
+      debounceConsumoCliente = setTimeout(carregarConsumo, 300);
+    });
+    let debounceConsumoNumero;
+    document.getElementById('cons-f-numero').addEventListener('input', () => {
+      clearTimeout(debounceConsumoNumero);
+      debounceConsumoNumero = setTimeout(carregarConsumo, 300);
+    });
 
     // --- Comprar créditos (pacotes avulsos, cobrança via Asaas no platform) ----
     let pacotesCreditos = [];
