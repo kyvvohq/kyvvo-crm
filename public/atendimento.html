@@ -60,6 +60,8 @@
   .ind-tabela th { color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase; border-top:none; }
   .modo-agente { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .modo-agente label { font-size:13px; color:var(--muted-strong); }
+  .atend-whatsapp-card h2 { margin:0 0 4px; font-size:15px; }
+  .atend-whatsapp-card .linha { font-size:12.5px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -128,7 +130,6 @@
           <ul class="ds-menu-sub">
             <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Geral</a></li>
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
-            <li><a class="ds-menu-sublink" href="/crm/whatsapp.html">WhatsApp</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
@@ -141,10 +142,13 @@
         <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Atendimento</h1><span class="contagem" id="contagem-abertos" hidden></span></div>
-          <p class="descricao">Conversas do agente de WhatsApp: veja o que ele sugeriu, assuma quando precisar e responda pela equipe.</p>
+          <div class="linha-titulo"><h1>Atendimento</h1></div>
         </div>
         <div class="acoes modo-agente" id="modo-agente"></div>
+      </div>
+      <div class="card atend-whatsapp-card">
+        <h2>WhatsApp</h2>
+        <div class="linha" id="atend-whatsapp-status">Carregando status da conexão…</div>
       </div>
       <div id="aviso-agente"></div>
       <div id="alertas-agente"></div>
@@ -261,9 +265,7 @@
         + tile('Tempo até a 1ª resposta humana', fmtMin(m.atendimento_humano.mediana_min), 'mediana · ' + m.atendimento_humano.respondidos + ' de ' + m.atendimento_humano.encaminhamentos + ' encaminhamentos respondidos')
         + tile('Filtro acionado', pct(m.execucoes.taxa_bloqueio), m.execucoes.bloqueadas_pelo_filtro + ' respostas trocadas pelo encaminhamento')
         + tile('Sugestões aprovadas sem edição', pct(sug.taxa_aprovada_sem_edicao), sug.aprovadas + ' aprovadas · ' + sug.editadas + ' editadas · ' + sug.descartadas + ' descartadas')
-        + tile('Custo da IA', usd(m.custo.ia_usd), (m.custo.tokens.entrada + m.custo.tokens.saida) + ' tokens · ' + escapeHtml(m.modelo || ''))
-        + tile('Mensagens enviadas', m.custo.mensagens_enviadas, m.custo.meta_usd_estimado === null ? 'custo da Meta: valor por mensagem ainda não configurado' : 'Meta estimado ' + usd(m.custo.meta_usd_estimado))
-        + tile('Uso do teto diário', m.teto_diario.teto ? pct(m.teto_diario.uso) : 'sem teto', m.teto_diario.tokens_hoje + ' tokens hoje')
+        + tile('Mensagens enviadas', m.custo.mensagens_enviadas, m.custo.meta_usd_estimado === null ? '' : 'Meta estimado ' + usd(m.custo.meta_usd_estimado))
         + '</div>'
         + (tabela ? '<table class="ind-tabela"><thead><tr><th>Conversa (mais caras)</th><th>Turnos</th><th>Msgs enviadas</th><th>Tokens</th><th>Custo IA</th></tr></thead><tbody>' + tabela + '</tbody></table>' : '');
     }
@@ -296,12 +298,23 @@
     }
     async function carregarLista() {
       conversas = await (await apiFetch('/crm/api/agente/conversas')).json();
-      const abertos = conversas.filter((c) => c.handoff_status === 'aberto').length;
-      const cont = document.getElementById('contagem-abertos');
-      cont.hidden = !abertos;
-      cont.textContent = abertos + (abertos === 1 ? ' aguardando' : ' aguardando');
       renderAbas();
       renderLista();
+    }
+
+    // --- WhatsApp (status, só leitura — conectar é feito pela Kyvvo) ---
+    async function carregarStatusWhatsapp() {
+      const el = document.getElementById('atend-whatsapp-status');
+      const res = await apiFetch('/crm/api/whatsapp/status');
+      const status = await res.json();
+      if (status.conectado) {
+        el.textContent = ['Conectado', status.numeroExibido || 'número não informado', status.nomeVerificado, status.qualidade ? `Qualidade: ${status.qualidade}` : null]
+          .filter(Boolean).join(' · ');
+      } else if (status.erro) {
+        el.textContent = 'Erro de conexão · ' + status.erro;
+      } else {
+        el.textContent = 'Não conectado';
+      }
     }
 
     // --- Conversa ---
@@ -436,6 +449,7 @@
     (async () => {
       await carregarConfig();
       carregarIndicadores();
+      carregarStatusWhatsapp();
       await carregarLista();
       if (selecionada) abrirConversa(selecionada);
     })();

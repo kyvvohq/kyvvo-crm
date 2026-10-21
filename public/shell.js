@@ -343,8 +343,8 @@ function abrirNotificacaoItem(tipo) {
   if (tipo === 'pedidos_parados') window.location.href = '/crm/quadro.html';
   else if (tipo === 'pedido_criado' || tipo === 'pedido_pronto') window.location.href = '/crm/pedidos.html';
   else if (tipo === 'importacao_concluida') window.location.href = '/crm/importacao.html';
-  else if (tipo === 'whatsapp_limite_proximo') window.location.href = '/crm/whatsapp.html';
-  else if (tipo === 'atendimento_bot_travado') window.location.href = '/crm/whatsapp.html?aba=conversas';
+  else if (tipo === 'whatsapp_limite_proximo') window.location.href = '/crm/automacoes.html';
+  else if (tipo === 'atendimento_bot_travado') window.location.href = '/crm/atendimento.html';
 }
 
 async function marcarNotificacaoLida(id) {
