@@ -21,6 +21,7 @@ const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, chec
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
+const creditos = require('./lib/creditos');
 const metaWhatsappService = require('./lib/meta-whatsapp-service');
 const { relatorioPedidos, listarPedidosDetalhado } = require('./lib/relatorios');
 const { novoDocumentoRelatorio, desenharResumo, desenharTabela, formatarMoedaPdf } = require('./lib/pdf-relatorios');
@@ -197,6 +198,30 @@ async function build(opcoes = {}) {
     }
     return true;
   }
+
+  // Segredo próprio (CRM_CREDITOS_INTERNAL_TOKEN) — mesmo padrão acima, mas
+  // quem chama é o kyvvo-platform, não o admin (ver
+  // kyvvo-platform/lib/creditos-crm.js#confirmarCreditoNoCrm). Direção
+  // contrária do PLATFORM_PAGAMENTOS_TOKEN (CRM -> platform), que já existe
+  // mais abaixo pra planos/assinatura.
+  function autenticarPlataformaInterno(request, reply) {
+    const token = (request.headers['x-internal-token'] || '').trim();
+    if (!process.env.CRM_CREDITOS_INTERNAL_TOKEN || token !== process.env.CRM_CREDITOS_INTERNAL_TOKEN) {
+      reply.code(401).send({ error: 'Não autorizado' });
+      return false;
+    }
+    return true;
+  }
+
+  fastify.post('/crm/plataforma-interno/creditos/confirmar', async (request, reply) => {
+    if (!autenticarPlataformaInterno(request, reply)) return;
+    const { tenantId, quantidade } = request.body || {};
+    if (!tenantId || !Number.isInteger(quantidade) || quantidade <= 0) {
+      return reply.code(400).send({ error: 'tenantId e quantidade (inteiro positivo) são obrigatórios.' });
+    }
+    const saldo = await creditos.creditarCompra(pool, tenantId, quantidade);
+    return { ok: true, saldo_plano: saldo.saldo_plano, saldo_comprado: saldo.saldo_comprado };
+  });
 
   fastify.get('/crm/admin-interno/whatsapp-numeros', async (request, reply) => {
     if (!autenticarAdminInterno(request, reply)) return;
@@ -2140,6 +2165,47 @@ async function build(opcoes = {}) {
   fastify.delete('/crm/api/automacoes/:id', { preHandler: fastify.authenticate }, async (request) => {
     await pool.query('delete from crm_automacoes where id = $1 and tenant_id = $2', [request.params.id, request.user.tenantId]);
     return { ok: true };
+  });
+
+  // --- Créditos de WhatsApp (aba Automações > Consumo e Histórico / Comprar
+  // créditos, pedido do Bruno 2026-10-21) -------------------------------------
+  // Saldo em si: lib/creditos.js (banco do próprio CRM). Compra: proxy
+  // servidor-a-servidor pro kyvvo-platform (mesmo padrão de /crm/api/pagamentos/*
+  // logo abaixo), que fala com a Asaas e, quando confirma, chama de volta
+  // POST /crm/plataforma-interno/creditos/confirmar (acima).
+  fastify.get('/crm/api/automacoes/consumo', { preHandler: fastify.authenticate }, async (request) => {
+    const { tenantId } = request.user;
+    const [saldo, disparosRows] = await Promise.all([
+      creditos.obterSaldo(pool, tenantId),
+      pool.query(
+        `select d.telefone_e164, d.template_nome, d.gatilho, d.status, d.mensagem_texto, d.pedido_id, d.criado_em,
+                c.nome as cliente_nome
+           from crm_whatsapp_disparos d
+           left join crm_pedidos p on p.id = d.pedido_id
+           left join crm_clientes c on c.id = p.cliente_id
+          where d.tenant_id = $1 order by d.criado_em desc limit 50`,
+        [tenantId]
+      ),
+    ]);
+    return { saldo_plano: saldo.saldoPlano, saldo_comprado: saldo.saldoComprado, saldo_total: saldo.saldoTotal, disparos: disparosRows.rows };
+  });
+
+  fastify.get('/crm/api/automacoes/creditos/pacotes', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = await chamarPlatformInterno('/internal/pagamentos-crm/creditos/pacotes', { reply });
+    if (dados) return dados;
+  });
+
+  fastify.get('/crm/api/automacoes/creditos', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${request.user.tenantId}/creditos`, { reply });
+    if (dados) return dados;
+  });
+
+  fastify.post('/crm/api/automacoes/creditos/comprar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, email } = request.user;
+    const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${tenantId}/creditos/comprar`, {
+      method: 'POST', body: { ...request.body, email }, reply,
+    });
+    if (dados) return dados;
   });
 
   // --- Painel Hoje (seção 7.6) -------------------------------------------------

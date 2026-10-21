@@ -11,12 +11,36 @@ const {
 // outros testes deste repo que passam pela mesma dependência (ver
 // test/bot-whatsapp.test.js).
 
-function poolFalso({ phoneNumberId, envioRecente, disparosExistentes = [] } = {}) {
+// saldoPlano=1 por padrão — crédito disponível, pra não quebrar os testes
+// que já existiam antes da trava de créditos (2026-10-21). ciclo_renovado_em
+// nasce "já renovado" (agora), então lib/creditos.js nunca tenta buscar o
+// plano do tenant no platform (sem rede nos testes). Testes do bloqueio por
+// falta de crédito passam saldoPlano: 0 explicitamente.
+function poolFalso({ phoneNumberId, envioRecente, disparosExistentes = [], saldoPlano = 1, saldoComprado = 0 } = {}) {
   const disparos = [...disparosExistentes];
   const envios = [];
+  const creditos = { saldoPlano, saldoComprado, renovadoEm: new Date() };
   return {
     disparos,
+    creditos,
     query: async (sql, params) => {
+      if (/^select ciclo_renovado_em from crm_creditos/.test(sql)) {
+        return { rows: creditos.renovadoEm ? [{ ciclo_renovado_em: creditos.renovadoEm }] : [] };
+      }
+      if (/^insert into crm_creditos \(tenant_id, saldo_plano, saldo_comprado, ciclo_renovado_em\)/.test(sql)) {
+        creditos.saldoPlano = params[1];
+        creditos.renovadoEm = new Date();
+        return { rows: [] };
+      }
+      if (/^select saldo_plano, saldo_comprado from crm_creditos/.test(sql)) {
+        return { rows: [{ saldo_plano: creditos.saldoPlano, saldo_comprado: creditos.saldoComprado }] };
+      }
+      if (/^update crm_creditos set/.test(sql)) {
+        if (creditos.saldoPlano > 0) creditos.saldoPlano -= 1;
+        else if (creditos.saldoComprado > 0) creditos.saldoComprado -= 1;
+        else return { rows: [] };
+        return { rows: [{ saldo_plano: creditos.saldoPlano, saldo_comprado: creditos.saldoComprado }] };
+      }
       if (/^select phone_number_id from crm_whatsapp_numeros/.test(sql)) {
         return { rows: phoneNumberId ? [{ phone_number_id: phoneNumberId }] : [] };
       }
@@ -141,6 +165,23 @@ test('dispararPedidoCriado: já enviado nas últimas 24h, bloqueia sem chamar a 
 
   assert.equal(pool.disparos.length, 1);
   assert.equal(pool.disparos[0].status, 'bloqueado_24h');
+});
+
+test('dispararPedidoCriado: sem créditos (plano e comprado zerados), bloqueia sem chamar a Meta', async () => {
+  const pool = poolFalso({ phoneNumberId: 'phone-123', saldoPlano: 0, saldoComprado: 0 });
+  const automacao = { id: 'a2b', gatilho: 'pedido_criado', etapa_id: null, ativo: true, whatsapp_template: 'confirma_pedido' };
+  const originalQuery = pool.query;
+  pool.query = async (sql, params) => {
+    if (/^select \* from crm_automacoes where tenant_id = \$1 and gatilho = 'pedido_criado'/.test(sql)) {
+      return { rows: [automacao] };
+    }
+    return originalQuery(sql, params);
+  };
+
+  await dispararPedidoCriado(pool, { tenantId: 'tenant-1', pedidoId: 'pedido-1', cliente: { nome: 'Ana', telefone: '+5534999998888' }, valorTotal: 150 });
+
+  assert.equal(pool.disparos.length, 1);
+  assert.equal(pool.disparos[0].status, 'sem_creditos');
 });
 
 test('checarPedidosParados: pedido além do prazo_alerta_dias da etapa dispara automação', async () => {

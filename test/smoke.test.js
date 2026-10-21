@@ -37,6 +37,32 @@ test('rota nova de valor do pedido também exige token', async () => {
   await app.close();
 });
 
+test('rotas de créditos (Automações > Consumo e Comprar créditos) também exigem token', async () => {
+  const app = await build();
+  const consumo = await app.inject({ method: 'GET', url: '/crm/api/automacoes/consumo' });
+  assert.equal(consumo.statusCode, 401);
+  const pacotes = await app.inject({ method: 'GET', url: '/crm/api/automacoes/creditos/pacotes' });
+  assert.equal(pacotes.statusCode, 401);
+  const comprar = await app.inject({ method: 'POST', url: '/crm/api/automacoes/creditos/comprar', payload: { pacote: 'creditos_100', meio: 'pix' } });
+  assert.equal(comprar.statusCode, 401);
+  await app.close();
+});
+
+test('plataforma-interno de créditos: exige CRM_CREDITOS_INTERNAL_TOKEN, não JWT', async () => {
+  const app = await build();
+  const semToken = await app.inject({ method: 'POST', url: '/crm/plataforma-interno/creditos/confirmar', payload: { tenantId: 'x', quantidade: 100 } });
+  assert.equal(semToken.statusCode, 401);
+
+  process.env.CRM_CREDITOS_INTERNAL_TOKEN = 'segredo-plataforma-interno-teste';
+  const tokenErrado = await app.inject({
+    method: 'POST', url: '/crm/plataforma-interno/creditos/confirmar',
+    headers: { 'x-internal-token': 'errado' }, payload: { tenantId: 'x', quantidade: 100 },
+  });
+  assert.equal(tokenErrado.statusCode, 401);
+  delete process.env.CRM_CREDITOS_INTERNAL_TOKEN;
+  await app.close();
+});
+
 test('admin-interno de whatsapp-numeros: exige ADMIN_INTERNAL_TOKEN, não JWT', async () => {
   const app = await build();
   const semToken = await app.inject({ method: 'GET', url: '/crm/admin-interno/whatsapp-numeros' });

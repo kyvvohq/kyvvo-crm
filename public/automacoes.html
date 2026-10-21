@@ -12,7 +12,22 @@
 <link rel="stylesheet" href="/ds/tokens.css">
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
-<style>.ds-tabela .ds-switch { margin: 0; }</style>
+<style>
+  .ds-tabela .ds-switch { margin: 0; }
+  .planos-grade { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px; }
+  .plano-card { border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; display:flex; flex-direction:column; gap:10px; }
+  .plano-card .nome { font-weight:700; font-size:14px; color:var(--text); }
+  .plano-card .preco { font-family:var(--font-display); font-size:22px; color:var(--text); }
+  .plano-card .preco span { font-size:12px; color:var(--muted); font-weight:400; }
+  .plano-card .descricao { font-size:12.5px; color:var(--muted); line-height:1.5; flex:1; }
+  .consumo-saldo-grade { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
+  .consumo-saldo-tile { background:var(--surface-muted); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; }
+  .consumo-saldo-tile .rotulo { font-size:11px; font-weight:600; letter-spacing:.4px; color:var(--muted); text-transform:uppercase; }
+  .consumo-saldo-tile .valor { font-size:22px; font-weight:700; margin-top:4px; }
+  .pix-qrcode { display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; }
+  .pix-qrcode img { width:220px; height:220px; border:1px solid var(--border); border-radius:var(--radius-md); }
+  .pix-qrcode textarea { width:100%; font-size:11.5px; }
+</style>
 </head>
 <body>
   <header class="ds-topbar">
@@ -93,34 +108,66 @@
       <div class="ds-pagina-cab">
         <div class="ds-pagina-cab-texto">
           <h1 class="ds-pagina-cab-titulo">Automações</h1>
-          <p class="ds-pagina-cab-sub">Mensagens automáticas enviadas pelo WhatsApp quando algo acontece nos pedidos.</p>
-        </div>
-        <div class="ds-pagina-cab-acoes">
-          <button type="button" class="ds-btn ds-btn-primario" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
         </div>
       </div>
 
-      <div class="ds-tabela" role="table" aria-label="Automações" style="--ds-colunas: minmax(0,1.8fr) minmax(0,1.7fr) minmax(0,1fr) 110px 48px">
-        <div class="ds-filtros">
-          <div class="ds-select">
-            <select id="filtro-gatilho" aria-label="Filtrar por gatilho">
-              <option value="">Todos os gatilhos</option>
-              <option value="mudanca_etapa">Pedido muda de etapa</option>
-              <option value="pedido_criado">Pedido criado</option>
-              <option value="pedido_parado">Pedido parado numa etapa</option>
-              <option value="aniversario_cliente">Aniversário do cliente</option>
-            </select>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      <div class="ds-abas" data-ds-abas>
+        <div class="ds-abas-lista">
+          <button type="button" class="ds-aba" id="aba-au-automacoes" aria-controls="painel-au-automacoes" aria-selected="true">Automações</button>
+          <button type="button" class="ds-aba" id="aba-au-consumo" aria-controls="painel-au-consumo" aria-selected="false">Consumo e histórico</button>
+          <button type="button" class="ds-aba" id="aba-au-comprar" aria-controls="painel-au-comprar" aria-selected="false">Comprar créditos</button>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-au-automacoes" aria-labelledby="aba-au-automacoes">
+          <div class="ds-pagina-cab" style="margin-bottom:14px">
+            <div class="ds-pagina-cab-texto"><p class="ds-pagina-cab-sub" style="margin:0">Mensagens automáticas enviadas pelo WhatsApp quando algo acontece nos pedidos.</p></div>
+            <div class="ds-pagina-cab-acoes">
+              <button type="button" class="ds-btn ds-btn-primario" id="btn-nova-automacao"><span data-icon="plus" data-size="16"></span>Nova automação</button>
+            </div>
+          </div>
+
+          <div class="ds-tabela" role="table" aria-label="Automações" style="--ds-colunas: minmax(0,1.8fr) minmax(0,1.7fr) minmax(0,1fr) 110px 48px">
+            <div class="ds-filtros">
+              <div class="ds-select">
+                <select id="filtro-gatilho" aria-label="Filtrar por gatilho">
+                  <option value="">Todos os gatilhos</option>
+                  <option value="mudanca_etapa">Pedido muda de etapa</option>
+                  <option value="pedido_criado">Pedido criado</option>
+                  <option value="pedido_parado">Pedido parado numa etapa</option>
+                  <option value="aniversario_cliente">Aniversário do cliente</option>
+                </select>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </div>
+            <div class="ds-tabela-cabecalho" role="row">
+              <span role="columnheader">Nome</span>
+              <span role="columnheader">Gatilho</span>
+              <span role="columnheader">Modelo</span>
+              <span role="columnheader">Ativa</span>
+              <span role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ações</span></span>
+            </div>
+            <div id="lista-automacoes"><div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div></div>
           </div>
         </div>
-        <div class="ds-tabela-cabecalho" role="row">
-          <span role="columnheader">Nome</span>
-          <span role="columnheader">Gatilho</span>
-          <span role="columnheader">Modelo</span>
-          <span role="columnheader">Ativa</span>
-          <span role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ações</span></span>
+
+        <div class="ds-abas-painel" id="painel-au-consumo" aria-labelledby="aba-au-consumo" hidden>
+          <div class="card" id="consumo-saldo">Carregando…</div>
+          <div class="ds-tabela" role="table" aria-label="Histórico de disparos" style="margin-top:16px;--ds-colunas: 100px minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 120px">
+            <div class="ds-tabela-cabecalho" role="row">
+              <span role="columnheader">Data</span>
+              <span role="columnheader">Cliente</span>
+              <span role="columnheader">Modelo</span>
+              <span role="columnheader">Gatilho</span>
+              <span role="columnheader">Status</span>
+            </div>
+            <div id="consumo-disparos-linhas"><div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div></div>
+          </div>
         </div>
-        <div id="lista-automacoes"><div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div></div>
+
+        <div class="ds-abas-painel" id="painel-au-comprar" aria-labelledby="aba-au-comprar" hidden>
+          <p class="modal-texto" style="margin:0 0 14px">Créditos avulsos não expiram e são usados depois da cota mensal do seu plano acabar.</p>
+          <div class="planos-grade" id="comprar-pacotes">Carregando…</div>
+        </div>
       </div>
     </div>
   </div>
@@ -134,6 +181,7 @@
     let etapas = [];
     let templates = [];
     let filtroGatilho = '';
+    const UF_LISTA = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
     const ROTULO_GATILHO = {
       mudanca_etapa: 'Pedido muda de etapa',
@@ -310,6 +358,188 @@
     });
     document.getElementById('btn-nova-automacao').addEventListener('click', () => abrirModalNovaAutomacao());
 
+    // --- Consumo e histórico (saldo + disparos de automação) -------------------
+    const STATUS_DISPARO_LABEL = { enviado: 'Enviado', erro: 'Erro', bloqueado_24h: 'Bloqueado (24h)', sem_creditos: 'Sem créditos' };
+    const STATUS_DISPARO_TONE = { enviado: 'sucesso', erro: 'erro', bloqueado_24h: 'aviso', sem_creditos: 'aviso' };
+
+    async function carregarConsumo() {
+      const res = await apiFetch('/crm/api/automacoes/consumo');
+      if (!res.ok) {
+        document.getElementById('consumo-saldo').textContent = 'Não foi possível carregar o consumo agora.';
+        return;
+      }
+      const dados = await res.json();
+      document.getElementById('consumo-saldo').innerHTML = `
+        <div class="consumo-saldo-grade">
+          <div class="consumo-saldo-tile"><div class="rotulo">Cota do plano</div><div class="valor">${dados.saldo_plano}</div></div>
+          <div class="consumo-saldo-tile"><div class="rotulo">Créditos comprados</div><div class="valor">${dados.saldo_comprado}</div></div>
+          <div class="consumo-saldo-tile"><div class="rotulo">Saldo total</div><div class="valor">${dados.saldo_total}</div></div>
+        </div>
+      `;
+      const linhas = document.getElementById('consumo-disparos-linhas');
+      if (!dados.disparos.length) {
+        linhas.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-texto">Nenhum disparo de automação ainda.</p></div>';
+        return;
+      }
+      linhas.innerHTML = dados.disparos.map((d) => `
+        <div class="ds-tabela-linha" role="row">
+          <span role="cell" data-rotulo="Data">${formatarDataHora(d.criado_em)}</span>
+          <span role="cell" data-rotulo="Cliente">${escapeHtml(d.cliente_nome || whatsappParaExibicao(d.telefone_e164))}</span>
+          <span role="cell" data-rotulo="Modelo">${escapeHtml(d.template_nome || '—')}</span>
+          <span role="cell" data-rotulo="Gatilho">${escapeHtml(ROTULO_GATILHO[d.gatilho] || d.gatilho || '—')}</span>
+          <span role="cell" data-rotulo="Status"><span class="ds-badge ds-badge-sm${STATUS_DISPARO_TONE[d.status] ? ' ds-badge-' + STATUS_DISPARO_TONE[d.status] : ''}">${STATUS_DISPARO_LABEL[d.status] || d.status}</span></span>
+        </div>
+      `).join('');
+    }
+
+    // --- Comprar créditos (pacotes avulsos, cobrança via Asaas no platform) ----
+    let pacotesCreditos = [];
+
+    async function carregarPacotes() {
+      const res = await apiFetch('/crm/api/automacoes/creditos/pacotes');
+      const container = document.getElementById('comprar-pacotes');
+      if (!res.ok) { container.textContent = 'Não foi possível carregar os pacotes agora.'; return; }
+      pacotesCreditos = await res.json();
+      container.innerHTML = pacotesCreditos.map((p) => `
+        <div class="plano-card">
+          <div class="nome">${p.quantidade} créditos</div>
+          <div class="preco">${formatarMoeda(p.valor)}<span> · ${formatarMoeda(p.preco_unitario)}/msg</span></div>
+          <div class="descricao">Créditos avulsos — não expiram, usados depois da cota mensal do plano.</div>
+          <button type="button" class="ds-btn ds-btn-primario" data-comprar-pacote="${p.chave}">Comprar</button>
+        </div>
+      `).join('');
+      container.querySelectorAll('[data-comprar-pacote]').forEach((btn) =>
+        btn.addEventListener('click', () => abrirModalComprarCreditos(btn.dataset.comprarPacote)));
+    }
+
+    function abrirModalComprarCreditos(pacoteChave) {
+      const pacote = pacotesCreditos.find((p) => p.chave === pacoteChave);
+      if (!pacote) return;
+      let meioSelecionado = 'pix';
+      abrirModal(`<h3>Comprar ${pacote.quantidade} créditos</h3>`, `
+        <div class="ds-form">
+          <p class="modal-texto">${formatarMoeda(pacote.valor)} — cobrança única, não recorrente.</p>
+          <div class="modal-erro" id="cr-erro"></div>
+          <div class="ds-form-grade">
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cr-meio">Forma de pagamento</label>
+              <div class="ds-select"><select id="cr-meio"><option value="pix">Pix</option><option value="cartao">Cartão de crédito</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+            <div class="ds-campo"><label class="ds-rotulo" for="cr-cpf-cnpj">CPF ou CNPJ</label><input class="ds-input" id="cr-cpf-cnpj" placeholder="Só números"></div>
+          </div>
+          <div id="cr-campos-cartao" hidden>
+            <div class="ds-form-grade">
+              <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="cr-cartao-numero">Número do cartão</label><input class="ds-input" id="cr-cartao-numero" placeholder="0000 0000 0000 0000"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-cartao-nome">Nome impresso no cartão</label><input class="ds-input" id="cr-cartao-nome"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-cartao-cvv">CVV</label><input class="ds-input" id="cr-cartao-cvv"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-cartao-mes">Validade — mês</label><input class="ds-input" id="cr-cartao-mes" placeholder="MM"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-cartao-ano">Validade — ano</label><input class="ds-input" id="cr-cartao-ano" placeholder="AAAA"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-telefone">Telefone do titular (com DDD)</label><input class="ds-input" id="cr-telefone" placeholder="Só números"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-cep">CEP</label><input class="ds-input" id="cr-cep"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-numero">Número</label><input class="ds-input" id="cr-numero"></div>
+              <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="cr-logradouro">Logradouro</label><input class="ds-input" id="cr-logradouro"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-bairro">Bairro</label><input class="ds-input" id="cr-bairro"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-complemento">Complemento (opcional)</label><input class="ds-input" id="cr-complemento"></div>
+              <div class="ds-campo"><label class="ds-rotulo" for="cr-cidade">Cidade</label><input class="ds-input" id="cr-cidade"></div>
+              <div class="ds-campo">
+                <label class="ds-rotulo" for="cr-uf">UF</label>
+                <div class="ds-select"><select id="cr-uf"><option value="">—</option>${UF_LISTA.map((uf) => `<option value="${uf}">${uf}</option>`).join('')}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+              </div>
+            </div>
+          </div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="cr-cancelar">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="cr-confirmar">Pagar ${formatarMoeda(pacote.valor)}</button>
+          </div>
+        </div>
+      `, 'modal-card-larga');
+
+      const camposCartao = document.getElementById('cr-campos-cartao');
+      document.getElementById('cr-meio').addEventListener('change', (e) => {
+        meioSelecionado = e.target.value;
+        camposCartao.hidden = meioSelecionado !== 'cartao';
+      });
+
+      document.getElementById('cr-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('cr-confirmar').addEventListener('click', async () => {
+        const msg = document.getElementById('cr-erro');
+        msg.textContent = '';
+        const meio = meioSelecionado;
+
+        const corpo = { pacote: pacoteChave, meio, cpf_cnpj: document.getElementById('cr-cpf-cnpj').value.trim(), nome: localStorage.getItem('crm_nome') || '' };
+        if (meio === 'cartao') {
+          corpo.cartao_numero = document.getElementById('cr-cartao-numero').value.trim();
+          corpo.cartao_nome = document.getElementById('cr-cartao-nome').value.trim();
+          corpo.cartao_cvv = document.getElementById('cr-cartao-cvv').value.trim();
+          corpo.cartao_validade_mes = document.getElementById('cr-cartao-mes').value.trim();
+          corpo.cartao_validade_ano = document.getElementById('cr-cartao-ano').value.trim();
+          corpo.telefone = document.getElementById('cr-telefone').value.trim();
+          corpo.endereco = {
+            cep: document.getElementById('cr-cep').value.trim(),
+            numero: document.getElementById('cr-numero').value.trim(),
+            logradouro: document.getElementById('cr-logradouro').value.trim(),
+            complemento: document.getElementById('cr-complemento').value.trim(),
+            bairro: document.getElementById('cr-bairro').value.trim(),
+            cidade: document.getElementById('cr-cidade').value.trim(),
+            uf: document.getElementById('cr-uf').value.trim(),
+          };
+        }
+
+        const btn = document.getElementById('cr-confirmar');
+        btn.disabled = true;
+        const res = await apiFetch('/crm/api/automacoes/creditos/comprar', { method: 'POST', body: JSON.stringify(corpo) });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) { msg.textContent = dados.error || 'Falha ao processar pagamento'; btn.disabled = false; return; }
+
+        if (dados.status === 'confirmada') {
+          fecharModal();
+          await carregarConsumo();
+          avisar('Créditos adicionados', `${pacote.quantidade} créditos já estão disponíveis.`);
+          return;
+        }
+
+        mostrarEsperaPix(dados);
+      });
+    }
+
+    // Pix nasce pendente (confirma pelo webhook da Asaas) — mostra o QR code
+    // e fica conferindo o status a cada 5s (até 2 min) sem o tenant precisar
+    // ficar recarregando a página.
+    function mostrarEsperaPix(compra) {
+      const qr = compra.pixQrCode;
+      abrirModal('<h3>Pague pelo Pix pra confirmar</h3>', `
+        <div class="pix-qrcode">
+          ${qr && qr.encodedImage ? `<img src="data:image/png;base64,${qr.encodedImage}" alt="QR code Pix">` : ''}
+          ${qr && qr.payload ? `<textarea class="ds-textarea" rows="4" readonly onclick="this.select()">${escapeHtml(qr.payload)}</textarea>` : ''}
+          <p class="modal-texto" id="pix-status">Aguardando confirmação do pagamento…</p>
+        </div>
+        <div class="ds-form-acoes">
+          <button type="button" class="ds-btn ds-btn-secundario" id="pix-fechar">Fechar</button>
+        </div>
+      `, 'modal-card-larga');
+      document.getElementById('pix-fechar').addEventListener('click', fecharModal);
+      pollarConfirmacaoCredito(compra.compraId, 0);
+    }
+
+    async function pollarConfirmacaoCredito(compraId, tentativa) {
+      if (tentativa >= 24 || !document.getElementById('pix-status')) return; // modal fechado ou ~2min sem confirmar
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+      const statusEl = document.getElementById('pix-status');
+      if (!statusEl) return;
+      const res = await apiFetch('/crm/api/automacoes/creditos');
+      if (res.ok) {
+        const lista = await res.json();
+        const compra = lista.find((c) => c.id === compraId);
+        if (compra && compra.status === 'confirmada') {
+          statusEl.textContent = 'Pagamento confirmado! Créditos adicionados.';
+          await carregarConsumo();
+          setTimeout(fecharModal, 1500);
+          return;
+        }
+      }
+      pollarConfirmacaoCredito(compraId, tentativa + 1);
+    }
+
     carregar().then(() => {
       // ⚡ por etapa no Quadro chega aqui como ?gatilho=mudanca_etapa&etapa_id=...
       const params = new URLSearchParams(window.location.search);
@@ -317,6 +547,8 @@
       const gatilhoInicial = params.get('gatilho');
       if (etapaIdInicial || gatilhoInicial) abrirModalNovaAutomacao({ gatilhoInicial, etapaIdInicial });
     });
+    carregarConsumo();
+    carregarPacotes();
   </script>
 </body>
 </html>
