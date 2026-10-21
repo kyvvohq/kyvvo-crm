@@ -66,6 +66,12 @@ test('montarParametros: template com parâmetro nomeado usa dados[nomeParam]', (
   ]);
 });
 
+test('montarParametros: parâmetro nomeado com apelido conhecido (ex.: nome_cliente) usa dados.cliente', () => {
+  const templateInfo = { parametros_nomeados: true, parametros_corpo: ['nome_cliente'] };
+  const params = montarParametros('mudanca_etapa', { cliente: 'Jose das Couves', etapa: 'Orçamento enviado' }, templateInfo);
+  assert.deepEqual(params, [{ nome: 'nome_cliente', nomeado: true, valor: 'Jose das Couves' }]);
+});
+
 test('montarParametros: sem template (ou posicional) cai no fallback por gatilho', () => {
   const params = montarParametros('pedido_criado', { cliente: 'Ana', pedido_valor: '99.00' }, null);
   assert.deepEqual(params, [
