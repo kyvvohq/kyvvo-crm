@@ -1,6 +1,6 @@
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
-const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio, estaDentroDoHorarioComercial, checarConversasParaRetomar } = require('../lib/bot-whatsapp');
+const { processarMensagem, saudacaoTexto, SAUDACAO_BOTOES, textoDaEntrada, textoDoEnvio, estaDentroDoHorarioComercial, checarRetomadasBot } = require('../lib/bot-whatsapp');
 
 describe('estaDentroDoHorarioComercial (Seg-Sex 8h-18h, horário de Brasília)', () => {
   // Datas em UTC escolhidas pra cair em horários conhecidos em
@@ -17,41 +17,79 @@ describe('estaDentroDoHorarioComercial (Seg-Sex 8h-18h, horário de Brasília)',
   test('sábado 10h (Brasília) está fora (fim de semana)', () => {
     assert.equal(estaDentroDoHorarioComercial(new Date('2026-10-03T13:00:00Z')), false);
   });
-  test('horário customizado (Configurações > Geral): 7h está dentro se início = 7', () => {
+  test('horário customizado (Configurações > Preferências): 7h está dentro se início = 7', () => {
     assert.equal(estaDentroDoHorarioComercial(new Date('2026-09-30T10:00:00Z'), { inicio: 7, fim: 18 }), true);
   });
 });
 
-describe('checarConversasParaRetomar (Configurações > Geral, pedido do Bruno 2026-10-03)', () => {
-  test('apaga conversa parada há mais tempo que bot_retomada_horas (default 24h sem config)', async () => {
-    const apagadas = [];
+describe('checarRetomadasBot (Configurações > Preferências, pedido do Bruno 2026-10-21)', () => {
+  const DENTRO_DO_HORARIO = () => new Date('2026-09-30T13:00:00Z'); // quarta 10h Brasília
+  const FORA_DO_HORARIO = () => new Date('2026-09-30T21:00:00Z'); // quarta 18h Brasília
+
+  function poolRetomada({ linhas = [], temNumero = true } = {}) {
+    const enviados = [];
+    const atualizacoes = [];
     const pool = {
-      query: async (sql) => {
-        if (/^select c\.tenant_id, c\.telefone_e164/.test(sql)) {
-          return { rows: [{ tenant_id: 'tenant-1', telefone_e164: '+5534999998888' }] };
+      query: async (sql, params) => {
+        if (/^select c\.id, c\.tenant_id, c\.telefone_e164/.test(sql)) return { rows: linhas };
+        if (/^select phone_number_id from crm_whatsapp_numeros/.test(sql)) {
+          return { rows: temNumero ? [{ phone_number_id: 'phone-1' }] : [] };
         }
-        if (/^delete from crm_conversas_whatsapp/.test(sql)) {
-          apagadas.push(sql);
+        if (/^insert into crm_mensagens_whatsapp/.test(sql)) return { rows: [] };
+        if (/^update crm_conversas_whatsapp set retomada_tentativas/.test(sql)) {
+          atualizacoes.push(params[0]);
           return { rows: [] };
         }
         throw new Error('query inesperada: ' + sql);
       },
     };
-    await checarConversasParaRetomar(pool);
-    assert.equal(apagadas.length, 1);
+    const enviarTexto = async (opts) => { enviados.push(opts); };
+    return { pool, enviarTexto, enviados, atualizacoes };
+  }
+
+  const LINHA_BASE = {
+    id: 'conversa-1', tenant_id: 'tenant-1', telefone_e164: '+5534999998888',
+    horario_atendimento_inicio: 8, horario_atendimento_fim: 18,
+  };
+
+  test('manda o nudge e incrementa a tentativa quando tudo bate', async () => {
+    const { pool, enviarTexto, enviados, atualizacoes } = poolRetomada({ linhas: [LINHA_BASE] });
+    await checarRetomadasBot(pool, { agora: DENTRO_DO_HORARIO, enviarTexto });
+    assert.equal(enviados.length, 1);
+    assert.equal(enviados[0].to, '+5534999998888');
+    assert.equal(enviados[0].phoneNumberId, 'phone-1');
+    assert.deepEqual(atualizacoes, ['conversa-1']);
   });
 
-  test('sem conversa parada: não apaga nada', async () => {
-    let apagou = false;
+  test('fora do horário comercial: não manda nada', async () => {
+    const { pool, enviarTexto, enviados } = poolRetomada({ linhas: [LINHA_BASE] });
+    await checarRetomadasBot(pool, { agora: FORA_DO_HORARIO, enviarTexto });
+    assert.equal(enviados.length, 0);
+  });
+
+  test('sem WhatsApp conectado pro tenant: não manda, mas não quebra', async () => {
+    const { pool, enviarTexto, enviados } = poolRetomada({ linhas: [LINHA_BASE], temNumero: false });
+    await checarRetomadasBot(pool, { agora: DENTRO_DO_HORARIO, enviarTexto });
+    assert.equal(enviados.length, 0);
+  });
+
+  test('sem conversas elegíveis (query já filtra ativa/tentativas/janela/agente): não manda nada', async () => {
+    const { pool, enviarTexto, enviados } = poolRetomada({ linhas: [] });
+    await checarRetomadasBot(pool, { agora: DENTRO_DO_HORARIO, enviarTexto });
+    assert.equal(enviados.length, 0);
+  });
+
+  test('a query exclui tenants com o agente novo ligado (crm_agente_config)', async () => {
+    let sqlCapturada = null;
     const pool = {
       query: async (sql) => {
-        if (/^select c\.tenant_id, c\.telefone_e164/.test(sql)) return { rows: [] };
-        apagou = true;
-        return { rows: [] };
+        if (/^select c\.id, c\.tenant_id, c\.telefone_e164/.test(sql)) { sqlCapturada = sql; return { rows: [] }; }
+        throw new Error('query inesperada: ' + sql);
       },
     };
-    await checarConversasParaRetomar(pool);
-    assert.equal(apagou, false);
+    await checarRetomadasBot(pool, { agora: DENTRO_DO_HORARIO, enviarTexto: async () => {} });
+    assert.ok(/crm_agente_config/.test(sqlCapturada));
+    assert.ok(/modo <> 'desligado'/.test(sqlCapturada));
   });
 });
 
@@ -84,7 +122,7 @@ describe('textoDoEnvio (histórico de mensagens — o que o bot respondeu)', () 
   });
 });
 
-function poolFalso({ semEtapa, clienteExistente } = {}) {
+function poolFalso({ semEtapa, clienteExistente, janelaEncerramentoMinutos } = {}) {
   const conversas = new Map();
   const clientes = new Map();
   const pedidos = [];
@@ -104,13 +142,16 @@ function poolFalso({ semEtapa, clienteExistente } = {}) {
       }
       if (/^insert into crm_conversas_whatsapp/.test(sql)) {
         const [tenantId, telefone, estado, respostas] = params;
-        conversas.set(key(tenantId, telefone), { tenant_id: tenantId, telefone_e164: telefone, estado, respostas: JSON.parse(respostas) });
+        conversas.set(key(tenantId, telefone), { tenant_id: tenantId, telefone_e164: telefone, estado, respostas: JSON.parse(respostas), atualizado_em: new Date() });
         return { rows: [] };
       }
       if (/^delete from crm_conversas_whatsapp/.test(sql)) {
         const [tenantId, telefone] = params;
         conversas.delete(key(tenantId, telefone));
         return { rows: [] };
+      }
+      if (/^select bot_janela_encerramento_minutos from crm_configuracoes/.test(sql)) {
+        return { rows: [{ bot_janela_encerramento_minutos: janelaEncerramentoMinutos ?? null }] };
       }
       if (/^select id from crm_etapas/.test(sql)) {
         return { rows: semEtapa ? [] : [{ id: 'etapa-1' }] };
@@ -386,6 +427,32 @@ test('estado desconhecido/corrompido: reinicia a conversa E manda a saudação (
   assert.equal(envios[0].tipo, 'botoes');
   assert.ok(envios[0].texto.includes('Basic 3D Print'));
   assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
+});
+
+describe('janela de encerramento automático (Configurações > Preferências, pedido do Bruno 2026-10-21)', () => {
+  test('conversa parada há mais tempo que a janela: reinicia do zero (saudação) silenciosamente', async () => {
+    const { pool, conversas } = poolFalso({ janelaEncerramentoMinutos: 60 });
+    await enviar(pool, TENANT, TELEFONE, texto('oi'));
+    await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido')); // estado = aguardando_arquivo
+    conversas.get(`${TENANT}|${TELEFONE}`).atualizado_em = new Date(Date.now() - 70 * 60000); // 70min > janela de 60min
+
+    const envios = await enviar(pool, TENANT, TELEFONE, texto('tenho um arquivo sim'));
+    assert.equal(envios.length, 1);
+    assert.equal(envios[0].tipo, 'botoes');
+    assert.ok(envios[0].texto.includes('Basic 3D Print')); // saudação do zero, não avançou o fluxo antigo
+    assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'aguardando_opcao');
+  });
+
+  test('conversa ainda dentro da janela: continua normalmente do estado salvo', async () => {
+    const { pool, conversas } = poolFalso({ janelaEncerramentoMinutos: 60 });
+    await enviar(pool, TENANT, TELEFONE, texto('oi'));
+    await enviar(pool, TENANT, TELEFONE, botao('fazer_pedido')); // estado = aguardando_arquivo
+    conversas.get(`${TENANT}|${TELEFONE}`).atualizado_em = new Date(Date.now() - 10 * 60000); // 10min < janela de 60min
+
+    const [envio] = await enviar(pool, TENANT, TELEFONE, botao('tem_arquivo'));
+    assert.ok(envio.texto.includes('STL')); // segue o fluxo "tenho arquivo", não reinicia
+    assert.equal(conversas.get(`${TENANT}|${TELEFONE}`).estado, 'recebendo_arquivos');
+  });
 });
 
 test('sem etapa configurada: ainda responde ao cliente, mas não cria pedido', async () => {

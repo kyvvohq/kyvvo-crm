@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kyvvo CRM — Geral</title>
+<title>Kyvvo CRM — Preferências</title>
 <link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -89,7 +89,7 @@
             <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
           </button>
           <ul class="ds-menu-sub">
-            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Geral</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Preferências</a></li>
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
@@ -103,7 +103,7 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Geral</h1></div>
+          <div class="linha-titulo"><h1>Preferências</h1></div>
         </div>
       </div>
 
@@ -127,13 +127,34 @@
 
         <div class="config-geral-grupo">
           <div class="textos">
-            <h3>Retomada de conversa parada no bot</h3>
-            <p>Se o cliente não avançar a conversa no bot nesse tempo, ela reinicia do zero na próxima mensagem — evita respostas fora de contexto a uma pergunta de muito tempo atrás.</p>
+            <h3>Janela de encerramento do atendimento</h3>
+            <p>Se o cliente não avançar a conversa no bot nesse tempo, o atendimento se encerra sozinho e reinicia do zero na próxima mensagem — evita respostas fora de contexto a uma pergunta de muito tempo atrás.</p>
           </div>
           <div class="campos">
             <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-retomada-horas">Horas</label>
-              <input class="ds-input" type="number" id="cfg-retomada-horas" min="1" step="1">
+              <label class="ds-rotulo" for="cfg-janela-horas">Horas</label>
+              <input class="ds-input" type="number" id="cfg-janela-horas" min="0.25" max="8" step="0.25">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-geral-grupo">
+          <div class="textos">
+            <h3>Retomar atendimento</h3>
+            <p>Se o cliente parar de responder, o bot tenta chamá-lo de volta (mensagem curta), antes de o atendimento se encerrar — só dentro do horário de atendimento acima.</p>
+          </div>
+          <div class="campos">
+            <div class="ds-campo" style="flex:0 0 auto">
+              <label class="ds-rotulo" for="cfg-retomada-ativa">Ativo</label>
+              <label class="ds-switch"><input type="checkbox" role="switch" id="cfg-retomada-ativa"><span class="ds-switch-trilho"></span></label>
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cfg-retomada-tentativas">Tentativas (1-3)</label>
+              <input class="ds-input" type="number" id="cfg-retomada-tentativas" min="1" max="3" step="1">
+            </div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="cfg-retomada-intervalo">Intervalo (1-3h)</label>
+              <input class="ds-input" type="number" id="cfg-retomada-intervalo" min="1" max="3" step="1">
             </div>
           </div>
         </div>
@@ -182,15 +203,26 @@
   <script src="/ds/components.js"></script>
   <script src="/crm/shell.js"></script>
   <script>
+    function atualizarCamposRetomada() {
+      const ativa = document.getElementById('cfg-retomada-ativa').checked;
+      document.getElementById('cfg-retomada-tentativas').disabled = !ativa;
+      document.getElementById('cfg-retomada-intervalo').disabled = !ativa;
+    }
+    document.getElementById('cfg-retomada-ativa').addEventListener('change', atualizarCamposRetomada);
+
     async function carregar() {
       const res = await apiFetch('/crm/api/configuracoes-gerais');
       const cfg = await res.json();
       document.getElementById('cfg-horario-inicio').value = cfg.horario_atendimento_inicio;
       document.getElementById('cfg-horario-fim').value = cfg.horario_atendimento_fim;
-      document.getElementById('cfg-retomada-horas').value = cfg.bot_retomada_horas;
+      document.getElementById('cfg-janela-horas').value = cfg.bot_janela_encerramento_minutos / 60;
+      document.getElementById('cfg-retomada-ativa').checked = cfg.bot_retomada_ativa;
+      document.getElementById('cfg-retomada-tentativas').value = cfg.bot_retomada_tentativas;
+      document.getElementById('cfg-retomada-intervalo').value = cfg.bot_retomada_intervalo_horas;
       document.getElementById('cfg-quadro-dias').value = cfg.quadro_dias_ultima_coluna;
       document.getElementById('cfg-mensagem-aviso').value = cfg.mensagem_aviso_pedido;
       document.getElementById('cfg-mensagem-aviso-ativa').checked = cfg.mensagem_aviso_pedido_ativo;
+      atualizarCamposRetomada();
     }
     carregar();
 
@@ -202,7 +234,10 @@
       const body = {
         horario_atendimento_inicio: Number(document.getElementById('cfg-horario-inicio').value),
         horario_atendimento_fim: Number(document.getElementById('cfg-horario-fim').value),
-        bot_retomada_horas: Number(document.getElementById('cfg-retomada-horas').value),
+        bot_janela_encerramento_minutos: Math.round(Number(document.getElementById('cfg-janela-horas').value) * 60),
+        bot_retomada_ativa: document.getElementById('cfg-retomada-ativa').checked,
+        bot_retomada_tentativas: Number(document.getElementById('cfg-retomada-tentativas').value),
+        bot_retomada_intervalo_horas: Number(document.getElementById('cfg-retomada-intervalo').value),
         quadro_dias_ultima_coluna: Number(document.getElementById('cfg-quadro-dias').value),
         mensagem_aviso_pedido: document.getElementById('cfg-mensagem-aviso').value.trim(),
         mensagem_aviso_pedido_ativo: document.getElementById('cfg-mensagem-aviso-ativa').checked,

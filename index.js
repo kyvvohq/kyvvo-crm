@@ -17,7 +17,7 @@ const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
-const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, checarConversasParaRetomar } = require('./lib/bot-whatsapp');
+const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, checarRetomadasBot } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
 const { enviarTexto, enviarTemplate, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
 const {
@@ -2525,8 +2525,9 @@ async function build(opcoes = {}) {
   // pelas Notificações, só tocando as colunas desta tela.
   fastify.get('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request) => {
     const { rows } = await pool.query(
-      `select horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna,
-              mensagem_aviso_pedido, mensagem_aviso_pedido_ativo
+      `select horario_atendimento_inicio, horario_atendimento_fim, bot_janela_encerramento_minutos,
+              bot_retomada_ativa, bot_retomada_tentativas, bot_retomada_intervalo_horas,
+              quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo
        from crm_configuracoes where tenant_id = $1`,
       [request.user.tenantId]
     );
@@ -2534,7 +2535,10 @@ async function build(opcoes = {}) {
     return {
       horario_atendimento_inicio: config.horario_atendimento_inicio ?? 8,
       horario_atendimento_fim: config.horario_atendimento_fim ?? 18,
-      bot_retomada_horas: config.bot_retomada_horas ?? 24,
+      bot_janela_encerramento_minutos: config.bot_janela_encerramento_minutos ?? 120,
+      bot_retomada_ativa: config.bot_retomada_ativa ?? false,
+      bot_retomada_tentativas: config.bot_retomada_tentativas ?? 1,
+      bot_retomada_intervalo_horas: config.bot_retomada_intervalo_horas ?? 1,
       quadro_dias_ultima_coluna: config.quadro_dias_ultima_coluna ?? 30,
       mensagem_aviso_pedido: config.mensagem_aviso_pedido ?? '📦 Pedido de canal próprio — não esqueça o cartão de recompra no kit.',
       mensagem_aviso_pedido_ativo: config.mensagem_aviso_pedido_ativo ?? true,
@@ -2544,29 +2548,54 @@ async function build(opcoes = {}) {
   fastify.patch('/crm/api/configuracoes-gerais', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId } = request.user;
     const {
-      horario_atendimento_inicio: inicio, horario_atendimento_fim: fim, bot_retomada_horas: retomadaHoras,
+      horario_atendimento_inicio: inicio, horario_atendimento_fim: fim, bot_janela_encerramento_minutos: janelaMinutos,
+      bot_retomada_ativa: retomadaAtiva, bot_retomada_tentativas: retomadaTentativas, bot_retomada_intervalo_horas: retomadaIntervalo,
       quadro_dias_ultima_coluna: diasUltimaColuna, mensagem_aviso_pedido: mensagemAviso, mensagem_aviso_pedido_ativo: mensagemAvisoAtiva,
     } = request.body || {};
-    if (![inicio, fim, retomadaHoras, diasUltimaColuna].every((v) => Number.isInteger(v))) {
+    if (![inicio, fim, janelaMinutos, diasUltimaColuna].every((v) => Number.isInteger(v))) {
       return reply.code(400).send({ error: 'Todos os campos são obrigatórios e precisam ser números inteiros' });
     }
     if (inicio < 0 || inicio > 23 || fim < 0 || fim > 23 || fim <= inicio) {
       return reply.code(400).send({ error: 'Horário inválido — início e fim precisam estar entre 0 e 23, com fim depois do início' });
     }
-    if (retomadaHoras < 1 || diasUltimaColuna < 1) {
-      return reply.code(400).send({ error: 'Tempo de retomada e dias da última coluna precisam ser pelo menos 1' });
+    if (janelaMinutos < 15 || janelaMinutos > 480) {
+      return reply.code(400).send({ error: 'Janela de encerramento precisa estar entre 15 e 480 minutos (0,25h a 8h)' });
     }
+    if (diasUltimaColuna < 1) {
+      return reply.code(400).send({ error: 'Dias da última coluna precisam ser pelo menos 1' });
+    }
+    if (typeof retomadaAtiva !== 'boolean') {
+      return reply.code(400).send({ error: '"Retomar atendimento" precisa ser verdadeiro ou falso' });
+    }
+    if (retomadaAtiva && (!Number.isInteger(retomadaTentativas) || retomadaTentativas < 1 || retomadaTentativas > 3)) {
+      return reply.code(400).send({ error: 'Tentativas de retomada precisam ser um número inteiro entre 1 e 3' });
+    }
+    if (retomadaAtiva && (!Number.isInteger(retomadaIntervalo) || retomadaIntervalo < 1 || retomadaIntervalo > 3)) {
+      return reply.code(400).send({ error: 'Intervalo de retomada precisa ser um número inteiro entre 1 e 3 horas' });
+    }
+    // Desativada: a tela pode nem mandar tentativas/intervalo (campos
+    // escondidos) — cai num valor válido qualquer, já que a coluna não
+    // aceita nulo e não tem efeito nenhum enquanto bot_retomada_ativa=false.
+    const retomadaTentativasFinal = retomadaAtiva ? retomadaTentativas : (Number.isInteger(retomadaTentativas) && retomadaTentativas >= 1 && retomadaTentativas <= 3 ? retomadaTentativas : 1);
+    const retomadaIntervaloFinal = retomadaAtiva ? retomadaIntervalo : (Number.isInteger(retomadaIntervalo) && retomadaIntervalo >= 1 && retomadaIntervalo <= 3 ? retomadaIntervalo : 1);
     if (typeof mensagemAviso !== 'string' || !mensagemAviso.trim()) {
       return reply.code(400).send({ error: 'Mensagem de aviso do pedido é obrigatória' });
     }
     const { rows } = await pool.query(
-      `insert into crm_configuracoes (tenant_id, horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo, atualizado_em)
-       values ($1, $2, $3, $4, $5, $6, $7, now())
+      `insert into crm_configuracoes (
+         tenant_id, horario_atendimento_inicio, horario_atendimento_fim, bot_janela_encerramento_minutos,
+         bot_retomada_ativa, bot_retomada_tentativas, bot_retomada_intervalo_horas,
+         quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo, atualizado_em
+       )
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
        on conflict (tenant_id) do update set
-         horario_atendimento_inicio = $2, horario_atendimento_fim = $3, bot_retomada_horas = $4, quadro_dias_ultima_coluna = $5,
-         mensagem_aviso_pedido = $6, mensagem_aviso_pedido_ativo = $7, atualizado_em = now()
-       returning horario_atendimento_inicio, horario_atendimento_fim, bot_retomada_horas, quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo`,
-      [tenantId, inicio, fim, retomadaHoras, diasUltimaColuna, mensagemAviso.trim(), !!mensagemAvisoAtiva]
+         horario_atendimento_inicio = $2, horario_atendimento_fim = $3, bot_janela_encerramento_minutos = $4,
+         bot_retomada_ativa = $5, bot_retomada_tentativas = $6, bot_retomada_intervalo_horas = $7,
+         quadro_dias_ultima_coluna = $8, mensagem_aviso_pedido = $9, mensagem_aviso_pedido_ativo = $10, atualizado_em = now()
+       returning horario_atendimento_inicio, horario_atendimento_fim, bot_janela_encerramento_minutos,
+                 bot_retomada_ativa, bot_retomada_tentativas, bot_retomada_intervalo_horas,
+                 quadro_dias_ultima_coluna, mensagem_aviso_pedido, mensagem_aviso_pedido_ativo`,
+      [tenantId, inicio, fim, janelaMinutos, retomadaAtiva, retomadaTentativasFinal, retomadaIntervaloFinal, diasUltimaColuna, mensagemAviso.trim(), !!mensagemAvisoAtiva]
     );
     return rows[0];
   });
@@ -2601,8 +2630,14 @@ async function start() {
     // não deixar um interval pendurado no processo de teste.
     setInterval(() => {
       checarGatilhosPeriodicos(pool).catch((err) => fastify.log.error(`[automacoes] checador periódico: ${err.message}`));
-      checarConversasParaRetomar(pool).catch((err) => fastify.log.error(`[bot-whatsapp] checador de retomada: ${err.message}`));
     }, 60 * 60 * 1000);
+    // Retomada de atendimento (Configurações > Preferências) precisa de mais
+    // granularidade que o checador de gatilhos acima — o intervalo mínimo
+    // configurável entre tentativas é 1h, então 5 min é folga suficiente
+    // sem acoplar ao ciclo horário dos gatilhos de automação.
+    setInterval(() => {
+      checarRetomadasBot(pool, { enviarTexto }).catch((err) => fastify.log.error(`[bot-whatsapp] checador de retomada: ${err.message}`));
+    }, 5 * 60 * 1000);
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
   } catch (err) {
     fastify.log.error(err);
