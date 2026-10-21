@@ -707,11 +707,19 @@ function acoesClienteHtml(telefone, nomeCliente, mensagemPadrao, emailAniversari
   }
   const tel = escapeHtml(telefone);
   const msg = escapeHtml(mensagemPadrao || '');
+  // Aniversariantes (emailAniversario presente) é mensagem iniciada pela
+  // empresa fora da janela de 24h — a Meta só aceita com modelo aprovado,
+  // nunca texto livre (pedido do Bruno, 2026-10-21). Por isso o botão abre um
+  // modal diferente (escolher modelo aprovado) em vez do texto livre usado
+  // por Pagamentos pendentes.
+  const btnDisparo = emailAniversario
+    ? `<button type="button" class="acao-disparo-individual" data-tipo="aniversario" data-cliente-id="${escapeHtml(emailAniversario.id)}" data-nome="${nome}" title="Disparo individual (modelo aprovado)" aria-label="Disparo individual (modelo aprovado)">${icon('zap', 16)}</button>`
+    : `<button type="button" class="acao-disparo-individual" data-telefone="${tel}" data-nome="${nome}" data-mensagem="${msg}" title="Disparo individual" aria-label="Disparo individual">${icon('zap', 16)}</button>`;
   return `
     <div class="acoes-cliente">
       <a class="acao-whatsapp" href="${linkWhatsapp(telefone, mensagemPadrao)}" target="_blank" rel="noopener" title="Chamar no WhatsApp" aria-label="Chamar no WhatsApp">${icon('message-circle', 16)}</a>
       <button type="button" class="acao-conversa-crm" data-telefone="${tel}" data-nome="${nome}" title="Conversa pelo CRM" aria-label="Conversa pelo CRM"><img src="/ds/favicon.svg" width="16" height="16" alt=""></button>
-      <button type="button" class="acao-disparo-individual" data-telefone="${tel}" data-nome="${nome}" data-mensagem="${msg}" title="Disparo individual" aria-label="Disparo individual">${icon('zap', 16)}</button>
+      ${btnDisparo}
       ${emailBtn}
     </div>
   `;
@@ -720,7 +728,11 @@ document.addEventListener('click', (e) => {
   const btnConversa = e.target.closest('.acao-conversa-crm');
   if (btnConversa) { abrirModalConversa(btnConversa.dataset.telefone, btnConversa.dataset.nome); return; }
   const btnDisparo = e.target.closest('.acao-disparo-individual');
-  if (btnDisparo) { abrirModalDisparoIndividual(btnDisparo.dataset.telefone, btnDisparo.dataset.nome, btnDisparo.dataset.mensagem); return; }
+  if (btnDisparo) {
+    if (btnDisparo.dataset.tipo === 'aniversario') abrirModalDisparoAniversario(btnDisparo.dataset.clienteId, btnDisparo.dataset.nome);
+    else abrirModalDisparoIndividual(btnDisparo.dataset.telefone, btnDisparo.dataset.nome, btnDisparo.dataset.mensagem);
+    return;
+  }
   const btnEmail = e.target.closest('.acao-email-aniversario');
   if (btnEmail) abrirModalEmailAniversario(btnEmail.dataset.clienteId, btnEmail.dataset.nome, btnEmail.dataset.assunto, btnEmail.dataset.corpo);
 });
@@ -847,6 +859,71 @@ function abrirModalEmailAniversario(clienteId, nomeCliente, assuntoPadrao, corpo
     });
     if (!res.ok) {
       const dados = await res.json().catch(() => ({}));
+      erroEl.textContent = dados.error || 'Erro ao enviar.';
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+      return;
+    }
+    fecharModal();
+  });
+}
+
+// Disparo individual de WhatsApp pra aniversariante (ícone ⚡ do Painel >
+// Aniversariantes do mês) — diferente de abrirModalDisparoIndividual
+// (texto livre, usado por Pagamentos pendentes): aniversário é mensagem
+// iniciada pela empresa fora da janela de 24h, a Meta só aceita com um
+// modelo aprovado (pedido do Bruno, 2026-10-21). Busca os modelos aprovados
+// em GET /crm/api/campanhas/canais (já filtra status === 'APPROVED') em vez
+// de mandar texto livre.
+async function abrirModalDisparoAniversario(clienteId, nomeCliente) {
+  abrirModal(
+    `<h3>Disparo de aniversário</h3><p class="modal-texto">${escapeHtml(nomeCliente || '')}</p>`,
+    `
+      <div class="modal-erro" id="disparo-aniv-erro"></div>
+      <p class="modal-texto" id="disparo-aniv-carregando">Carregando modelos aprovados…</p>
+      <div id="disparo-aniv-corpo" hidden></div>
+    `
+  );
+  const res = await apiFetch('/crm/api/campanhas/canais');
+  const corpoEl = document.getElementById('disparo-aniv-corpo');
+  if (!corpoEl) return; // modal fechado antes da resposta chegar
+  const carregandoEl = document.getElementById('disparo-aniv-carregando');
+  const erroEl = document.getElementById('disparo-aniv-erro');
+
+  if (!res.ok) { carregandoEl.remove(); erroEl.textContent = 'Não foi possível carregar os modelos agora.'; return; }
+  const canais = await res.json();
+  if (!canais.whatsapp.conectado) { carregandoEl.remove(); erroEl.textContent = 'Nenhum WhatsApp conectado — conecte em Configurações > WhatsApp.'; return; }
+  const modelos = canais.whatsapp.modelos || [];
+  if (!modelos.length) { carregandoEl.remove(); erroEl.textContent = 'Nenhum modelo aprovado pela Meta ainda.'; return; }
+
+  carregandoEl.remove();
+  corpoEl.hidden = false;
+  corpoEl.innerHTML = `
+    <label for="disparo-aniv-modelo">Modelo aprovado</label>
+    <select id="disparo-aniv-modelo">${modelos.map((m) => `<option value="${escapeHtml(m.nome)}">${escapeHtml(m.nome)}</option>`).join('')}</select>
+    <p class="modal-texto" id="disparo-aniv-preview"></p>
+    <div class="modal-acoes">
+      <button type="button" class="ds-btn ds-btn-secundario" id="disparo-aniv-cancelar">Cancelar</button>
+      <button type="button" class="ds-btn ds-btn-primario" id="disparo-aniv-enviar">Enviar</button>
+    </div>
+  `;
+  const selectEl = document.getElementById('disparo-aniv-modelo');
+  const previewEl = document.getElementById('disparo-aniv-preview');
+  const atualizarPreview = () => { previewEl.textContent = (modelos.find((m) => m.nome === selectEl.value) || {}).corpo || ''; };
+  selectEl.addEventListener('change', atualizarPreview);
+  atualizarPreview();
+
+  document.getElementById('disparo-aniv-cancelar').addEventListener('click', fecharModal);
+  document.getElementById('disparo-aniv-enviar').addEventListener('click', async () => {
+    const btn = document.getElementById('disparo-aniv-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+    const envio = await apiFetch(`/crm/api/clientes/${clienteId}/whatsapp-aniversario`, {
+      method: 'POST',
+      body: JSON.stringify({ templateNome: selectEl.value }),
+    });
+    if (!envio.ok) {
+      const dados = await envio.json().catch(() => ({}));
       erroEl.textContent = dados.error || 'Erro ao enviar.';
       btn.disabled = false;
       btn.textContent = 'Enviar';

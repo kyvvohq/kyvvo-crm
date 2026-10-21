@@ -48,6 +48,13 @@ test('rotas de créditos (Automações > Consumo e Comprar créditos) também ex
   await app.close();
 });
 
+test('disparo individual de aniversário (modelo aprovado) exige token', async () => {
+  const app = await build();
+  const res = await app.inject({ method: 'POST', url: '/crm/api/clientes/qualquer-id/whatsapp-aniversario', payload: { templateNome: 'x' } });
+  assert.equal(res.statusCode, 401);
+  await app.close();
+});
+
 test('plataforma-interno de créditos: exige CRM_CREDITOS_INTERNAL_TOKEN, não JWT', async () => {
   const app = await build();
   const semToken = await app.inject({ method: 'POST', url: '/crm/plataforma-interno/creditos/confirmar', payload: { tenantId: 'x', quantidade: 100 } });

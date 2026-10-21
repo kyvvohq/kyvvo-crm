@@ -19,8 +19,11 @@ const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano } = 
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
 const { processarMensagem, registrarMensagem, textoDaEntrada, textoDoEnvio, checarConversasParaRetomar } = require('./lib/bot-whatsapp');
 const { DIR_UPLOADS } = require('./lib/whatsapp-media');
-const { enviarTexto, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
-const { dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS } = require('./lib/automacoes');
+const { enviarTexto, enviarTemplate, enviarBotoes, enviarLista, listarTemplates } = require('@kyvvohq/whatsapp');
+const {
+  dispararMudancaEtapa, dispararPedidoCriado, checarGatilhosPeriodicos, GATILHOS_VALIDOS,
+  enviadoRecentemente, registrarEnvio, registrarDisparo, montarParametros, renderizarCorpoTemplate,
+} = require('./lib/automacoes');
 const creditos = require('./lib/creditos');
 const metaWhatsappService = require('./lib/meta-whatsapp-service');
 const { relatorioPedidos, listarPedidosDetalhado } = require('./lib/relatorios');
@@ -503,6 +506,67 @@ async function build(opcoes = {}) {
       layout: { tipo: 'mensagem', titulo: assunto, paragrafos: [corpo] },
     });
     if (!enviado) return reply.code(502).send({ error: 'Falha ao enviar o e-mail.' });
+    return { ok: true };
+  });
+
+  // Ícone de disparo individual do Painel > Aniversariantes do mês (pedido
+  // do Bruno, 2026-10-21): diferente do disparo individual de texto livre
+  // (Pagamentos pendentes), aniversário é mensagem iniciada pela empresa fora
+  // da janela de 24h — a Meta só aceita isso com um modelo aprovado, nunca
+  // texto livre (ver EXEMPLOS_PARAMETRO/comentário do erro #132000 em
+  // @kyvvohq/whatsapp). Por isso o front busca a lista de modelos aprovados
+  // (GET /crm/api/campanhas/canais, já filtra status === 'APPROVED') e manda
+  // só o nome escolhido aqui — mesma trava de créditos/24h/registro de
+  // histórico das automações (gatilho 'aniversario_cliente', igual o envio
+  // automático de checarAniversariantes). Busca telefone/nome no cadastro em
+  // vez de confiar no que o front manda, mesma defesa do email-aniversario.
+  fastify.post('/crm/api/clientes/:id/whatsapp-aniversario', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const templateNome = (request.body?.templateNome || '').trim();
+    if (!templateNome) return reply.code(400).send({ error: 'Escolha um modelo aprovado.' });
+
+    const { rows: clienteRows } = await pool.query('select nome, telefone from crm_clientes where id = $1 and tenant_id = $2', [request.params.id, tenantId]);
+    if (!clienteRows[0]) return reply.code(404).send({ error: 'Cliente não encontrado' });
+    const telefoneE164 = paraE164(clienteRows[0].telefone);
+    if (!telefoneE164) return reply.code(409).send({ error: 'Cliente sem telefone cadastrado' });
+    const nomeCliente = clienteRows[0].nome;
+
+    const { rows: numeroRows } = await pool.query('select phone_number_id, meta_waba_id from crm_whatsapp_numeros where tenant_id = $1 limit 1', [tenantId]);
+    const phoneNumberId = numeroRows[0] && numeroRows[0].phone_number_id;
+    if (!phoneNumberId) return reply.code(409).send({ error: 'Nenhum WhatsApp conectado — conecte em Configurações > WhatsApp.' });
+
+    const templates = await listarTemplates({ wabaId: numeroRows[0].meta_waba_id });
+    const templateInfo = templates.find((t) => t.nome === templateNome);
+    if (!templateInfo || templateInfo.status !== 'APPROVED') {
+      return reply.code(400).send({ error: 'Modelo inválido ou não aprovado pela Meta.' });
+    }
+
+    if (await enviadoRecentemente(pool, telefoneE164)) {
+      await registrarDisparo(pool, { tenantId, telefoneE164, templateNome, gatilho: 'aniversario_cliente', status: 'bloqueado_24h' });
+      return reply.code(409).send({ error: 'Este cliente já recebeu uma mensagem nas últimas 24h.' });
+    }
+
+    const saldo = await creditos.obterSaldo(pool, tenantId);
+    if (saldo.saldoTotal <= 0) {
+      await registrarDisparo(pool, { tenantId, telefoneE164, templateNome, gatilho: 'aniversario_cliente', status: 'sem_creditos' });
+      return reply.code(402).send({ error: 'Sem créditos de WhatsApp disponíveis.' });
+    }
+
+    const parametrosCorpo = montarParametros('aniversario_cliente', { cliente: nomeCliente }, templateInfo);
+    const mensagemTexto = renderizarCorpoTemplate(templateInfo.corpo, parametrosCorpo);
+    const enviado = await enviarTemplate({ to: telefoneE164, templateName: templateNome, parametrosCorpo, phoneNumberId });
+    if (!enviado) {
+      await registrarDisparo(pool, { tenantId, telefoneE164, templateNome, gatilho: 'aniversario_cliente', status: 'erro', mensagemTexto });
+      return reply.code(502).send({ error: 'A Meta recusou o envio (confira se o modelo ainda está aprovado).' });
+    }
+
+    // Grava o disparo antes do registro de 24h/débito de crédito — mesmo
+    // cuidado do fix em lib/automacoes.js (2026-10-21): um envio que a Meta
+    // já aceitou não pode sumir do histórico por causa de uma falha num
+    // efeito colateral best-effort depois dele.
+    await registrarDisparo(pool, { tenantId, telefoneE164, templateNome, gatilho: 'aniversario_cliente', status: 'enviado', mensagemTexto });
+    await registrarEnvio(pool, tenantId, telefoneE164).catch((err) => console.error(`[painel] falha ao registrar envio (24h) do disparo de aniversário: ${err.message}`));
+    await creditos.debitar(pool, tenantId).catch((err) => console.error(`[painel] falha ao debitar crédito do disparo de aniversário: ${err.message}`));
     return { ok: true };
   });
 
