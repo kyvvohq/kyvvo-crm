@@ -13,16 +13,57 @@
 <link rel="stylesheet" href="/ds/components.css">
 <link rel="stylesheet" href="/crm/shell.css">
 <style>
-  .config-geral-grupo { display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
-  .config-geral-grupo:last-of-type { border-bottom:none; margin-bottom:0; padding-bottom:0; }
-  .config-geral-grupo .textos { flex:1 1 260px; min-width:220px; }
-  .config-geral-grupo .textos h3 { margin:0 0 4px; font-size:14px; }
-  .config-geral-grupo .textos p { margin:0; font-size:12.5px; color:var(--muted); line-height:1.5; }
-  .config-geral-grupo .campos { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
-  .config-geral-grupo .ds-campo { flex:0 1 110px; min-width:90px; }
-  .config-geral-acoes { display:flex; justify-content:flex-end; margin-top:20px; }
-  .config-geral-erro { color:var(--danger); font-size:13px; margin-top:10px; text-align:right; }
-  .config-geral-salvo { color:var(--success); font-size:13px; margin-top:10px; text-align:right; }
+  /* Preferências: dois blocos (card) com linhas "texto à esquerda, controle à direita".
+     Os elementos globais do CRM (label/input/button em shell.css) têm tamanho de
+     formulário cheio; aqui os controles são compactos e ficam escopados em .pref. */
+  .pref { max-width:920px; }
+  .pref-card { padding:0; overflow:hidden; }
+  .pref-card-cab { display:flex; gap:12px; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border); background:var(--surface-muted); }
+  .pref-card-ico { flex:none; width:36px; height:36px; border-radius:var(--radius-md); background:var(--accent-tint); color:var(--accent-strong); display:inline-flex; align-items:center; justify-content:center; }
+  .pref-card-cab h2 { margin:0; font-size:16px; line-height:1.25; }
+  .pref-card-cab p { margin:2px 0 0; font-size:13px; color:var(--muted); }
+
+  .pref-linha { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 32px; align-items:center; padding:20px 24px; border-bottom:1px solid var(--border); }
+  .pref-linha:last-child { border-bottom:none; }
+  .pref-textos h3 { margin:0 0 4px; font-size:14px; }
+  .pref-textos p { margin:0; font-size:13px; color:var(--muted-strong); line-height:1.5; max-width:62ch; }
+  .pref-controle { display:flex; align-items:center; gap:8px; justify-content:flex-end; font-size:13px; color:var(--text-secondary); white-space:nowrap; }
+  .pref-controle label { margin:0; font-weight:500; }
+  .pref .pref-num { width:72px; height:36px; padding:0 8px; text-align:center; }
+  .pref .pref-num:disabled { background:var(--surface-muted); color:var(--muted); }
+  .pref-unidade { color:var(--muted-strong); }
+  .pref-nota { font-size:12px; color:var(--muted); }
+
+  /* Linha secundária (opções que dependem do interruptor da linha de cima). */
+  .pref-sub { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:12px 24px; padding:12px 16px; border-radius:var(--radius-md); background:var(--surface-muted); border:1px solid var(--border); }
+  .pref-sub .pref-controle { justify-content:flex-start; }
+  .pref-sub[data-desligado="true"] { opacity:.55; }
+
+  .pref-msg { grid-column:1 / -1; }
+  .pref-msg textarea { min-height:72px; font-size:13.5px; }
+  .pref-msg[data-desligado="true"] textarea { background:var(--surface-muted); color:var(--muted); }
+  .pref-msg-rodape { display:flex; justify-content:space-between; gap:12px; margin-top:6px; font-size:12px; color:var(--muted); }
+
+  .pref-erro { grid-column:1 / -1; color:var(--danger); font-size:12.5px; margin:0; }
+  .pref-linha[data-invalida="true"] .pref-num, .pref-linha[data-invalida="true"] textarea { border-color:var(--danger); }
+
+  /* Barra de salvar fixa no rodapé da tela: o botão só habilita quando algo mudou. */
+  .pref-barra { position:sticky; bottom:16px; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px 12px 20px; background:var(--card); border:1px solid var(--border-strong); border-radius:var(--radius-md); box-shadow:0 8px 24px rgba(var(--shadow-rgb),.12); }
+  .pref-status { font-size:13px; color:var(--muted-strong); display:flex; align-items:center; gap:8px; }
+  .pref-status::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--success); }
+  .pref-status[data-estado="alterado"] { color:var(--text); }
+  .pref-status[data-estado="alterado"]::before { background:var(--warning, #F5A524); }
+  .pref-status[data-estado="erro"] { color:var(--danger); }
+  .pref-status[data-estado="erro"]::before { background:var(--danger); }
+  .pref-acoes { display:flex; gap:8px; }
+
+  @media (max-width: 640px) {
+    .pref-card-cab, .pref-linha { padding-left:16px; padding-right:16px; }
+    .pref-linha { grid-template-columns:1fr; }
+    .pref-controle { justify-content:flex-start; flex-wrap:wrap; }
+    .pref-barra { flex-direction:column; align-items:stretch; }
+    .pref-acoes { justify-content:flex-end; }
+  }
 </style>
 </head>
 <body>
@@ -100,100 +141,104 @@
       </ul>
     </nav>
 
-    <div class="painel-main">
+    <div class="painel-main pref">
       <div class="cabecalho-pagina">
         <div class="textos">
           <div class="linha-titulo"><h1>Preferências</h1></div>
+          <p class="descricao">Ajuste como o atendimento no WhatsApp e o Quadro funcionam na sua conta.</p>
         </div>
       </div>
 
-      <div class="card">
-        <div class="config-geral-grupo">
-          <div class="textos">
+      <section class="card pref-card" aria-labelledby="pref-t-whats">
+        <header class="pref-card-cab">
+          <span class="pref-card-ico" data-icon="message-circle" data-size="18"></span>
+          <div><h2 id="pref-t-whats">Atendimento no WhatsApp</h2><p>Como o bot e a equipe humana trabalham juntos.</p></div>
+        </header>
+
+        <div class="pref-linha" id="linha-horario">
+          <div class="pref-textos">
             <h3>Horário de atendimento humano</h3>
-            <p>Quando o cliente pede pra falar com um atendente no bot do WhatsApp, fora desse horário (Seg. a Sex.) ele recebe um aviso em vez de acionar a equipe.</p>
+            <p>Quando o cliente pede para falar com um atendente, o bot só aciona a equipe dentro deste horário (segunda a sexta). Fora dele, o cliente recebe um aviso.</p>
           </div>
-          <div class="campos">
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-horario-inicio">Início (h)</label>
-              <input class="ds-input" type="number" id="cfg-horario-inicio" min="0" max="23" step="1">
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-horario-fim">Fim (h)</label>
-              <input class="ds-input" type="number" id="cfg-horario-fim" min="0" max="23" step="1">
-            </div>
+          <div class="pref-controle">
+            <label for="cfg-horario-inicio">Das</label><input class="ds-input pref-num" type="number" id="cfg-horario-inicio" min="0" max="23" step="1" inputmode="decimal" >
+            <label for="cfg-horario-fim">às</label><input class="ds-input pref-num" type="number" id="cfg-horario-fim" min="0" max="23" step="1" inputmode="decimal" >
+            <span class="pref-unidade">h</span>
           </div>
+          <p class="pref-erro" id="erro-horario" hidden></p>
         </div>
 
-        <div class="config-geral-grupo">
-          <div class="textos">
-            <h3>Janela de encerramento do atendimento</h3>
-            <p>Se o cliente não avançar a conversa no bot nesse tempo, o atendimento se encerra sozinho e reinicia do zero na próxima mensagem — evita respostas fora de contexto a uma pergunta de muito tempo atrás.</p>
+        <div class="pref-linha" id="linha-janela">
+          <div class="pref-textos">
+            <h3>Encerrar atendimento parado</h3>
+            <p>Se o cliente não avançar na conversa nesse tempo, o atendimento se encerra e recomeça do zero na próxima mensagem. Evita respostas fora de contexto a uma pergunta antiga.</p>
           </div>
-          <div class="campos">
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-janela-horas">Horas</label>
-              <input class="ds-input" type="number" id="cfg-janela-horas" min="0.25" max="8" step="0.25">
-            </div>
+          <div class="pref-controle">
+            <label for="cfg-janela-horas" class="pref-nota">Após</label><input class="ds-input pref-num" type="number" id="cfg-janela-horas" min="0.25" max="8" step="0.25" inputmode="decimal" >
+            <span class="pref-unidade">horas</span>
           </div>
+          <p class="pref-erro" id="erro-janela" hidden></p>
         </div>
 
-        <div class="config-geral-grupo">
-          <div class="textos">
+        <div class="pref-linha" id="linha-retomada">
+          <div class="pref-textos">
             <h3>Retomar atendimento</h3>
-            <p>Se o cliente parar de responder, o bot tenta chamá-lo de volta (mensagem curta), antes de o atendimento se encerrar — só dentro do horário de atendimento acima.</p>
+            <p>Se o cliente parar de responder, o bot tenta chamá-lo de volta com uma mensagem curta antes de encerrar. Só acontece dentro do horário de atendimento acima.</p>
           </div>
-          <div class="campos">
-            <div class="ds-campo" style="flex:0 0 auto">
-              <label class="ds-rotulo" for="cfg-retomada-ativa">Ativo</label>
-              <label class="ds-switch"><input type="checkbox" role="switch" id="cfg-retomada-ativa"><span class="ds-switch-trilho"></span></label>
+          <div class="pref-controle"><label class="ds-switch" title="Retomar atendimento"><input type="checkbox" role="switch" id="cfg-retomada-ativa" aria-label="Retomar atendimento"><span class="ds-switch-trilho"></span></label></div>
+          <div class="pref-sub" id="sub-retomada">
+            <div class="pref-controle">
+              <label for="cfg-retomada-tentativas">Tentar até</label><input class="ds-input pref-num" type="number" id="cfg-retomada-tentativas" min="1" max="3" step="1" inputmode="decimal" >
+              <span class="pref-unidade">vez(es) (máx. 3)</span>
             </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-retomada-tentativas">Tentativas (1-3)</label>
-              <input class="ds-input" type="number" id="cfg-retomada-tentativas" min="1" max="3" step="1">
-            </div>
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-retomada-intervalo">Intervalo (1-3h)</label>
-              <input class="ds-input" type="number" id="cfg-retomada-intervalo" min="1" max="3" step="1">
+            <div class="pref-controle">
+              <label for="cfg-retomada-intervalo">com intervalo de</label><input class="ds-input pref-num" type="number" id="cfg-retomada-intervalo" min="1" max="3" step="1" inputmode="decimal" >
+              <span class="pref-unidade">hora(s) (1 a 3)</span>
             </div>
           </div>
+          <p class="pref-erro" id="erro-retomada" hidden></p>
+        </div>
+      </section>
+
+      <section class="card pref-card" aria-labelledby="pref-t-quadro">
+        <header class="pref-card-cab">
+          <span class="pref-card-ico" data-icon="kanban" data-size="18"></span>
+          <div><h2 id="pref-t-quadro">Quadro e pedidos</h2><p>O que aparece no Quadro e nos avisos dos pedidos.</p></div>
+        </header>
+
+        <div class="pref-linha" id="linha-quadro">
+          <div class="pref-textos">
+            <h3>Ocultar pedidos antigos da última coluna</h3>
+            <p>Pedidos parados na etapa final há mais tempo que isso somem do Quadro. Eles continuam existindo e aparecem normalmente em Pedidos.</p>
+          </div>
+          <div class="pref-controle">
+            <label for="cfg-quadro-dias" class="pref-nota">Após</label><input class="ds-input pref-num" type="number" id="cfg-quadro-dias" min="1" max="3650" step="1" inputmode="decimal" >
+            <span class="pref-unidade">dias</span>
+          </div>
+          <p class="pref-erro" id="erro-quadro" hidden></p>
         </div>
 
-        <div class="config-geral-grupo">
-          <div class="textos">
-            <h3>Visibilidade da última coluna do Quadro</h3>
-            <p>Pedidos parados há mais tempo que isso na última coluna (a etapa final) somem da visão do Quadro — continuam existindo e aparecem normalmente em Pedidos.</p>
+        <div class="pref-linha" id="linha-aviso">
+          <div class="pref-textos">
+            <h3>Aviso em pedidos de canal próprio</h3>
+            <p>Mensagem mostrada no topo do pedido quando a origem não é marketplace (Shopee, TikTok ou Mercado Livre). Cada pedido pode fechar o aviso; desligar aqui remove de todos.</p>
           </div>
-          <div class="campos">
-            <div class="ds-campo">
-              <label class="ds-rotulo" for="cfg-quadro-dias">Dias</label>
-              <input class="ds-input" type="number" id="cfg-quadro-dias" min="1" step="1">
-            </div>
+          <div class="pref-controle"><label class="ds-switch" title="Mostrar aviso"><input type="checkbox" role="switch" id="cfg-mensagem-aviso-ativa" aria-label="Mostrar aviso"><span class="ds-switch-trilho"></span></label></div>
+          <div class="pref-msg" id="msg-aviso">
+            <label for="cfg-mensagem-aviso" class="pref-nota" style="margin:0 0 6px">Mensagem</label>
+            <textarea class="ds-textarea" id="cfg-mensagem-aviso" rows="2" maxlength="300"></textarea>
+            <div class="pref-msg-rodape"><span>Aparece como um aviso no topo do pedido.</span><span id="msg-contador">0/300</span></div>
           </div>
+          <p class="pref-erro" id="erro-aviso" hidden></p>
         </div>
+      </section>
 
-        <div class="config-geral-grupo">
-          <div class="textos">
-            <h3>Mensagem aviso pedido</h3>
-            <p>Aviso mostrado no topo do modal de pedido quando a origem não é marketplace (Shopee/TikTok/Mercado Livre). Pode ser fechado por pedido — desligando aqui, some de todos.</p>
-          </div>
-          <div class="campos" style="flex:1 1 320px;align-items:flex-start">
-            <div class="ds-campo" style="flex:1 1 260px">
-              <label class="ds-rotulo" for="cfg-mensagem-aviso">Mensagem</label>
-              <textarea class="ds-textarea" id="cfg-mensagem-aviso" rows="2" style="min-height:0"></textarea>
-            </div>
-            <div class="ds-campo" style="flex:0 0 auto">
-              <label class="ds-rotulo" for="cfg-mensagem-aviso-ativa">Ativo</label>
-              <label class="ds-switch"><input type="checkbox" role="switch" id="cfg-mensagem-aviso-ativa"><span class="ds-switch-trilho"></span></label>
-            </div>
-          </div>
+      <div class="pref-barra" role="region" aria-label="Salvar preferências">
+        <div class="pref-status" id="pref-status" data-estado="salvo" role="status" aria-live="polite">Tudo salvo</div>
+        <div class="pref-acoes">
+          <button type="button" class="btn-secundario" id="btn-descartar" disabled>Descartar</button>
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-geral" disabled>Salvar alterações</button>
         </div>
-
-        <div class="config-geral-acoes">
-          <button type="button" class="ds-btn ds-btn-primario" id="btn-salvar-geral">Salvar</button>
-        </div>
-        <div class="config-geral-erro" id="config-geral-erro" hidden></div>
-        <div class="config-geral-salvo" id="config-geral-salvo" hidden>Salvo!</div>
       </div>
     </div>
   </div>
@@ -203,54 +248,149 @@
   <script src="/ds/components.js"></script>
   <script src="/crm/shell.js"></script>
   <script>
-    function atualizarCamposRetomada() {
-      const ativa = document.getElementById('cfg-retomada-ativa').checked;
-      document.getElementById('cfg-retomada-tentativas').disabled = !ativa;
-      document.getElementById('cfg-retomada-intervalo').disabled = !ativa;
+    const $ = (id) => document.getElementById(id);
+    const CAMPOS = ['cfg-horario-inicio', 'cfg-horario-fim', 'cfg-janela-horas', 'cfg-retomada-ativa', 'cfg-retomada-tentativas',
+      'cfg-retomada-intervalo', 'cfg-quadro-dias', 'cfg-mensagem-aviso', 'cfg-mensagem-aviso-ativa'];
+    let original = null;   // valores como estão salvos no servidor
+    let salvando = false;
+
+    function valorCampo(id) {
+      const el = $(id);
+      return el.type === 'checkbox' ? el.checked : el.value.trim();
     }
-    document.getElementById('cfg-retomada-ativa').addEventListener('change', atualizarCamposRetomada);
+    function estadoAtual() { return Object.fromEntries(CAMPOS.map((id) => [id, valorCampo(id)])); }
+    function alterado() { return original && CAMPOS.some((id) => String(valorCampo(id)) !== String(original[id])); }
+
+    function definirStatus(estado, texto) {
+      const el = $('pref-status');
+      el.dataset.estado = estado;
+      el.textContent = texto;
+    }
+    function atualizarDependencias() {
+      const retomada = $('cfg-retomada-ativa').checked;
+      $('cfg-retomada-tentativas').disabled = !retomada;
+      $('cfg-retomada-intervalo').disabled = !retomada;
+      $('sub-retomada').dataset.desligado = String(!retomada);
+      $('msg-aviso').dataset.desligado = String(!$('cfg-mensagem-aviso-ativa').checked);
+      $('msg-contador').textContent = $('cfg-mensagem-aviso').value.length + '/300';
+    }
+    function atualizarBarra() {
+      atualizarDependencias();
+      const mudou = alterado();
+      $('btn-salvar-geral').disabled = !mudou || salvando;
+      $('btn-descartar').disabled = !mudou || salvando;
+      if (salvando) return;
+      if (mudou) definirStatus('alterado', 'Há alterações não salvas');
+      else if ($('pref-status').dataset.estado !== 'salvo') definirStatus('salvo', 'Tudo salvo');
+    }
+
+    function preencher(cfg) {
+      $('cfg-horario-inicio').value = cfg.horario_atendimento_inicio;
+      $('cfg-horario-fim').value = cfg.horario_atendimento_fim;
+      $('cfg-janela-horas').value = cfg.bot_janela_encerramento_minutos / 60;
+      $('cfg-retomada-ativa').checked = cfg.bot_retomada_ativa;
+      $('cfg-retomada-tentativas').value = cfg.bot_retomada_tentativas;
+      $('cfg-retomada-intervalo').value = cfg.bot_retomada_intervalo_horas;
+      $('cfg-quadro-dias').value = cfg.quadro_dias_ultima_coluna;
+      $('cfg-mensagem-aviso').value = cfg.mensagem_aviso_pedido;
+      $('cfg-mensagem-aviso-ativa').checked = cfg.mensagem_aviso_pedido_ativo;
+      original = estadoAtual();
+      limparErros();
+      atualizarBarra();
+    }
 
     async function carregar() {
       const res = await apiFetch('/crm/api/configuracoes-gerais');
-      const cfg = await res.json();
-      document.getElementById('cfg-horario-inicio').value = cfg.horario_atendimento_inicio;
-      document.getElementById('cfg-horario-fim').value = cfg.horario_atendimento_fim;
-      document.getElementById('cfg-janela-horas').value = cfg.bot_janela_encerramento_minutos / 60;
-      document.getElementById('cfg-retomada-ativa').checked = cfg.bot_retomada_ativa;
-      document.getElementById('cfg-retomada-tentativas').value = cfg.bot_retomada_tentativas;
-      document.getElementById('cfg-retomada-intervalo').value = cfg.bot_retomada_intervalo_horas;
-      document.getElementById('cfg-quadro-dias').value = cfg.quadro_dias_ultima_coluna;
-      document.getElementById('cfg-mensagem-aviso').value = cfg.mensagem_aviso_pedido;
-      document.getElementById('cfg-mensagem-aviso-ativa').checked = cfg.mensagem_aviso_pedido_ativo;
-      atualizarCamposRetomada();
+      preencher(await res.json());
     }
     carregar();
 
-    document.getElementById('btn-salvar-geral').addEventListener('click', async () => {
-      const erroEl = document.getElementById('config-geral-erro');
-      const salvoEl = document.getElementById('config-geral-salvo');
-      erroEl.hidden = true;
-      salvoEl.hidden = true;
+    // ---- Validação no cliente (espelha as regras do servidor) ----
+    const LINHAS = { horario: 'linha-horario', janela: 'linha-janela', retomada: 'linha-retomada', quadro: 'linha-quadro', aviso: 'linha-aviso' };
+    function limparErros() {
+      Object.entries(LINHAS).forEach(([k, linha]) => {
+        $('erro-' + k).hidden = true;
+        $(linha).dataset.invalida = 'false';
+      });
+    }
+    function erroEm(chave, texto, erros) { erros[chave] = texto; }
+    function validar() {
+      const erros = {};
+      const ini = Number($('cfg-horario-inicio').value), fim = Number($('cfg-horario-fim').value);
+      if (!Number.isInteger(ini) || !Number.isInteger(fim) || $('cfg-horario-inicio').value === '' || $('cfg-horario-fim').value === '') erroEm('horario', 'Informe o início e o fim em horas inteiras.', erros);
+      else if (ini < 0 || ini > 23 || fim < 0 || fim > 23) erroEm('horario', 'Use horas entre 0 e 23.', erros);
+      else if (fim <= ini) erroEm('horario', 'O fim precisa ser depois do início.', erros);
+      const horas = Number($('cfg-janela-horas').value);
+      if ($('cfg-janela-horas').value === '' || !Number.isFinite(horas) || horas < 0.25 || horas > 8 || !Number.isInteger(Math.round(horas * 60))) erroEm('janela', 'Use um tempo entre 0,25 e 8 horas.', erros);
+      if ($('cfg-retomada-ativa').checked) {
+        const t = Number($('cfg-retomada-tentativas').value), i = Number($('cfg-retomada-intervalo').value);
+        if (!Number.isInteger(t) || t < 1 || t > 3) erroEm('retomada', 'As tentativas precisam ser de 1 a 3.', erros);
+        else if (!Number.isInteger(i) || i < 1 || i > 3) erroEm('retomada', 'O intervalo precisa ser de 1 a 3 horas.', erros);
+      }
+      const dias = Number($('cfg-quadro-dias').value);
+      if ($('cfg-quadro-dias').value === '' || !Number.isInteger(dias) || dias < 1) erroEm('quadro', 'Informe pelo menos 1 dia.', erros);
+      if (!$('cfg-mensagem-aviso').value.trim()) erroEm('aviso', 'A mensagem do aviso não pode ficar vazia.', erros);
+      return erros;
+    }
+    function mostrarErros(erros) {
+      limparErros();
+      Object.entries(erros).forEach(([k, texto]) => {
+        $('erro-' + k).textContent = texto;
+        $('erro-' + k).hidden = false;
+        $(LINHAS[k]).dataset.invalida = 'true';
+      });
+      const primeira = Object.keys(erros)[0];
+      if (primeira) $(LINHAS[primeira]).scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    CAMPOS.forEach((id) => {
+      $(id).addEventListener('input', atualizarBarra);
+      $(id).addEventListener('change', atualizarBarra);
+    });
+    $('btn-descartar').addEventListener('click', () => {
+      CAMPOS.forEach((id) => {
+        const el = $(id);
+        if (el.type === 'checkbox') el.checked = !!original[id]; else el.value = original[id];
+      });
+      limparErros();
+      atualizarBarra();
+    });
+
+    // Aviso do navegador ao sair com alterações pendentes.
+    window.addEventListener('beforeunload', (e) => { if (alterado() && !salvando) { e.preventDefault(); e.returnValue = ''; } });
+
+    $('btn-salvar-geral').addEventListener('click', async () => {
+      const erros = validar();
+      if (Object.keys(erros).length) { mostrarErros(erros); definirStatus('erro', 'Corrija os campos destacados'); return; }
+      limparErros();
+      salvando = true;
+      $('btn-salvar-geral').disabled = true; $('btn-descartar').disabled = true;
+      definirStatus('alterado', 'Salvando…');
       const body = {
-        horario_atendimento_inicio: Number(document.getElementById('cfg-horario-inicio').value),
-        horario_atendimento_fim: Number(document.getElementById('cfg-horario-fim').value),
-        bot_janela_encerramento_minutos: Math.round(Number(document.getElementById('cfg-janela-horas').value) * 60),
-        bot_retomada_ativa: document.getElementById('cfg-retomada-ativa').checked,
-        bot_retomada_tentativas: Number(document.getElementById('cfg-retomada-tentativas').value),
-        bot_retomada_intervalo_horas: Number(document.getElementById('cfg-retomada-intervalo').value),
-        quadro_dias_ultima_coluna: Number(document.getElementById('cfg-quadro-dias').value),
-        mensagem_aviso_pedido: document.getElementById('cfg-mensagem-aviso').value.trim(),
-        mensagem_aviso_pedido_ativo: document.getElementById('cfg-mensagem-aviso-ativa').checked,
+        horario_atendimento_inicio: Number($('cfg-horario-inicio').value),
+        horario_atendimento_fim: Number($('cfg-horario-fim').value),
+        bot_janela_encerramento_minutos: Math.round(Number($('cfg-janela-horas').value) * 60),
+        bot_retomada_ativa: $('cfg-retomada-ativa').checked,
+        bot_retomada_tentativas: Number($('cfg-retomada-tentativas').value),
+        bot_retomada_intervalo_horas: Number($('cfg-retomada-intervalo').value),
+        quadro_dias_ultima_coluna: Number($('cfg-quadro-dias').value),
+        mensagem_aviso_pedido: $('cfg-mensagem-aviso').value.trim(),
+        mensagem_aviso_pedido_ativo: $('cfg-mensagem-aviso-ativa').checked,
       };
-      const res = await apiFetch('/crm/api/configuracoes-gerais', { method: 'PATCH', body: JSON.stringify(body) });
-      if (!res.ok) {
-        const dados = await res.json().catch(() => ({}));
-        erroEl.textContent = dados.error || 'Erro ao salvar';
-        erroEl.hidden = false;
+      let res;
+      try { res = await apiFetch('/crm/api/configuracoes-gerais', { method: 'PATCH', body: JSON.stringify(body) }); }
+      catch (e) { res = null; }
+      salvando = false;
+      if (!res || !res.ok) {
+        const dados = res ? await res.json().catch(() => ({})) : {};
+        definirStatus('erro', dados.error || 'Não foi possível salvar. Tente de novo.');
+        $('btn-salvar-geral').disabled = false; $('btn-descartar').disabled = false;
         return;
       }
-      salvoEl.hidden = false;
-      setTimeout(() => { salvoEl.hidden = true; }, 2000);
+      original = estadoAtual();
+      definirStatus('salvo', 'Preferências salvas');
+      atualizarBarra();
+      setTimeout(() => { if (!alterado() && $('pref-status').dataset.estado === 'salvo') definirStatus('salvo', 'Tudo salvo'); }, 2500);
     });
   </script>
 </body>
