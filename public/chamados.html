@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Chamados</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="ds-topbar-acoes">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/relatorios.html"><span class="ds-menu-icone" data-icon="chart-column"></span><span class="ds-menu-rotulo">Relatórios</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Preferências</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/plano-cobranca.html">Plano e cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <header class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto">
+          <h1 class="ds-pagina-cab-titulo">Chamados</h1>
+        </div>
+      </header>
+
+      <div class="ds-tabela" role="table" aria-label="Chamados"
+           style="--ds-colunas: minmax(0,1fr) minmax(0,1.4fr) 110px 100px 150px 110px">
+        <div class="ds-filtros">
+          <div class="ds-select"><select id="f-status" aria-label="Status">
+            <option value="">Qualquer status</option>
+            <option value="aberto">Aberto</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="aguardando_cliente">Aguardando cliente</option>
+            <option value="resolvido">Resolvido</option>
+            <option value="fechado">Fechado</option>
+          </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          <div class="ds-select"><select id="f-urgencia" aria-label="Urgência">
+            <option value="">Qualquer urgência</option>
+            <option value="baixa">Baixa</option>
+            <option value="media">Média</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+        </div>
+        <div class="ds-tabela-cabecalho" role="row">
+          <span role="columnheader">Cliente</span><span role="columnheader">Descrição</span><span role="columnheader">Categoria</span>
+          <span role="columnheader">Urgência</span><span role="columnheader">Status</span><span role="columnheader"></span>
+        </div>
+        <div id="linhas-chamados"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="CRM"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    let chamadosAtuais = [];
+
+    const ROTULO_CATEGORIA = { bug: 'Bug', duvida_tecnica: 'Dúvida técnica', reclamacao: 'Reclamação', outro: 'Outro' };
+    const ROTULO_URGENCIA = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+    const BADGE_URGENCIA = { baixa: 'ds-badge-info', media: 'ds-badge-aviso', alta: 'ds-badge-aviso', critica: 'ds-badge-erro' };
+    const ROTULO_STATUS = { aberto: 'Aberto', em_andamento: 'Em andamento', aguardando_cliente: 'Aguardando cliente', resolvido: 'Resolvido', fechado: 'Fechado' };
+
+    async function carregar() {
+      const params = new URLSearchParams();
+      if (document.getElementById('f-status').value) params.set('status', document.getElementById('f-status').value);
+      if (document.getElementById('f-urgencia').value) params.set('urgencia', document.getElementById('f-urgencia').value);
+      const res = await apiFetch(`/crm/api/chamados?${params}`);
+      chamadosAtuais = await res.json();
+      renderizar();
+    }
+
+    ['f-status', 'f-urgencia'].forEach((id) => document.getElementById(id).addEventListener('change', carregar));
+
+    function renderizar() {
+      const container = document.getElementById('linhas-chamados');
+      container.innerHTML = chamadosAtuais.length ? chamadosAtuais.map((ch) => `
+        <div class="ds-tabela-linha ds-tabela-linha-clicavel" role="row" tabindex="0" data-id="${ch.id}">
+          <span role="cell" data-rotulo="Cliente"><span class="ds-tabela-primario">${escapeHtml(ch.cliente_nome)}</span><br><span style="color:var(--muted);font-size:12.5px">${escapeHtml(ch.cliente_telefone || '')}</span></span>
+          <span role="cell" data-rotulo="Descrição">${escapeHtml((ch.descricao || '').slice(0, 80))}${(ch.descricao || '').length > 80 ? '…' : ''}</span>
+          <span role="cell" data-rotulo="Categoria">${escapeHtml(ROTULO_CATEGORIA[ch.categoria] || ch.categoria || '—')}</span>
+          <span role="cell" data-rotulo="Urgência"><span class="ds-badge ${BADGE_URGENCIA[ch.urgencia]} ds-badge-sm">${ROTULO_URGENCIA[ch.urgencia]}</span></span>
+          <span role="cell" data-rotulo="Status">
+            <div class="ds-select ds-select-sm"><select data-acao="mudar-status" data-id="${ch.id}">
+              ${Object.entries(ROTULO_STATUS).map(([v, r]) => `<option value="${v}" ${v === ch.status ? 'selected' : ''}>${r}</option>`).join('')}
+            </select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          </span>
+          <span role="cell">
+            <button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" data-acao="detalhe" data-id="${ch.id}">Detalhe</button>
+          </span>
+        </div>
+      `).join('') : `<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhum chamado com esses filtros</p></div>`;
+
+      container.querySelectorAll('[data-acao="mudar-status"]').forEach((select) => {
+        select.addEventListener('change', async () => {
+          await apiFetch(`/crm/api/chamados/${select.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ status: select.value }) });
+          carregar();
+        });
+      });
+      container.querySelectorAll('[data-acao="detalhe"]').forEach((btn) => {
+        btn.addEventListener('click', () => abrirDetalheChamado(btn.dataset.id));
+      });
+    }
+
+    function abrirDetalheChamado(id) {
+      const ch = chamadosAtuais.find((x) => x.id === id);
+      if (!ch) return;
+      abrirModal('<h3>Detalhe do chamado</h3>', `
+        <div class="ds-form">
+          <p class="modal-texto"><strong>Produto afetado:</strong> ${escapeHtml(ch.produto_afetado || '—')}</p>
+          <p class="modal-texto"><strong>Descrição:</strong><br>${escapeHtml(ch.descricao)}</p>
+          <div class="ds-campo"><label class="ds-rotulo" for="ch-resumo">Resumo da resolução</label><textarea class="ds-textarea" id="ch-resumo">${escapeHtml(ch.resolucao_resumo || '')}</textarea></div>
+          <div class="modal-erro" id="ch-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="ch-cancelar">Fechar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="ch-salvar">Salvar resumo</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('ch-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('ch-salvar').addEventListener('click', async () => {
+        const res = await apiFetch(`/crm/api/chamados/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ resolucao_resumo: document.getElementById('ch-resumo').value.trim() || null }),
+        });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('ch-erro').textContent = dados.error || 'Falha ao salvar';
+          return;
+        }
+        fecharModal();
+        carregar();
+      });
+    }
+
+    carregar();
+  </script>
+</body>
+</html>

@@ -105,6 +105,34 @@ painelSidebar.addEventListener('ds-menu-alternar', (e) => {
     if (d && el && d.encaminhamentos_abertos > 0) { el.textContent = d.encaminhamentos_abertos; el.hidden = false; }
   }).catch(() => {});
 })();
+
+// Itens "Leads"/"Chamados" — só pro tenant com o perfil de agente da própria
+// Kyvvo (atendimento geral/suporte/vendas); nenhum outro tenant do CRM vê
+// esses menus. Mesmo padrão de injeção do item "Atendimento" acima.
+(function adicionarMenuLeadsEChamados() {
+  apiFetch('/crm/api/agente/config').then((r) => (r.ok ? r.json() : null)).then((config) => {
+    if (!config || config.perfil_agente !== 'kyvvo_atendimento') return;
+    const lista = painelSidebar.querySelector('.ds-menu-lista');
+    if (!lista) return;
+    const atendimento = lista.querySelector('a[href="/crm/atendimento.html"]');
+    const ancora = atendimento && atendimento.parentElement;
+    if (!ancora) return;
+    let ancoraAtual = ancora;
+    if (!lista.querySelector('a[href="/crm/leads.html"]')) {
+      const liLeads = document.createElement('li');
+      liLeads.innerHTML = '<a class="ds-menu-link" href="/crm/leads.html"><span class="ds-menu-icone">' + icon('circle-dollar-sign', 18) + '</span><span class="ds-menu-rotulo">Leads</span></a>';
+      ancoraAtual.after(liLeads);
+      if (liLeads.querySelector('a').getAttribute('href') === window.location.pathname) liLeads.querySelector('a').classList.add('ds-menu-link-ativo');
+      ancoraAtual = liLeads;
+    }
+    if (!lista.querySelector('a[href="/crm/chamados.html"]')) {
+      const liChamados = document.createElement('li');
+      liChamados.innerHTML = '<a class="ds-menu-link" href="/crm/chamados.html"><span class="ds-menu-icone">' + icon('circle-alert', 18) + '</span><span class="ds-menu-rotulo">Chamados</span></a>';
+      ancoraAtual.after(liChamados);
+      if (liChamados.querySelector('a').getAttribute('href') === window.location.pathname) liChamados.querySelector('a').classList.add('ds-menu-link-ativo');
+    }
+  }).catch(() => {});
+})();
 document.querySelectorAll('.ds-menu-link[href], .ds-menu-sublink[href]').forEach((item) => {
   if (item.getAttribute('href') !== window.location.pathname) return;
   item.classList.add(item.classList.contains('ds-menu-sublink') ? 'ds-menu-sublink-ativo' : 'ds-menu-link-ativo');

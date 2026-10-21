@@ -14,6 +14,8 @@ const { inicializarModelosPadrao } = require('./lib/mensagens');
 const { resolverSegmento } = require('./lib/segmentos');
 const campanhas = require('./lib/campanhas');
 const { inicializarEtapasPadrao, buscarEtapaPronto } = require('./lib/etapas');
+const leads = require('./lib/leads');
+const chamados = require('./lib/chamados');
 const { buscarSugestoesDuplicados, mesclarClientes } = require('./lib/duplicados');
 const { parseCsv, importarClientesCsv, processarImportacaoNfeEmSegundoPlano } = require('./lib/importacoes');
 const { tenantPrecisaOnboarding, confirmarOnboarding } = require('./lib/onboarding');
@@ -2357,7 +2359,15 @@ async function build(opcoes = {}) {
   };
   const depsEnvio = () => ({ enviarTexto: fastify.agente.deps.enviarTexto || enviarTexto, agora: fastify.agente.deps.agora });
 
-  fastify.get('/crm/api/agente/config', { preHandler: fastify.authenticate }, async (request) => atendimento.obterConfig(pool, request.user.tenantId));
+  fastify.get('/crm/api/agente/config', { preHandler: fastify.authenticate }, async (request) => {
+    const config = await atendimento.obterConfig(pool, request.user.tenantId);
+    // perfil_agente não está no obterConfig genérico do pacote (decide
+    // ferramentas/gatilhos, não é exibido na tela de config do agente em si)
+    // — busca à parte só pra habilitar/desabilitar os menus Leads/Chamados
+    // no shell (ver public/shell.js).
+    const { rows: [perfil] } = await pool.query('select perfil_agente from crm_agente_config where tenant_id = $1', [request.user.tenantId]);
+    return { ...config, perfil_agente: (perfil && perfil.perfil_agente) || null };
+  });
 
   fastify.put('/crm/api/agente/config', { preHandler: fastify.authenticate }, atende(async (request) => {
     const { tenantId, userId } = request.user;
@@ -2613,6 +2623,113 @@ async function build(opcoes = {}) {
 
   fastify.get('/crm/api/notificacoes/historico', { preHandler: fastify.authenticate }, async (request) => {
     return listarHistoricoNotificacoes(pool, request.user.tenantId, request.query || {});
+  });
+
+  // --- Leads (funil de vendas) e Chamados (suporte) — hoje usado só pelo
+  // tenant da própria Kyvvo (bot de atendimento geral/suporte/vendas, ver
+  // lib/agente/ferramentas-kyvvo.js), mas é feature genérica do produto.
+  // Mesmo padrão fino de /crm/api/etapas e /crm/api/pedidos, lógica em
+  // lib/leads.js/lib/chamados.js.
+  fastify.get('/crm/api/leads-etapas', { preHandler: fastify.authenticate }, async (request) => {
+    return leads.listarEtapasLeads(pool, request.user.tenantId);
+  });
+
+  fastify.post('/crm/api/leads-etapas', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const etapa = await leads.criarEtapaLead(pool, request.user.tenantId, nome);
+    return reply.code(201).send(etapa);
+  });
+
+  fastify.patch('/crm/api/leads-etapas/reordenar', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const ids = request.body?.ids;
+    if (!Array.isArray(ids) || !ids.length) return reply.code(400).send({ error: 'ids é obrigatório' });
+    await leads.reordenarEtapasLeads(pool, request.user.tenantId, ids);
+    return { ok: true };
+  });
+
+  fastify.patch('/crm/api/leads-etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const nome = (request.body?.nome || '').trim();
+    if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
+    const etapa = await leads.renomearEtapaLead(pool, request.user.tenantId, request.params.id, nome);
+    if (!etapa) return reply.code(404).send({ error: 'Etapa não encontrada' });
+    return etapa;
+  });
+
+  fastify.delete('/crm/api/leads-etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const r = await leads.apagarEtapaLead(pool, request.user.tenantId, request.params.id);
+    if (r.status) return reply.code(r.status).send({ error: r.erro });
+    return r;
+  });
+
+  fastify.post('/crm/api/leads', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId } = request.user;
+    const { telefone, nome_cliente: nomeCliente, empresa, produto_interesse: produtoInteresse, segmento, porte, plano_interesse: planoInteresse, valor_estimado: valorEstimado, observacoes } = request.body || {};
+    if (!telefone || !telefone.trim()) return reply.code(400).send({ error: 'Telefone é obrigatório' });
+    const cliente = await encontrarOuCriarPorTelefone(pool, tenantId, { telefone, nome: nomeCliente, origem: 'Manual' });
+    const lead = await leads.garantirLeadAberto(pool, { tenantId, clienteId: cliente.id, origem: 'Manual' });
+    const leadAtualizado = await leads.atualizarLead(pool, tenantId, lead.id, { empresa, produtoInteresse, segmento, porte, planoInteresse, valorEstimado, observacoes });
+    return reply.code(201).send(leadAtualizado);
+  });
+
+  fastify.get('/crm/api/leads', { preHandler: fastify.authenticate }, async (request) => {
+    const { etapa_id: etapaId, aberto } = request.query || {};
+    const abertoBool = aberto === 'true' ? true : aberto === 'false' ? false : undefined;
+    return leads.listarLeads(pool, request.user.tenantId, { etapaId, aberto: abertoBool });
+  });
+
+  fastify.get('/crm/api/leads/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const lead = await leads.obterLead(pool, request.user.tenantId, request.params.id);
+    if (!lead) return reply.code(404).send({ error: 'Lead não encontrado' });
+    return lead;
+  });
+
+  fastify.patch('/crm/api/leads/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { valor_estimado: valorEstimado, observacoes, empresa, produto_interesse: produtoInteresse, segmento, porte, plano_interesse: planoInteresse } = request.body || {};
+    const lead = await leads.atualizarLead(pool, request.user.tenantId, request.params.id, { valorEstimado, observacoes, empresa, produtoInteresse, segmento, porte, planoInteresse });
+    if (!lead) return reply.code(404).send({ error: 'Lead não encontrado' });
+    return lead;
+  });
+
+  fastify.patch('/crm/api/leads/:id/etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { etapa_id: etapaId, motivo_perda: motivoPerda } = request.body || {};
+    if (!etapaId) return reply.code(400).send({ error: 'etapa_id é obrigatório' });
+    const lead = await leads.moverEtapaLead(pool, request.user.tenantId, request.params.id, etapaId, { motivoPerda });
+    if (!lead) return reply.code(404).send({ error: 'Lead não encontrado' });
+    return lead;
+  });
+
+  fastify.get('/crm/api/chamados', { preHandler: fastify.authenticate }, async (request) => {
+    const { status, urgencia } = request.query || {};
+    return chamados.listarChamados(pool, request.user.tenantId, { status, urgencia });
+  });
+
+  fastify.post('/crm/api/chamados', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { cliente_id: clienteId, categoria, descricao, produto_afetado: produtoAfetado, urgencia } = request.body || {};
+    if (!clienteId) return reply.code(400).send({ error: 'cliente_id é obrigatório' });
+    try {
+      const chamado = await chamados.criarChamado(pool, { tenantId: request.user.tenantId, clienteId, categoria, descricao, produtoAfetado, urgencia });
+      return reply.code(201).send(chamado);
+    } catch (erro) {
+      return reply.code(400).send({ error: erro.message });
+    }
+  });
+
+  fastify.get('/crm/api/chamados/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const chamado = await chamados.obterChamado(pool, request.user.tenantId, request.params.id);
+    if (!chamado) return reply.code(404).send({ error: 'Chamado não encontrado' });
+    return chamado;
+  });
+
+  fastify.patch('/crm/api/chamados/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { status, resolucao_resumo: resolucaoResumo } = request.body || {};
+    try {
+      const chamado = await chamados.atualizarStatusChamado(pool, request.user.tenantId, request.params.id, { status, resolucaoResumo });
+      if (!chamado) return reply.code(404).send({ error: 'Chamado não encontrado' });
+      return chamado;
+    } catch (erro) {
+      return reply.code(400).send({ error: erro.message });
+    }
   });
 
   return fastify;

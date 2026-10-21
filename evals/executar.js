@@ -11,7 +11,8 @@ const DENTRO_DO_HORARIO = new Date('2026-10-12T15:00:00Z'); // segunda, 12:00 em
 const FORA_DO_HORARIO = new Date('2026-10-12T22:00:00Z'); // segunda, 19:00 em São Paulo
 
 const TABELAS_LIMPEZA = ['crm_handoffs', 'crm_agente_execucoes', 'crm_eventos', 'crm_anexos', 'crm_pedidos', 'crm_tags', 'crm_mensagens_whatsapp',
-  'crm_conversas_whatsapp', 'crm_clientes', 'crm_etapas', 'crm_agente_conhecimento', 'crm_agente_config', 'crm_campos_customizados'];
+  'crm_conversas_whatsapp', 'crm_clientes', 'crm_etapas', 'crm_agente_conhecimento', 'crm_agente_config', 'crm_campos_customizados',
+  'crm_leads', 'crm_leads_etapas', 'crm_chamados'];
 
 async function prepararTenant(pool, { seed, conhecimento }) {
   const tenantId = crypto.randomUUID();

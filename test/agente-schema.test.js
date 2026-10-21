@@ -17,6 +17,10 @@ const B = crypto.randomUUID();
 const TABELAS_AGENTE = [
   'crm_agente_config', 'crm_agente_conhecimento', 'crm_agente_execucoes', 'crm_handoffs', 'crm_anexos',
 ];
+// Leads/Chamados (perfil kyvvo_atendimento) — mesma checagem genérica de
+// tenant_id, tabelas novas e separadas de crm_pedidos/crm_etapas de
+// propósito (ver db/046_crm_leads.sql).
+const TABELAS_LEADS_CHAMADOS = ['crm_leads', 'crm_leads_etapas', 'crm_chamados'];
 
 before(async () => { if (temBanco) await migrar(); });
 after(async () => {
@@ -39,6 +43,38 @@ test('toda tabela nova do agente tem tenant_id uuid not null', opts, async () =>
     assert.equal(r.data_type, 'uuid', r.table_name);
     assert.equal(r.is_nullable, 'NO', r.table_name);
   }
+});
+
+test('toda tabela de Leads/Chamados tem tenant_id uuid not null', opts, async () => {
+  const { rows } = await pool.query(
+    `select table_name, is_nullable, data_type from information_schema.columns
+      where column_name = 'tenant_id' and table_name = any($1)`, [TABELAS_LEADS_CHAMADOS]);
+  assert.equal(rows.length, TABELAS_LEADS_CHAMADOS.length);
+  for (const r of rows) {
+    assert.equal(r.data_type, 'uuid', r.table_name);
+    assert.equal(r.is_nullable, 'NO', r.table_name);
+  }
+});
+
+test('crm_agente_config.perfil_agente existe, default basic3d_producao_sob_encomenda', opts, async () => {
+  const { rows } = await pool.query(
+    `select column_default from information_schema.columns
+      where table_name = 'crm_agente_config' and column_name = 'perfil_agente'`);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].column_default, /basic3d_producao_sob_encomenda/);
+});
+
+test('crm_conversas_whatsapp.turnos_contados_desde existe (fix do limite de turnos permanente)', opts, async () => {
+  const { rows } = await pool.query(
+    `select 1 from information_schema.columns
+      where table_name = 'crm_conversas_whatsapp' and column_name = 'turnos_contados_desde'`);
+  assert.equal(rows.length, 1);
+});
+
+test('seed da Basic (reaplicado depois do perfil_agente existir): continua 100% zero mudança de comportamento', opts, async () => {
+  await semearAgente(pool, A, seed, { modo: 'rascunho' });
+  const cfg = await pool.query('select perfil_agente from crm_agente_config where tenant_id = $1', [A]);
+  assert.equal(cfg.rows[0].perfil_agente, 'basic3d_producao_sob_encomenda', 'seed sem perfil_agente na chave config deve cair no default, não ficar null');
 });
 
 test('seed da Basic: reproduzível (2x = mesmo estado) e isolado por tenant', opts, async () => {

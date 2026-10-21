@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kyvvo CRM — Leads</title>
+<link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('crm_tema')==='dark'?'dark':'light');})();</script>
+<link rel="stylesheet" href="/ds/tokens.css">
+<link rel="stylesheet" href="/ds/components.css">
+<link rel="stylesheet" href="/crm/shell.css">
+</head>
+<body>
+  <header class="ds-topbar">
+    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+      <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
+      <span class="ds-topbar-kyvvo">kyvvo</span>
+    </a>
+    <div class="ds-topbar-acoes">
+    <div class="ds-notificacoes" id="notificacoes-sino">
+      <button class="ds-notificacoes-btn" id="notificacoes-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Notificações">
+        <span data-icon="bell" data-size="20"></span>
+        <span class="ds-notificacoes-contagem" id="notificacoes-contagem" hidden></span>
+      </button>
+      <div class="ds-notificacoes-painel" role="menu" hidden>
+        <div class="ds-notificacoes-lista" id="notificacoes-lista"></div>
+      </div>
+    </div>
+    <div class="topo-perfil" id="topo-perfil">
+      <button class="topo-perfil-gatilho ds-topbar-perfil" id="topo-perfil-gatilho" type="button" aria-haspopup="true" aria-expanded="false">
+        <div class="ds-topbar-avatar js-avatar-usuario"></div>
+        <span class="ds-topbar-nome js-nome-usuario"></span>
+        <span data-icon="chevron-down" data-size="14"></span>
+      </button>
+      <div class="menu-perfil" id="menu-perfil" hidden>
+        <div class="menu-perfil-usuario">
+          <div class="avatar js-avatar-usuario"></div>
+          <div class="textos">
+            <div class="nome js-nome-usuario"></div>
+            <div class="email js-email-usuario"></div>
+          </div>
+        </div>
+        <div class="menu-perfil-divisor"></div>
+        <div class="menu-perfil-item menu-perfil-tema">
+          <span data-icon="sun-moon" data-size="16"></span><span class="rotulo">Tema</span>
+          <button class="toggle-tema" type="button" role="switch" aria-checked="false" aria-label="Alternar tema claro/escuro"><span class="bolinha"></span></button>
+        </div>
+        <div id="menu-perfil-outros-produtos"></div>
+        <div class="menu-perfil-divisor"></div>
+        <button class="menu-perfil-item perigo btn-sair" type="button">
+          <span data-icon="log-out" data-size="16"></span><span class="rotulo">Sair da conta</span>
+        </button>
+      </div>
+    </div>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="ds-menu" data-ds-menu id="painel-sidebar">
+      <button type="button" class="ds-menu-toggle" id="btn-toggle-sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <ul class="ds-menu-lista">
+        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/relatorios.html"><span class="ds-menu-icone" data-icon="chart-column"></span><span class="ds-menu-rotulo">Relatórios</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/campanhas.html"><span class="ds-menu-icone" data-icon="funnel"></span><span class="ds-menu-rotulo">Campanhas</span></a></li>
+        <li class="ds-menu-grupo">
+          <button type="button" class="ds-menu-link ds-menu-grupo-botao" aria-expanded="false">
+            <span class="ds-menu-icone" data-icon="settings"></span>
+            <span class="ds-menu-rotulo">Configurações</span>
+            <span class="ds-menu-seta" data-icon="chevron-down" data-size="14"></span>
+          </button>
+          <ul class="ds-menu-sub">
+            <li><a class="ds-menu-sublink" href="/crm/configuracoes-geral.html">Preferências</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
+            <li><a class="ds-menu-sublink" href="/crm/plano-cobranca.html">Plano e cobrança</a></li>
+          </ul>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="painel-main">
+      <header class="ds-pagina-cab">
+        <div class="ds-pagina-cab-texto">
+          <h1 class="ds-pagina-cab-titulo">Leads</h1>
+        </div>
+        <div class="ds-pagina-cab-acoes">
+          <button type="button" class="ds-btn ds-btn-primario" id="btn-novo-lead"><span data-icon="plus" data-size="16"></span>Novo lead</button>
+        </div>
+      </header>
+
+      <div class="ds-tabela" role="table" aria-label="Leads"
+           style="--ds-colunas: minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 160px 110px 48px">
+        <div class="ds-filtros">
+          <div class="ds-pesquisa">
+            <svg class="ds-pesquisa-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input class="ds-pesquisa-input" type="search" id="f-cliente" placeholder="Buscar cliente ou empresa…" aria-label="Buscar">
+          </div>
+          <div class="ds-select"><select id="f-etapa" aria-label="Etapa"><option value="">Qualquer etapa</option></select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+        </div>
+        <div class="ds-tabela-cabecalho" role="row">
+          <span role="columnheader">Cliente</span><span role="columnheader">Empresa</span><span role="columnheader">Produto de interesse</span>
+          <span role="columnheader">Etapa</span><span role="columnheader">Origem</span><span role="columnheader"></span>
+        </div>
+        <div id="linhas-leads"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer data-ds-rodape data-ds-produto="CRM"></footer>
+
+  <script src="/ds/components.js"></script>
+  <script src="/crm/shell.js"></script>
+  <script>
+    let leadsAtuais = [];
+    let etapasLeads = [];
+    let buscaLeads = '';
+
+    const ROTULO_PRODUTO = { studio: 'Studio', crm: 'CRM', people: 'People', platform: 'Platform', nao_sabe: 'Não sabe' };
+
+    async function carregar() {
+      const params = new URLSearchParams();
+      if (document.getElementById('f-etapa').value) params.set('etapa_id', document.getElementById('f-etapa').value);
+
+      const [resLeads, resEtapas] = await Promise.all([
+        apiFetch(`/crm/api/leads?${params}`),
+        apiFetch('/crm/api/leads-etapas'),
+      ]);
+      leadsAtuais = await resLeads.json();
+      etapasLeads = await resEtapas.json();
+
+      document.getElementById('f-etapa').innerHTML = '<option value="">Qualquer etapa</option>'
+        + etapasLeads.map((e) => `<option value="${e.id}" ${e.id === document.getElementById('f-etapa').value ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
+
+      renderizar();
+    }
+
+    document.getElementById('f-etapa').addEventListener('change', carregar);
+
+    let debounceBusca;
+    document.getElementById('f-cliente').addEventListener('input', (e) => {
+      clearTimeout(debounceBusca);
+      debounceBusca = setTimeout(() => { buscaLeads = e.target.value.trim().toLowerCase(); renderizar(); }, 300);
+    });
+
+    function opcoesEtapaHtml(etapaAtualId) {
+      return etapasLeads.map((e) => `<option value="${e.id}" ${e.id === etapaAtualId ? 'selected' : ''}>${escapeHtml(e.nome)}</option>`).join('');
+    }
+
+    function renderizar() {
+      const filtrados = buscaLeads
+        ? leadsAtuais.filter((l) => (l.cliente_nome || '').toLowerCase().includes(buscaLeads) || (l.empresa || '').toLowerCase().includes(buscaLeads))
+        : leadsAtuais;
+
+      const container = document.getElementById('linhas-leads');
+      container.innerHTML = filtrados.length ? filtrados.map((l) => `
+        <div class="ds-tabela-linha" role="row" data-id="${l.id}">
+          <span role="cell" data-rotulo="Cliente"><span class="ds-tabela-primario">${escapeHtml(l.cliente_nome)}</span><br><span style="color:var(--muted);font-size:12.5px">${escapeHtml(l.cliente_telefone || '')}</span></span>
+          <span role="cell" data-rotulo="Empresa">${escapeHtml(l.empresa || '—')}</span>
+          <span role="cell" data-rotulo="Produto">${l.produto_interesse ? escapeHtml(ROTULO_PRODUTO[l.produto_interesse] || l.produto_interesse) : '—'}</span>
+          <span role="cell" data-rotulo="Etapa">
+            <div class="ds-select ds-select-sm"><select data-acao="mover-etapa" data-id="${l.id}">${opcoesEtapaHtml(l.etapa_id)}</select>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          </span>
+          <span role="cell" data-rotulo="Origem">${escapeHtml(l.origem)}</span>
+          <span role="cell">
+            <button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" data-acao="detalhe" data-id="${l.id}">Detalhe</button>
+          </span>
+        </div>
+      `).join('') : `<div class="ds-vazio"><p class="ds-vazio-titulo">Nenhum lead ainda</p></div>`;
+
+      container.querySelectorAll('[data-acao="mover-etapa"]').forEach((select) => {
+        select.addEventListener('change', async () => {
+          await apiFetch(`/crm/api/leads/${select.dataset.id}/etapa`, { method: 'PATCH', body: JSON.stringify({ etapa_id: select.value }) });
+          carregar();
+        });
+      });
+      container.querySelectorAll('[data-acao="detalhe"]').forEach((btn) => {
+        btn.addEventListener('click', () => abrirDetalheLead(btn.dataset.id));
+      });
+    }
+
+    function abrirDetalheLead(id) {
+      const lead = leadsAtuais.find((l) => l.id === id);
+      if (!lead) return;
+      abrirModal('<h3>Detalhe do lead</h3>', `
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo"><label class="ds-rotulo" for="ld-empresa">Empresa</label><input class="ds-input" id="ld-empresa" value="${escapeHtml(lead.empresa || '')}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="ld-segmento">Segmento</label><input class="ds-input" id="ld-segmento" value="${escapeHtml(lead.segmento || '')}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="ld-plano">Plano de interesse</label><input class="ds-input" id="ld-plano" value="${escapeHtml(lead.plano_interesse || '')}"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="ld-valor">Valor estimado</label><input class="ds-input" id="ld-valor" inputmode="decimal" value="${lead.valor_estimado != null ? Number(lead.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''}"></div>
+            <div class="ds-campo ds-campo-largo"><label class="ds-rotulo" for="ld-obs">Observações</label><textarea class="ds-textarea" id="ld-obs">${escapeHtml(lead.observacoes || '')}</textarea></div>
+          </div>
+          <div class="modal-erro" id="ld-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="ld-cancelar">Fechar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="ld-salvar">Salvar</button>
+          </div>
+        </div>
+      `);
+      const campoValor = document.getElementById('ld-valor');
+      aplicarMascaraMoeda(campoValor);
+      document.getElementById('ld-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('ld-salvar').addEventListener('click', async () => {
+        const res = await apiFetch(`/crm/api/leads/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            empresa: document.getElementById('ld-empresa').value.trim() || null,
+            segmento: document.getElementById('ld-segmento').value.trim() || null,
+            plano_interesse: document.getElementById('ld-plano').value.trim() || null,
+            valor_estimado: valorMoedaParaNumero(campoValor) || null,
+            observacoes: document.getElementById('ld-obs').value.trim() || null,
+          }),
+        });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('ld-erro').textContent = dados.error || 'Falha ao salvar';
+          return;
+        }
+        fecharModal();
+        carregar();
+      });
+    }
+
+    document.getElementById('btn-novo-lead').addEventListener('click', () => {
+      abrirModal('<h3>Novo lead</h3>', `
+        <div class="ds-form">
+          <div class="ds-form-grade">
+            <div class="ds-campo"><label class="ds-rotulo" for="nl-telefone">Telefone<span class="obrigatorio">*</span></label><input class="ds-input" id="nl-telefone" placeholder="(34) 99999-9999" required></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="nl-nome">Nome (se cliente novo)</label><input class="ds-input" id="nl-nome"></div>
+            <div class="ds-campo"><label class="ds-rotulo" for="nl-empresa">Empresa</label><input class="ds-input" id="nl-empresa"></div>
+            <div class="ds-campo">
+              <label class="ds-rotulo" for="nl-produto">Produto de interesse</label>
+              <div class="ds-select"><select id="nl-produto"><option value="">—</option><option value="studio">Studio</option><option value="crm">CRM</option><option value="people">People</option><option value="platform">Platform</option></select>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+            </div>
+          </div>
+          <div class="modal-erro" id="nl-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-secundario" id="nl-cancelar">Cancelar</button>
+            <button type="button" class="ds-btn ds-btn-primario" id="nl-salvar">Criar lead</button>
+          </div>
+        </div>
+      `);
+      document.getElementById('nl-cancelar').addEventListener('click', fecharModal);
+      document.getElementById('nl-salvar').addEventListener('click', async () => {
+        const telefone = document.getElementById('nl-telefone').value.trim();
+        if (!telefone) { document.getElementById('nl-erro').textContent = 'Telefone é obrigatório'; return; }
+        const res = await apiFetch('/crm/api/leads', {
+          method: 'POST',
+          body: JSON.stringify({
+            telefone,
+            nome_cliente: document.getElementById('nl-nome').value.trim() || null,
+            empresa: document.getElementById('nl-empresa').value.trim() || null,
+            produto_interesse: document.getElementById('nl-produto').value || null,
+          }),
+        });
+        if (!res.ok) {
+          const dados = await res.json().catch(() => ({}));
+          document.getElementById('nl-erro').textContent = dados.error || 'Falha ao criar lead';
+          return;
+        }
+        fecharModal();
+        carregar();
+      });
+    });
+
+    carregar();
+  </script>
+</body>
+</html>
