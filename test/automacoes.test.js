@@ -20,6 +20,14 @@ function poolFalso({ phoneNumberId, envioRecente, disparosExistentes = [] } = {}
       if (/^select phone_number_id from crm_whatsapp_numeros/.test(sql)) {
         return { rows: phoneNumberId ? [{ phone_number_id: phoneNumberId }] : [] };
       }
+      // buscarWabaId (achado ao vivo, 2026-10-20: enviarAutomacao listava
+      // templates da WABA errada por não passar wabaId) — meta_waba_id null
+      // aqui é proposital: testes não configuram META_WABA_ID/token, então
+      // listarTemplates() cai no mesmo modo dev de antes independente do
+      // valor retornado.
+      if (/^select meta_waba_id from crm_whatsapp_numeros/.test(sql)) {
+        return { rows: phoneNumberId ? [{ meta_waba_id: null }] : [] };
+      }
       if (/^select 1 from crm_whatsapp_envios/.test(sql)) {
         return { rows: envioRecente ? [{}] : [] };
       }
