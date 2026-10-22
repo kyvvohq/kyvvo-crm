@@ -418,7 +418,7 @@
         kpi({ icone: 'package', rotulo: 'Próximos da entrega', valor: dados.pedidos_proximos_entrega, meta: 'Próximos 7 dias',
           tag: 'button', attrs: `type="button" data-ir-lista='${JSON.stringify({ proximos_entrega_dias: '7' })}'` }),
         kpi({ icone: 'bot', rotulo: 'Atendimentos do bot hoje', valor: dados.atendimentos_bot_dia, meta: 'Ver conversas',
-          tag: 'a', attrs: 'href="/crm/whatsapp.html?aba=conversas"' }),
+          tag: 'a', attrs: 'href="/crm/atendimento.html"' }),
       ].join('');
 
       // Funil: abertas na ordem do Quadro, depois "ganha" (entregue) e

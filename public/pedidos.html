@@ -292,10 +292,10 @@
         await apiFetch(`/crm/api/pedidos/${id}/pagamento`, { method: 'PATCH', body: JSON.stringify({ status_pagamento: 'pago' }) });
         carregar();
       } else if (e.detail.acao === 'chamar-agente') {
-        // Abre a conversa do bot com esse cliente (Configurações > WhatsApp
-        // > Conversas) — "WhatsApp" abaixo preserva o comportamento antigo
-        // (wa.me direto, fora do bot).
-        if (pedido && pedido.cliente_telefone) window.location.href = `/crm/whatsapp.html?telefone=${encodeURIComponent(pedido.cliente_telefone)}`;
+        // Abre a conversa do bot com esse cliente — popup reusável
+        // (abrirModalConversa, shell.js). "WhatsApp" abaixo preserva o
+        // comportamento antigo (wa.me direto, fora do bot).
+        if (pedido && pedido.cliente_telefone) abrirModalConversa(pedido.cliente_telefone, pedido.cliente_nome);
       } else if (e.detail.acao === 'whatsapp') {
         if (pedido && pedido.cliente_telefone) window.open(linkWhatsapp(pedido.cliente_telefone), '_blank', 'noopener');
       } else if (e.detail.acao === 'cancelar') {
