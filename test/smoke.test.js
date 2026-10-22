@@ -91,6 +91,25 @@ test('admin-interno de agente/metricas: exige ADMIN_INTERNAL_TOKEN, não JWT', a
   await app.close();
 });
 
+test('n8n-interno (Kyvvo Atendimento): todas as rotas exigem N8N_INTERNAL_TOKEN, não JWT', async () => {
+  const app = await build();
+  for (const [method, url] of [
+    ['POST', '/crm/n8n-interno/clientes'], ['GET', '/crm/n8n-interno/historico'],
+    ['POST', '/crm/n8n-interno/mensagens'], ['POST', '/crm/n8n-interno/leads'], ['POST', '/crm/n8n-interno/chamados'],
+  ]) {
+    const semToken = await app.inject({ method, url });
+    assert.equal(semToken.statusCode, 401, `${method} ${url}`);
+  }
+
+  process.env.N8N_INTERNAL_TOKEN = 'segredo-n8n-interno-teste';
+  const tokenErrado = await app.inject({
+    method: 'POST', url: '/crm/n8n-interno/clientes', headers: { 'x-n8n-internal-token': 'errado' }, payload: {},
+  });
+  assert.equal(tokenErrado.statusCode, 401);
+  delete process.env.N8N_INTERNAL_TOKEN;
+  await app.close();
+});
+
 test('admin-interno de whatsapp-numeros: vincular, trocar tenant e desvincular', async () => {
   process.env.ADMIN_INTERNAL_TOKEN = 'segredo-admin-interno-teste';
   const app = await build();

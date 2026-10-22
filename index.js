@@ -228,6 +228,73 @@ async function build(opcoes = {}) {
     return { ok: true, saldo_plano: saldo.saldo_plano, saldo_comprado: saldo.saldo_comprado };
   });
 
+  // Segredo próprio (N8N_INTERNAL_TOKEN) — mesmo padrão acima, quem chama é
+  // o workflow "Kyvvo — Atendimento Geral/Suporte/Vendas" no n8n (projeto
+  // isolado, nunca o v4/Bot Lucas). Evita o n8n precisar de credencial
+  // direta de Postgres (e do schema inteiro do CRM) — só essas 5 operações
+  // específicas, tudo reaproveitando lib/leads.js/lib/chamados.js/
+  // lib/clientes.js já existentes. `tenant_id` sempre explícito no
+  // body/query (não vem de JWT, o n8n não autentica como usuário).
+  function autenticarN8nInterno(request, reply) {
+    const token = (request.headers['x-n8n-internal-token'] || '').trim();
+    if (!process.env.N8N_INTERNAL_TOKEN || token !== process.env.N8N_INTERNAL_TOKEN) {
+      reply.code(401).send({ error: 'Não autorizado' });
+      return false;
+    }
+    return true;
+  }
+
+  fastify.post('/crm/n8n-interno/clientes', async (request, reply) => {
+    if (!autenticarN8nInterno(request, reply)) return;
+    const { tenant_id: tenantId, telefone, nome } = request.body || {};
+    if (!tenantId || !telefone) return reply.code(400).send({ error: 'tenant_id e telefone são obrigatórios' });
+    const cliente = await encontrarOuCriarPorTelefone(pool, tenantId, { telefone, nome, origem: 'WhatsApp' });
+    return { id: cliente.id, nome: cliente.nome };
+  });
+
+  fastify.get('/crm/n8n-interno/historico', async (request, reply) => {
+    if (!autenticarN8nInterno(request, reply)) return;
+    const { tenant_id: tenantId, telefone, limite } = request.query || {};
+    if (!tenantId || !telefone) return reply.code(400).send({ error: 'tenant_id e telefone são obrigatórios' });
+    const { rows } = await pool.query(
+      `select direcao, conteudo from crm_mensagens_whatsapp
+        where tenant_id = $1 and telefone_e164 = $2
+        order by criado_em desc limit $3`,
+      [tenantId, telefone, Math.min(Number(limite) || 10, 50)]
+    );
+    return { mensagens: rows.reverse() };
+  });
+
+  fastify.post('/crm/n8n-interno/mensagens', async (request, reply) => {
+    if (!autenticarN8nInterno(request, reply)) return;
+    const { tenant_id: tenantId, telefone, texto_recebido: textoRecebido, texto_enviado: textoEnviado } = request.body || {};
+    if (!tenantId || !telefone) return reply.code(400).send({ error: 'tenant_id e telefone são obrigatórios' });
+    if (textoRecebido) await registrarMensagem(pool, { tenantId, telefoneE164: telefone, direcao: 'recebida', tipo: 'texto', conteudo: textoRecebido });
+    if (textoEnviado) await registrarMensagem(pool, { tenantId, telefoneE164: telefone, direcao: 'enviada', tipo: 'texto', conteudo: textoEnviado });
+    return { ok: true };
+  });
+
+  fastify.post('/crm/n8n-interno/leads', async (request, reply) => {
+    if (!autenticarN8nInterno(request, reply)) return;
+    const { tenant_id: tenantId, cliente_id: clienteId, empresa, produto_interesse: produtoInteresse, segmento, porte, plano_interesse: planoInteresse, observacoes } = request.body || {};
+    if (!tenantId || !clienteId) return reply.code(400).send({ error: 'tenant_id e cliente_id são obrigatórios' });
+    const lead = await leads.garantirLeadAberto(pool, { tenantId, clienteId, origem: 'WhatsApp' });
+    const atualizado = await leads.atualizarLead(pool, tenantId, lead.id, { empresa, produtoInteresse, segmento, porte, planoInteresse, observacoes });
+    return atualizado;
+  });
+
+  fastify.post('/crm/n8n-interno/chamados', async (request, reply) => {
+    if (!autenticarN8nInterno(request, reply)) return;
+    const { tenant_id: tenantId, cliente_id: clienteId, categoria, descricao, produto_afetado: produtoAfetado, urgencia } = request.body || {};
+    if (!tenantId || !clienteId) return reply.code(400).send({ error: 'tenant_id e cliente_id são obrigatórios' });
+    try {
+      const chamado = await chamados.criarChamado(pool, { tenantId, clienteId, origem: 'WhatsApp', categoria, descricao, produtoAfetado, urgencia });
+      return chamado;
+    } catch (erro) {
+      return reply.code(400).send({ error: erro.message });
+    }
+  });
+
   fastify.get('/crm/admin-interno/whatsapp-numeros', async (request, reply) => {
     if (!autenticarAdminInterno(request, reply)) return;
     // modo/status (035) incluídos a partir de 2026-10-20 — faltavam aqui,
