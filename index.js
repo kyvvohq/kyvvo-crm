@@ -35,6 +35,7 @@ const {
   listarNotificacoesPendentes, marcarNotificacaoLida, marcarTodasNotificacoesLidas, listarHistoricoNotificacoes,
   dispararNotificacaoEvento,
 } = require('./lib/notificacoes');
+const { VAPID_PUBLIC_KEY } = require('./lib/push');
 const { criarAgente } = require('./lib/agente');
 const atendimento = require('./lib/agente/atendimento');
 const { processarConversa } = require('./lib/agente/processador');
@@ -2690,6 +2691,40 @@ async function build(opcoes = {}) {
 
   fastify.get('/crm/api/notificacoes/historico', { preHandler: fastify.authenticate }, async (request) => {
     return listarHistoricoNotificacoes(pool, request.user.tenantId, request.query || {});
+  });
+
+  // Assinatura de notificação push no navegador — canal "CRM" de
+  // Configurações > Notificações > Regras (lib/push.js), réplica do
+  // kyvvo-studio. ON CONFLICT (endpoint): o mesmo navegador pode re-assinar
+  // (ex: depois de limpar o site data) sem gerar linha duplicada.
+  fastify.get('/crm/api/push/vapid-public-key', { preHandler: fastify.authenticate }, async () => {
+    return { publicKey: VAPID_PUBLIC_KEY || null };
+  });
+
+  fastify.post('/crm/api/push/subscribe', { preHandler: fastify.authenticate }, async (request, reply) => {
+    const { tenantId, userId } = request.user;
+    const { endpoint, keys } = request.body || {};
+    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+      return reply.code(400).send({ error: 'Assinatura push inválida.' });
+    }
+    await pool.query(
+      `INSERT INTO crm_push_subscriptions (tenant_id, usuario_id, endpoint, p256dh, auth, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (endpoint) DO UPDATE SET
+         tenant_id = EXCLUDED.tenant_id,
+         usuario_id = EXCLUDED.usuario_id,
+         p256dh = EXCLUDED.p256dh,
+         auth = EXCLUDED.auth,
+         user_agent = EXCLUDED.user_agent`,
+      [tenantId, userId, endpoint, keys.p256dh, keys.auth, request.headers['user-agent'] || null]
+    );
+    return { ok: true };
+  });
+
+  fastify.post('/crm/api/push/unsubscribe', { preHandler: fastify.authenticate }, async (request) => {
+    const { endpoint } = request.body || {};
+    if (endpoint) await pool.query('DELETE FROM crm_push_subscriptions WHERE endpoint = $1', [endpoint]);
+    return { ok: true };
   });
 
   // --- Leads (funil de vendas) e Chamados (suporte) — hoje usado só pelo

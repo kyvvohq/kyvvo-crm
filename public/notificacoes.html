@@ -143,8 +143,12 @@
           </div>
           <div class="msg" id="msg-destino"></div>
           <p class="vazio" style="padding:0 0 8px; text-align:left">Precisa estar preenchido pros canais E-mail/WhatsApp abaixo funcionarem.</p>
-          <div class="ds-tabela" role="table" aria-label="Regras de notificação" style="--ds-colunas: minmax(0,1.6fr) 90px 90px 70px">
-            <div class="ds-tabela-cabecalho" role="row"><span role="columnheader">Descrição</span><span role="columnheader">E-mail</span><span role="columnheader">WhatsApp</span><span role="columnheader">CRM</span></div>
+          <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button type="button" class="ds-btn ds-btn-secundario ds-btn-sm" id="btn-ativar-push">Ativar notificações push neste navegador</button>
+            <span id="notificacao-push-status" style="font-size:13px;color:var(--muted-strong)"></span>
+          </div>
+          <div class="ds-tabela" role="table" aria-label="Regras de notificação" style="--ds-colunas: minmax(0,1.6fr) 90px 90px 70px 70px">
+            <div class="ds-tabela-cabecalho" role="row"><span role="columnheader">Descrição</span><span role="columnheader">E-mail</span><span role="columnheader">WhatsApp</span><span role="columnheader">CRM</span><span role="columnheader">Push</span></div>
             <div id="lista-regras"></div>
           </div>
         </div>
@@ -194,10 +198,84 @@
     // antes desta tela existir, tratado como "só CRM").
     function canaisAtivosNotificacao(cfg) {
       if (cfg && cfg.canais && typeof cfg.canais === 'object') {
-        return { crm: cfg.canais.crm !== false, email: !!cfg.canais.email, whatsapp: !!cfg.canais.whatsapp };
+        return { crm: cfg.canais.crm !== false, email: !!cfg.canais.email, whatsapp: !!cfg.canais.whatsapp, push: !!cfg.canais.push };
       }
-      return { crm: cfg ? cfg.ativo !== false : true, email: false, whatsapp: false };
+      return { crm: cfg ? cfg.ativo !== false : true, email: false, whatsapp: false, push: false };
     }
+
+    // --- Push no navegador (Web Push/VAPID) — réplica do kyvvo-studio -------
+    function urlBase64ParaUint8Array(base64) {
+      const padding = '='.repeat((4 - (base64.length % 4)) % 4);
+      const base64Normalizado = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const bruto = window.atob(base64Normalizado);
+      return Uint8Array.from([...bruto].map((c) => c.charCodeAt(0)));
+    }
+
+    async function assinaturaPushAtual() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+      const registration = await navigator.serviceWorker.getRegistration('/crm/push-sw.js');
+      if (!registration) return null;
+      return registration.pushManager.getSubscription();
+    }
+
+    async function ativarPushNavegador() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        alert('Este navegador não suporta notificações push.');
+        return false;
+      }
+      const permissao = await Notification.requestPermission();
+      if (permissao !== 'granted') {
+        alert('Permissão de notificação negada no navegador.');
+        return false;
+      }
+      try {
+        const resPublicKey = await apiFetch('/crm/api/push/vapid-public-key');
+        const { publicKey } = await resPublicKey.json();
+        if (!publicKey) {
+          alert('Push ainda não configurado no servidor.');
+          return false;
+        }
+        const registration = await navigator.serviceWorker.register('/crm/push-sw.js');
+        await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ParaUint8Array(publicKey),
+        });
+        const res = await apiFetch('/crm/api/push/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({
+            endpoint: subscription.endpoint,
+            keys: { p256dh: subscription.toJSON().keys.p256dh, auth: subscription.toJSON().keys.auth },
+          }),
+        });
+        if (!res.ok) {
+          alert('Erro ao ativar push.');
+          return false;
+        }
+        return true;
+      } catch (err) {
+        alert('Erro ao ativar push: ' + err.message);
+        return false;
+      }
+    }
+
+    const statusPushEl = document.getElementById('notificacao-push-status');
+    const btnAtivarPush = document.getElementById('btn-ativar-push');
+    assinaturaPushAtual().then((assinatura) => {
+      if (assinatura) {
+        statusPushEl.textContent = 'Push já ativado neste navegador.';
+        btnAtivarPush.textContent = 'Reativar notificações push';
+      }
+    });
+    btnAtivarPush.addEventListener('click', async () => {
+      btnAtivarPush.disabled = true;
+      const ok = await ativarPushNavegador();
+      btnAtivarPush.disabled = false;
+      if (ok) {
+        statusPushEl.textContent = 'Push já ativado neste navegador.';
+        btnAtivarPush.textContent = 'Reativar notificações push';
+      }
+    });
 
     // Guarda o que já está salvo de verdade no servidor — usado pra: (1)
     // decidir card (tem destino) vs formulário (não tem), (2) o botão Salvar
@@ -300,6 +378,7 @@
             <span role="cell" data-rotulo="E-mail">${toggleCanal(tipo.chave, 'email', canais, `E-mail — ${escapeHtml(tipo.titulo)}`)}</span>
             <span role="cell" data-rotulo="WhatsApp">${toggleCanal(tipo.chave, 'whatsapp', canais, `WhatsApp — ${escapeHtml(tipo.titulo)}`)}</span>
             <span role="cell" data-rotulo="CRM">${toggleCanal(tipo.chave, 'crm', canais, `CRM — ${escapeHtml(tipo.titulo)}`)}</span>
+            <span role="cell" data-rotulo="Push">${toggleCanal(tipo.chave, 'push', canais, `Push — ${escapeHtml(tipo.titulo)}`)}</span>
           </div>
         `;
       }).join('');
