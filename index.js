@@ -97,6 +97,13 @@ async function build(opcoes = {}) {
     prefix: '/crm/',
   });
 
+  // Redirects de URLs antigas (favoritos/links salvos) depois da reorganização
+  // de menu — Painel/Quadro renomeados pra Início/Visão geral e Importação
+  // deixou de ser página própria (virou aba de Cadastro).
+  fastify.get('/crm/painel.html', (request, reply) => reply.redirect(301, '/crm/inicio.html'));
+  fastify.get('/crm/quadro.html', (request, reply) => reply.redirect(301, '/crm/visao-geral.html'));
+  fastify.get('/crm/importacao.html', (request, reply) => reply.redirect(301, '/crm/opcoes-cadastro.html?aba=importacao'));
+
   // `files` subiu de 20 pra 300 — a importação de NF-e processa em segundo
   // plano agora (fila, ver /crm/api/importacoes/nfe), não tem mais motivo
   // pra limitar quantos arquivos o usuário manda de uma vez.
@@ -808,7 +815,7 @@ async function build(opcoes = {}) {
         localStorage.setItem('crm_token', ${JSON.stringify(token)});
         localStorage.setItem('crm_nome', ${JSON.stringify(nome || '')});
         localStorage.setItem('crm_outros_produtos', ${JSON.stringify(JSON.stringify(outrosProdutos || []))});
-        location.href = '/crm/painel.html';
+        location.href = '/crm/inicio.html';
       </script></body></html>`;
     } catch (err) {
       request.log.error(`Falha ao consumir handoff: ${err.message}`);
@@ -884,6 +891,46 @@ async function build(opcoes = {}) {
       return null;
     }
     return dados;
+  }
+
+  // Módulos ativos do tenant (catálogo em kyvvo-platform: modulos/tenant_modulos,
+  // liga/desliga pelo admin). Usa o próprio Bearer do request — o mesmo JWT
+  // RS256 do platform que autenticou esta requisição no CRM serve pra chamar
+  // GET /entitlements/:tenantId lá (exige que o tenantId do token bata, o que
+  // já é garantido aqui). Best-effort: módulo indisponível nunca deve travar
+  // a tela, só fica invisível (fail-closed pros menus que dependem disso).
+  async function obterModulosAtivos(request) {
+    try {
+      const res = await fetch(`${PLATFORM_URL}/entitlements/${request.user.tenantId}`, {
+        headers: { Authorization: request.headers.authorization },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return [];
+      const { modulos } = await res.json();
+      return modulos || [];
+    } catch (err) {
+      request.log.warn(`Falha ao checar módulos ativos do tenant: ${err.message}`);
+      return [];
+    }
+  }
+
+  // Leads/Chamados (menus internos de atendimento Kyvvo) exigem os dois: o
+  // módulo correspondente ativado no admin (crm_leads/crm_chamados) E o
+  // perfil de agente da própria Kyvvo — nenhum dos dois sozinho libera. Usado
+  // tanto por GET /crm/api/agente/config (pro shell decidir o que mostrar no
+  // menu) quanto como preHandler nas rotas de dados abaixo, pra não depender
+  // só de esconder o link (ver achado: endpoints não tinham trava própria).
+  function exigeAgenteKyvvo(moduloKey) {
+    return async (request, reply) => {
+      const { rows: [perfil] } = await pool.query('select perfil_agente from crm_agente_config where tenant_id = $1', [request.user.tenantId]);
+      if (!perfil || perfil.perfil_agente !== 'kyvvo_atendimento') {
+        return reply.code(403).send({ error: 'Sem acesso a este recurso.' });
+      }
+      const modulos = await obterModulosAtivos(request);
+      if (!modulos.includes(moduloKey)) {
+        return reply.code(403).send({ error: 'Módulo não ativado para este tenant.' });
+      }
+    };
   }
 
   fastify.get('/crm/api/pagamentos', { preHandler: fastify.authenticate }, async (request, reply) => {
@@ -2441,7 +2488,18 @@ async function build(opcoes = {}) {
     // — busca à parte só pra habilitar/desabilitar os menus Leads/Chamados
     // no shell (ver public/shell.js).
     const { rows: [perfil] } = await pool.query('select perfil_agente from crm_agente_config where tenant_id = $1', [request.user.tenantId]);
-    return { ...config, perfil_agente: (perfil && perfil.perfil_agente) || null };
+    const perfilAgente = (perfil && perfil.perfil_agente) || null;
+
+    // leads_habilitado/chamados_habilitado: perfil de agente E módulo
+    // ativado no admin (ver exigeAgenteKyvvo acima) — só consulta o platform
+    // se o perfil já bater, pra não gastar round-trip em todo tenant comum.
+    const modulos = perfilAgente === 'kyvvo_atendimento' ? await obterModulosAtivos(request) : [];
+    return {
+      ...config,
+      perfil_agente: perfilAgente,
+      leads_habilitado: modulos.includes('crm_leads'),
+      chamados_habilitado: modulos.includes('crm_chamados'),
+    };
   });
 
   fastify.put('/crm/api/agente/config', { preHandler: fastify.authenticate }, atende(async (request) => {
@@ -2739,25 +2797,25 @@ async function build(opcoes = {}) {
   // lib/agente/ferramentas-kyvvo.js), mas é feature genérica do produto.
   // Mesmo padrão fino de /crm/api/etapas e /crm/api/pedidos, lógica em
   // lib/leads.js/lib/chamados.js.
-  fastify.get('/crm/api/leads-etapas', { preHandler: fastify.authenticate }, async (request) => {
+  fastify.get('/crm/api/leads-etapas', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request) => {
     return leads.listarEtapasLeads(pool, request.user.tenantId);
   });
 
-  fastify.post('/crm/api/leads-etapas', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.post('/crm/api/leads-etapas', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const nome = (request.body?.nome || '').trim();
     if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
     const etapa = await leads.criarEtapaLead(pool, request.user.tenantId, nome);
     return reply.code(201).send(etapa);
   });
 
-  fastify.patch('/crm/api/leads-etapas/reordenar', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.patch('/crm/api/leads-etapas/reordenar', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const ids = request.body?.ids;
     if (!Array.isArray(ids) || !ids.length) return reply.code(400).send({ error: 'ids é obrigatório' });
     await leads.reordenarEtapasLeads(pool, request.user.tenantId, ids);
     return { ok: true };
   });
 
-  fastify.patch('/crm/api/leads-etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.patch('/crm/api/leads-etapas/:id', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const nome = (request.body?.nome || '').trim();
     if (!nome) return reply.code(400).send({ error: 'Nome é obrigatório' });
     const etapa = await leads.renomearEtapaLead(pool, request.user.tenantId, request.params.id, nome);
@@ -2765,13 +2823,13 @@ async function build(opcoes = {}) {
     return etapa;
   });
 
-  fastify.delete('/crm/api/leads-etapas/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.delete('/crm/api/leads-etapas/:id', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const r = await leads.apagarEtapaLead(pool, request.user.tenantId, request.params.id);
     if (r.status) return reply.code(r.status).send({ error: r.erro });
     return r;
   });
 
-  fastify.post('/crm/api/leads', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.post('/crm/api/leads', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const { tenantId } = request.user;
     const { telefone, nome_cliente: nomeCliente, empresa, produto_interesse: produtoInteresse, segmento, porte, plano_interesse: planoInteresse, valor_estimado: valorEstimado, observacoes } = request.body || {};
     if (!telefone || !telefone.trim()) return reply.code(400).send({ error: 'Telefone é obrigatório' });
@@ -2781,26 +2839,26 @@ async function build(opcoes = {}) {
     return reply.code(201).send(leadAtualizado);
   });
 
-  fastify.get('/crm/api/leads', { preHandler: fastify.authenticate }, async (request) => {
+  fastify.get('/crm/api/leads', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request) => {
     const { etapa_id: etapaId, aberto } = request.query || {};
     const abertoBool = aberto === 'true' ? true : aberto === 'false' ? false : undefined;
     return leads.listarLeads(pool, request.user.tenantId, { etapaId, aberto: abertoBool });
   });
 
-  fastify.get('/crm/api/leads/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.get('/crm/api/leads/:id', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const lead = await leads.obterLead(pool, request.user.tenantId, request.params.id);
     if (!lead) return reply.code(404).send({ error: 'Lead não encontrado' });
     return lead;
   });
 
-  fastify.patch('/crm/api/leads/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.patch('/crm/api/leads/:id', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const { valor_estimado: valorEstimado, observacoes, empresa, produto_interesse: produtoInteresse, segmento, porte, plano_interesse: planoInteresse } = request.body || {};
     const lead = await leads.atualizarLead(pool, request.user.tenantId, request.params.id, { valorEstimado, observacoes, empresa, produtoInteresse, segmento, porte, planoInteresse });
     if (!lead) return reply.code(404).send({ error: 'Lead não encontrado' });
     return lead;
   });
 
-  fastify.patch('/crm/api/leads/:id/etapa', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.patch('/crm/api/leads/:id/etapa', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_leads')] }, async (request, reply) => {
     const { etapa_id: etapaId, motivo_perda: motivoPerda } = request.body || {};
     if (!etapaId) return reply.code(400).send({ error: 'etapa_id é obrigatório' });
     const lead = await leads.moverEtapaLead(pool, request.user.tenantId, request.params.id, etapaId, { motivoPerda });
@@ -2808,12 +2866,12 @@ async function build(opcoes = {}) {
     return lead;
   });
 
-  fastify.get('/crm/api/chamados', { preHandler: fastify.authenticate }, async (request) => {
+  fastify.get('/crm/api/chamados', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_chamados')] }, async (request) => {
     const { status, urgencia } = request.query || {};
     return chamados.listarChamados(pool, request.user.tenantId, { status, urgencia });
   });
 
-  fastify.post('/crm/api/chamados', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.post('/crm/api/chamados', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_chamados')] }, async (request, reply) => {
     const { cliente_id: clienteId, categoria, descricao, produto_afetado: produtoAfetado, urgencia } = request.body || {};
     if (!clienteId) return reply.code(400).send({ error: 'cliente_id é obrigatório' });
     try {
@@ -2824,13 +2882,13 @@ async function build(opcoes = {}) {
     }
   });
 
-  fastify.get('/crm/api/chamados/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.get('/crm/api/chamados/:id', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_chamados')] }, async (request, reply) => {
     const chamado = await chamados.obterChamado(pool, request.user.tenantId, request.params.id);
     if (!chamado) return reply.code(404).send({ error: 'Chamado não encontrado' });
     return chamado;
   });
 
-  fastify.patch('/crm/api/chamados/:id', { preHandler: fastify.authenticate }, async (request, reply) => {
+  fastify.patch('/crm/api/chamados/:id', { preHandler: [fastify.authenticate, exigeAgenteKyvvo('crm_chamados')] }, async (request, reply) => {
     const { status, resolucao_resumo: resolucaoResumo } = request.body || {};
     try {
       const chamado = await chamados.atualizarStatusChamado(pool, request.user.tenantId, request.params.id, { status, resolucaoResumo });

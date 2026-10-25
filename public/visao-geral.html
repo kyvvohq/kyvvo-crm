@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kyvvo CRM — Quadro</title>
+<title>Kyvvo CRM — Visão geral</title>
 <link rel="icon" type="image/svg+xml" href="/ds/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -157,7 +157,7 @@
 </head>
 <body>
   <header class="ds-topbar">
-    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+    <a class="ds-topbar-marca" href="/crm/inicio.html" aria-label="Ir para o início">
       <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
       <span class="ds-topbar-kyvvo">kyvvo</span>
     </a>
@@ -205,8 +205,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <ul class="ds-menu-lista">
-        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
-        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/inicio.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Início</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/visao-geral.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Visão geral</span></a></li>
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
         <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
@@ -223,7 +223,6 @@
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
-            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
             <li><a class="ds-menu-sublink" href="/crm/plano-cobranca.html">Plano e cobrança</a></li>
           </ul>
         </li>
@@ -233,7 +232,7 @@
     <div class="painel-main">
       <div class="cabecalho-pagina">
         <div class="textos">
-          <div class="linha-titulo"><h1>Quadro</h1></div>
+          <div class="linha-titulo"><h1>Visão geral</h1></div>
         </div>
       </div>
 
@@ -710,7 +709,7 @@
     // ligarEventosGrid() (função abaixo), não uma vez só no load.
     function abrirModalNovoRecurso() {
       const overlay = abrirModal('<h3>Novo recurso</h3>', `
-        <p class="modal-texto">São as raias do Quadro — ex.: cada impressora 3D, forno, posto de trabalho.</p>
+        <p class="modal-texto">São as raias da Visão geral — ex.: cada impressora 3D, forno, posto de trabalho.</p>
         <div class="ds-form">
           <div class="ds-campo"><label class="ds-rotulo" for="r-nome">Nome</label><input class="ds-input" id="r-nome" placeholder="ex.: Impressora 2" autofocus></div>
           <div class="modal-erro" id="r-erro"></div>

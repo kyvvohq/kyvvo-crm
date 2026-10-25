@@ -15,11 +15,13 @@
 <style>
   .opcao-sistema-selo { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--muted); flex-shrink:0; }
   .cadastro-aba-topo { display:flex; justify-content:flex-end; margin-bottom:12px; }
+  .card-importacao h2 { font-size:15px; margin:0 0 6px; color:var(--text); }
+  .card-importacao p.modal-texto { margin:0 0 14px; }
 </style>
 </head>
 <body>
   <header class="ds-topbar">
-    <a class="ds-topbar-marca" href="/crm/painel.html" aria-label="Ir para o início">
+    <a class="ds-topbar-marca" href="/crm/inicio.html" aria-label="Ir para o início">
       <span class="ds-topbar-produto"><span class="ds-topbar-produto-acento">CR</span>M</span>
       <span class="ds-topbar-kyvvo">kyvvo</span>
     </a>
@@ -67,8 +69,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <ul class="ds-menu-lista">
-        <li><a class="ds-menu-link" href="/crm/painel.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Painel</span></a></li>
-        <li><a class="ds-menu-link" href="/crm/quadro.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Quadro</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/inicio.html"><span class="ds-menu-icone" data-icon="layout-dashboard"></span><span class="ds-menu-rotulo">Início</span></a></li>
+        <li><a class="ds-menu-link" href="/crm/visao-geral.html"><span class="ds-menu-icone" data-icon="kanban"></span><span class="ds-menu-rotulo">Visão geral</span></a></li>
         <li><a class="ds-menu-link" href="/crm/clientes.html"><span class="ds-menu-icone" data-icon="users"></span><span class="ds-menu-rotulo">Clientes</span></a></li>
         <li><a class="ds-menu-link" href="/crm/pedidos.html"><span class="ds-menu-icone" data-icon="list"></span><span class="ds-menu-rotulo">Pedidos</span></a></li>
         <li><a class="ds-menu-link" href="/crm/estoque.html"><span class="ds-menu-icone" data-icon="package"></span><span class="ds-menu-rotulo">Estoque</span></a></li>
@@ -85,7 +87,6 @@
             <li><a class="ds-menu-sublink" href="/crm/opcoes-cadastro.html">Cadastro</a></li>
             <li><a class="ds-menu-sublink" href="/crm/automacoes.html">Automações</a></li>
             <li><a class="ds-menu-sublink" href="/crm/notificacoes.html">Notificações</a></li>
-            <li><a class="ds-menu-sublink" href="/crm/importacao.html">Importação</a></li>
             <li><a class="ds-menu-sublink" href="/crm/plano-cobranca.html">Plano e cobrança</a></li>
           </ul>
         </li>
@@ -102,6 +103,7 @@
           <button type="button" class="ds-aba" id="aba-cadastro-segmentos" aria-controls="painel-cadastro-segmentos" aria-selected="true">Segmentos</button>
           <button type="button" class="ds-aba" id="aba-cadastro-origens" aria-controls="painel-cadastro-origens" aria-selected="false">Origem</button>
           <button type="button" class="ds-aba" id="aba-cadastro-tipo-entrega" aria-controls="painel-cadastro-tipo-entrega" aria-selected="false">Tipo de frete</button>
+          <button type="button" class="ds-aba" id="aba-cadastro-importacao" aria-controls="painel-cadastro-importacao" aria-selected="false">Importação</button>
         </div>
 
         <div class="ds-abas-painel" id="painel-cadastro-segmentos" aria-labelledby="aba-cadastro-segmentos">
@@ -129,6 +131,20 @@
           <div class="ds-tabela" role="table" aria-label="Tipo de frete" style="--ds-colunas: minmax(0,1fr) 160px 48px">
             <div class="ds-tabela-cabecalho" role="row"><span role="columnheader">Nome</span><span role="columnheader">Status</span><span role="columnheader"></span></div>
             <div id="lista-tipo-entrega"></div>
+          </div>
+        </div>
+
+        <div class="ds-abas-painel" id="painel-cadastro-importacao" aria-labelledby="aba-cadastro-importacao" hidden>
+          <div class="card card-importacao">
+            <h2>Clientes (CSV)</h2>
+            <p class="modal-texto">Planilha antiga, exportação do Google Forms etc.</p>
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-importar-csv">Importar CSV</button>
+          </div>
+
+          <div class="card card-importacao">
+            <h2>Pedidos (NF-e)</h2>
+            <p class="modal-texto">Um ou mais arquivos XML de NF-e — concilia com pedido existente pelo número, ou cria um novo.</p>
+            <button type="button" class="ds-btn ds-btn-primario" id="btn-importar-nfe">Importar NF-e</button>
           </div>
         </div>
       </div>
@@ -255,6 +271,203 @@
     });
 
     Object.keys(TIPOS_CADASTRO).forEach(carregarTipo);
+
+    // Abre direto na aba Importação quando chega por link/notificação (ex.:
+    // sininho > "importação concluída", redirect da antiga importacao.html)
+    // — aba própria, não página própria, desde a fusão com Cadastro.
+    if (new URLSearchParams(location.search).get('aba') === 'importacao') {
+      KyvvoDS.abasSelecionar(document.querySelector('[data-ds-abas]'), 'aba-cadastro-importacao');
+    }
+
+    // --- Importação CSV de clientes (movida de Clientes) ----------------------
+    const CAMPOS_IMPORTACAO = [
+      { campo: 'nome', label: 'Nome', obrigatorio: true },
+      { campo: 'telefone', label: 'Telefone (WhatsApp)' },
+      { campo: 'email', label: 'E-mail' },
+      { campo: 'cpf', label: 'CPF' },
+      { campo: 'data_nascimento', label: 'Data de nascimento' },
+      { campo: 'cidade', label: 'Cidade' },
+      { campo: 'uf', label: 'UF' },
+      { campo: 'segmento', label: 'Segmento' },
+      { campo: 'origem', label: 'Origem' },
+    ];
+    let csvArquivo = null, csvCabecalho = [], csvLinhas = [];
+
+    function parseCsvLinhaSimples(linha, delimitador) {
+      const campos = [];
+      let campo = '', dentroAspas = false;
+      for (let i = 0; i < linha.length; i++) {
+        const ch = linha[i];
+        if (dentroAspas) {
+          if (ch === '"') { if (linha[i + 1] === '"') { campo += '"'; i++; } else dentroAspas = false; }
+          else campo += ch;
+        } else if (ch === '"') dentroAspas = true;
+        else if (ch === delimitador) { campos.push(campo); campo = ''; }
+        else campo += ch;
+      }
+      campos.push(campo);
+      return campos;
+    }
+
+    document.getElementById('btn-importar-csv').addEventListener('click', () => {
+      abrirModal('<h3>Importar clientes (CSV)</h3>', `
+        <p class="modal-texto">Planilha antiga, exportação do Google Forms etc. Escolha o arquivo e diga qual coluna é qual.</p>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="csv-arquivo">Arquivo</label><input type="file" id="csv-arquivo" accept=".csv,text/csv"></div>
+          <div id="csv-mapeamento" hidden>
+            <div id="csv-campos-mapeamento" style="margin-top:14px"></div>
+            <div id="csv-preview" style="margin-top:12px"></div>
+          </div>
+          <div class="modal-erro" id="csv-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="csv-importar" disabled>Importar</button>
+          </div>
+        </div>
+      `, 'modal-card-larga');
+
+      document.getElementById('csv-arquivo').addEventListener('change', async (e) => {
+        const arquivo = e.target.files[0];
+        if (!arquivo) return;
+        csvArquivo = arquivo;
+        const texto = await arquivo.text();
+        const s = texto.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const primeiraLinha = s.split('\n')[0] || '';
+        const delimitador = (primeiraLinha.match(/;/g) || []).length > (primeiraLinha.match(/,/g) || []).length ? ';' : ',';
+        const linhasTexto = s.split('\n').filter((l) => l.trim() !== '');
+        csvCabecalho = parseCsvLinhaSimples(linhasTexto[0], delimitador);
+        csvLinhas = linhasTexto.slice(1, 6).map((l) => parseCsvLinhaSimples(l, delimitador));
+
+        const opcoes = ['<option value="">Não importar</option>', ...csvCabecalho.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)].join('');
+        document.getElementById('csv-campos-mapeamento').innerHTML = CAMPOS_IMPORTACAO.map((c) => `
+          <div class="grid2" style="align-items:center;margin-bottom:6px">
+            <label class="ds-rotulo" style="margin:0">${c.label}${c.obrigatorio ? '<span class="obrigatorio">*</span>' : ''}</label>
+            <div class="ds-select"><select data-campo-mapeado="${c.campo}">${opcoes}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+          </div>
+        `).join('');
+        // Tenta casar automaticamente por nome parecido da coluna.
+        CAMPOS_IMPORTACAO.forEach((c) => {
+          const select = document.querySelector(`[data-campo-mapeado="${c.campo}"]`);
+          const achado = csvCabecalho.find((h) => h.toLowerCase().trim().includes(c.campo === 'telefone' ? 'telefone' : c.campo) || (c.campo === 'telefone' && h.toLowerCase().includes('whatsapp')));
+          if (achado) select.value = achado;
+        });
+
+        document.getElementById('csv-preview').innerHTML = `
+          <p class="modal-texto" style="margin-bottom:6px">Prévia (${linhasTexto.length - 1} linha(s) no total):</p>
+          <div class="card" style="padding:0;overflow:auto">
+            <table><thead><tr>${csvCabecalho.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+            <tbody>${csvLinhas.map((l) => `<tr>${l.map((v) => `<td>${escapeHtml(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+          </div>
+        `;
+        document.getElementById('csv-mapeamento').hidden = false;
+        document.getElementById('csv-importar').disabled = false;
+      });
+
+      document.getElementById('csv-importar').addEventListener('click', async () => {
+        const mapeamento = {};
+        document.querySelectorAll('[data-campo-mapeado]').forEach((sel) => { mapeamento[sel.dataset.campoMapeado] = sel.value || null; });
+        if (!mapeamento.nome) { document.getElementById('csv-erro').textContent = 'Mapeie pelo menos o campo Nome'; return; }
+
+        const btn = document.getElementById('csv-importar');
+        btn.disabled = true;
+        btn.textContent = 'Importando…';
+        const formData = new FormData();
+        formData.append('arquivo', csvArquivo);
+        formData.append('mapeamento', JSON.stringify(mapeamento));
+        const res = await apiFetch('/crm/api/importacoes/csv', { method: 'POST', body: formData });
+        const dados = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          document.getElementById('csv-erro').textContent = dados.error || 'Falha ao importar';
+          btn.disabled = false;
+          btn.textContent = 'Importar';
+          return;
+        }
+        document.getElementById('csv-mapeamento').innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> criado(s), <strong>${dados.atualizados}</strong> atualizado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px">${escapeHtml(dados.erro)}</p>` : ''}
+        `;
+        btn.hidden = true;
+      });
+    });
+
+    // --- Importar NF-e (movida de Pedidos) -----------------------------------
+    // Processa em fila no servidor (index.js: POST responde 202 na hora,
+    // processamento continua em segundo plano) — sem limite de quantos
+    // arquivos por vez. A tela faz polling em GET /crm/api/importacoes/:id
+    // pra mostrar progresso real ("7 de 14 processados") e uma notificação
+    // aparece no sininho quando terminar, mesmo se a modal for fechada antes.
+    document.getElementById('btn-importar-nfe').addEventListener('click', () => {
+      abrirModal('<h3>Importar NF-e (XML)</h3>', `
+        <p class="modal-texto">Selecione quantos arquivos XML de NF-e quiser. Concilia automaticamente com um pedido existente pelo número do pedido (tag do item da nota) — se não achar, cria um pedido novo. Nota de devolução de mercadoria é ignorada. Pode fechar esta janela a qualquer momento — avisamos no sininho quando terminar.</p>
+        <div class="ds-form">
+          <div class="ds-campo"><label class="ds-rotulo" for="nfe-arquivos">Arquivos</label><input type="file" id="nfe-arquivos" accept=".xml,text/xml" multiple></div>
+          <div id="nfe-progresso" style="margin-top:12px"></div>
+          <div id="nfe-resultado" style="margin-top:12px"></div>
+          <div class="modal-erro" id="nfe-erro"></div>
+          <div class="ds-form-acoes">
+            <button type="button" class="ds-btn ds-btn-primario" id="nfe-importar" disabled>Importar</button>
+          </div>
+        </div>
+      `, 'modal-card-larga');
+
+      document.getElementById('nfe-arquivos').addEventListener('change', (e) => {
+        document.getElementById('nfe-importar').disabled = !e.target.files.length;
+      });
+
+      let pollTimer = null;
+      async function acompanharProgresso(id) {
+        const progressoEl = document.getElementById('nfe-progresso');
+        const resultadoEl = document.getElementById('nfe-resultado');
+        if (!progressoEl) { clearInterval(pollTimer); return; } // modal fechada
+        const res = await apiFetch(`/crm/api/importacoes/${id}`);
+        if (!res.ok) { clearInterval(pollTimer); return; }
+        const dados = await res.json();
+        const processados = dados.criados + dados.atualizados + dados.com_erro;
+        if (dados.status === 'processando') {
+          progressoEl.innerHTML = `<p class="modal-texto">Processando… ${processados} de ${dados.total_arquivos || '?'} arquivo(s).</p>`;
+          return;
+        }
+        clearInterval(pollTimer);
+        progressoEl.innerHTML = '';
+        resultadoEl.innerHTML = `
+          <p class="modal-texto"><strong>${dados.criados}</strong> pedido(s) novo(s), <strong>${dados.atualizados}</strong> conciliado(s)${dados.com_erro ? `, <strong>${dados.com_erro}</strong> com erro` : ''}.</p>
+          ${dados.erro ? `<p class="modal-texto" style="color:var(--muted);font-size:12px;white-space:pre-wrap">${escapeHtml(dados.erro.split(' | ').join('\n'))}</p>` : ''}
+        `;
+      }
+
+      document.getElementById('nfe-importar').addEventListener('click', async () => {
+        const arquivos = document.getElementById('nfe-arquivos').files;
+        if (!arquivos.length) return;
+        const btn = document.getElementById('nfe-importar');
+        const erroEl = document.getElementById('nfe-erro');
+        btn.disabled = true;
+        btn.textContent = 'Enviando…';
+        erroEl.textContent = '';
+        try {
+          const formData = new FormData();
+          Array.from(arquivos).forEach((a) => formData.append('arquivo', a));
+          const res = await apiFetch('/crm/api/importacoes/nfe', { method: 'POST', body: formData });
+          const dados = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            erroEl.textContent = dados.error || 'Falha ao importar';
+            btn.disabled = false;
+            btn.textContent = 'Importar';
+            return;
+          }
+          btn.hidden = true;
+          document.getElementById('nfe-arquivos').hidden = true;
+          acompanharProgresso(dados.id);
+          pollTimer = setInterval(() => acompanharProgresso(dados.id), 2000);
+          return;
+        } catch (erro) {
+          // Sem isso, qualquer falha de rede ao ENVIAR os arquivos (não mais
+          // ao processar — isso já é em fila) deixava o botão travado em
+          // "Enviando…" pra sempre, sem nenhuma mensagem.
+          erroEl.textContent = 'Falha de conexão ao enviar os arquivos — tente de novo.';
+        }
+        btn.disabled = false;
+        btn.textContent = 'Importar';
+      });
+    });
   </script>
 </body>
 </html>
