@@ -100,9 +100,9 @@ async function build(opcoes = {}) {
   // Redirects de URLs antigas (favoritos/links salvos) depois da reorganização
   // de menu — Painel/Quadro renomeados pra Início/Visão geral e Importação
   // deixou de ser página própria (virou aba de Cadastro).
-  fastify.get('/crm/painel.html', (request, reply) => reply.redirect(301, '/crm/inicio.html'));
-  fastify.get('/crm/quadro.html', (request, reply) => reply.redirect(301, '/crm/visao-geral.html'));
-  fastify.get('/crm/importacao.html', (request, reply) => reply.redirect(301, '/crm/opcoes-cadastro.html?aba=importacao'));
+  fastify.get('/crm/painel.html', (request, reply) => reply.redirect('/crm/inicio.html', 301));
+  fastify.get('/crm/quadro.html', (request, reply) => reply.redirect('/crm/visao-geral.html', 301));
+  fastify.get('/crm/importacao.html', (request, reply) => reply.redirect('/crm/opcoes-cadastro.html?aba=importacao', 301));
 
   // `files` subiu de 20 pra 300 — a importação de NF-e processa em segundo
   // plano agora (fila, ver /crm/api/importacoes/nfe), não tem mais motivo
