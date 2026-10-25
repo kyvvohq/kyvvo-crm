@@ -862,7 +862,14 @@ async function build(opcoes = {}) {
     try {
       res = await fetch(`${PLATFORM_URL}${path}`, {
         method,
-        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.PLATFORM_PAGAMENTOS_TOKEN },
+        // Content-Type só quando há body de fato — mandar 'application/json'
+        // num DELETE sem corpo (ex.: cancelar assinatura) faz o Fastify do
+        // platform tentar parsear um body vazio como JSON e estourar
+        // FST_ERR_CTP_EMPTY_JSON_BODY (400 genérico, antes de chegar na rota).
+        headers: {
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+          'X-Internal-Token': process.env.PLATFORM_PAGAMENTOS_TOKEN,
+        },
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(15000),
       });
