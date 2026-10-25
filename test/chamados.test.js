@@ -13,15 +13,35 @@ async function tokenTenant() {
   return 'token-fake';
 }
 
+// Chamados exige perfil_agente='kyvvo_atendimento' (query em
+// crm_agente_config) E o módulo 'crm_chamados' ativo no admin (GET
+// /entitlements/:tenantId no platform) — ver exigeAgenteKyvvo em index.js.
+// Os testes abaixo testam a lógica das próprias rotas, não esse gate, então
+// mockam os dois pra sempre passar (ver leads.test.js, mesmo padrão).
+const fetchOriginal = global.fetch;
+global.fetch = async (url, opts) => {
+  if (String(url).includes('/entitlements/')) {
+    return { ok: true, json: async () => ({ modulos: ['crm_leads', 'crm_chamados'] }) };
+  }
+  return fetchOriginal(url, opts);
+};
+
+function mockPool(respostaRota) {
+  pool.query = async (sql, params) => {
+    if (/perfil_agente/.test(sql)) return { rows: [{ perfil_agente: 'kyvvo_atendimento' }] };
+    return respostaRota(sql, params);
+  };
+}
+
 afterEach(() => { delete pool.query; });
 
 test('GET /crm/api/chamados: filtra por status e urgencia', async () => {
   const app = await build();
   let sqlCapturada;
-  pool.query = async (sql, params) => {
+  mockPool((sql, params) => {
     sqlCapturada = { sql, params };
     return { rows: [{ id: 'ch-1', status: 'aberto', urgencia: 'alta' }] };
-  };
+  });
   const token = await tokenTenant();
   const res = await app.inject({
     method: 'GET', url: '/crm/api/chamados?status=aberto&urgencia=alta',
@@ -35,7 +55,7 @@ test('GET /crm/api/chamados: filtra por status e urgencia', async () => {
 
 test('GET /crm/api/chamados/:id: 404 quando não encontra', async () => {
   const app = await build();
-  pool.query = async () => ({ rows: [] });
+  mockPool(() => ({ rows: [] }));
   const token = await tokenTenant();
   const res = await app.inject({ method: 'GET', url: '/crm/api/chamados/inexistente', headers: { authorization: `Bearer ${token}` } });
   assert.equal(res.statusCode, 404);
@@ -44,6 +64,7 @@ test('GET /crm/api/chamados/:id: 404 quando não encontra', async () => {
 
 test('POST /crm/api/chamados: exige cliente_id', async () => {
   const app = await build();
+  mockPool(() => ({ rows: [] }));
   const token = await tokenTenant();
   const res = await app.inject({ method: 'POST', url: '/crm/api/chamados', headers: { authorization: `Bearer ${token}` }, payload: { descricao: 'bug x' } });
   assert.equal(res.statusCode, 400);
@@ -52,7 +73,7 @@ test('POST /crm/api/chamados: exige cliente_id', async () => {
 
 test('POST /crm/api/chamados: exige descricao (validação de lib/chamados.js)', async () => {
   const app = await build();
-  pool.query = async () => ({ rows: [{ id: 'cli-1' }] });
+  mockPool(() => ({ rows: [{ id: 'cli-1' }] }));
   const token = await tokenTenant();
   const res = await app.inject({
     method: 'POST', url: '/crm/api/chamados', headers: { authorization: `Bearer ${token}` },
@@ -64,6 +85,7 @@ test('POST /crm/api/chamados: exige descricao (validação de lib/chamados.js)',
 
 test('PATCH /crm/api/chamados/:id: status inválido devolve 400', async () => {
   const app = await build();
+  mockPool(() => ({ rows: [] }));
   const token = await tokenTenant();
   const res = await app.inject({
     method: 'PATCH', url: '/crm/api/chamados/ch-1', headers: { authorization: `Bearer ${token}` },
@@ -77,11 +99,11 @@ test('PATCH /crm/api/chamados/:id: resolver marca resolvido_em (query inclui o C
   const app = await build();
   let sqlCapturada;
   let paramsCapturados;
-  pool.query = async (sql, params) => {
+  mockPool((sql, params) => {
     sqlCapturada = sql;
     paramsCapturados = params;
     return { rows: [{ id: 'ch-1', status: 'resolvido' }] };
-  };
+  });
   const token = await tokenTenant();
   const res = await app.inject({
     method: 'PATCH', url: '/crm/api/chamados/ch-1', headers: { authorization: `Bearer ${token}` },
@@ -101,5 +123,14 @@ test('todas as rotas de chamados exigem token', async () => {
     const res = await app.inject({ method, url });
     assert.equal(res.statusCode, 401, `${method} ${url}`);
   }
+  await app.close();
+});
+
+test('rotas de chamados exigem perfil_agente=kyvvo_atendimento E módulo crm_chamados ativo', async () => {
+  const app = await build();
+  pool.query = async () => ({ rows: [{ perfil_agente: null }] });
+  const token = await tokenTenant();
+  const res = await app.inject({ method: 'GET', url: '/crm/api/chamados', headers: { authorization: `Bearer ${token}` } });
+  assert.equal(res.statusCode, 403);
   await app.close();
 });

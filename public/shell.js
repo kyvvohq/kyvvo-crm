@@ -106,26 +106,30 @@ painelSidebar.addEventListener('ds-menu-alternar', (e) => {
   }).catch(() => {});
 })();
 
-// Itens "Leads"/"Chamados" — só pro tenant com o perfil de agente da própria
-// Kyvvo (atendimento geral/suporte/vendas); nenhum outro tenant do CRM vê
-// esses menus. Mesmo padrão de injeção do item "Atendimento" acima.
+// Itens "Leads"/"Chamados" — só aparecem quando os DOIS critérios valem:
+// perfil de agente da própria Kyvvo (atendimento geral/suporte/vendas) E o
+// módulo correspondente (crm_leads/crm_chamados) ativado pelo admin pra esse
+// tenant; nenhum outro tenant do CRM vê esses menus. O backend já aplica a
+// mesma trava nas rotas de dados (ver exigeAgenteKyvvo em index.js) — isto
+// aqui só decide o que mostrar. Mesmo padrão de injeção do item "Atendimento"
+// acima.
 (function adicionarMenuLeadsEChamados() {
   apiFetch('/crm/api/agente/config').then((r) => (r.ok ? r.json() : null)).then((config) => {
-    if (!config || config.perfil_agente !== 'kyvvo_atendimento') return;
+    if (!config || (!config.leads_habilitado && !config.chamados_habilitado)) return;
     const lista = painelSidebar.querySelector('.ds-menu-lista');
     if (!lista) return;
     const atendimento = lista.querySelector('a[href="/crm/atendimento.html"]');
     const ancora = atendimento && atendimento.parentElement;
     if (!ancora) return;
     let ancoraAtual = ancora;
-    if (!lista.querySelector('a[href="/crm/leads.html"]')) {
+    if (config.leads_habilitado && !lista.querySelector('a[href="/crm/leads.html"]')) {
       const liLeads = document.createElement('li');
       liLeads.innerHTML = '<a class="ds-menu-link" href="/crm/leads.html"><span class="ds-menu-icone">' + icon('circle-dollar-sign', 18) + '</span><span class="ds-menu-rotulo">Leads</span></a>';
       ancoraAtual.after(liLeads);
       if (liLeads.querySelector('a').getAttribute('href') === window.location.pathname) liLeads.querySelector('a').classList.add('ds-menu-link-ativo');
       ancoraAtual = liLeads;
     }
-    if (!lista.querySelector('a[href="/crm/chamados.html"]')) {
+    if (config.chamados_habilitado && !lista.querySelector('a[href="/crm/chamados.html"]')) {
       const liChamados = document.createElement('li');
       liChamados.innerHTML = '<a class="ds-menu-link" href="/crm/chamados.html"><span class="ds-menu-icone">' + icon('circle-alert', 18) + '</span><span class="ds-menu-rotulo">Chamados</span></a>';
       ancoraAtual.after(liChamados);
@@ -368,9 +372,9 @@ function valorMoedaParaNumero(input) {
 // Só uma tela de destino por enquanto (Quadro/Pedidos); tipo novo que
 // precisar de destino próprio entra aqui.
 function abrirNotificacaoItem(tipo) {
-  if (tipo === 'pedidos_parados') window.location.href = '/crm/quadro.html';
+  if (tipo === 'pedidos_parados') window.location.href = '/crm/visao-geral.html';
   else if (tipo === 'pedido_criado' || tipo === 'pedido_pronto') window.location.href = '/crm/pedidos.html';
-  else if (tipo === 'importacao_concluida') window.location.href = '/crm/importacao.html';
+  else if (tipo === 'importacao_concluida') window.location.href = '/crm/opcoes-cadastro.html?aba=importacao';
   else if (tipo === 'whatsapp_limite_proximo') window.location.href = '/crm/automacoes.html';
   else if (tipo === 'atendimento_bot_travado') window.location.href = '/crm/atendimento.html';
 }
