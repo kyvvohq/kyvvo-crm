@@ -71,7 +71,7 @@ const PRODUTOS_HANDOFF_DESTINO = {
 };
 
 async function build(opcoes = {}) {
-  const fastify = Fastify({ logger: true });
+  const fastify = Fastify({ logger: true, trustProxy: true });
   // Agente de IA (Fase 2). `opcoes.agente` permite injetar dependências nos testes.
   fastify.decorate('agente', opcoes.agente || criarAgente(pool));
 
@@ -864,7 +864,7 @@ async function build(opcoes = {}) {
   // compartilhado (X-Internal-Token), mesmo padrão de lib/email.js. O CRM
   // já provou a identidade do usuário com a própria sessão (fastify.authenticate,
   // local); só repassa o tenantId.
-  async function chamarPlatformInterno(path, { method = 'GET', body, reply } = {}) {
+  async function chamarPlatformInterno(path, { method = 'GET', body, reply, ip } = {}) {
     let res;
     try {
       res = await fetch(`${PLATFORM_URL}${path}`, {
@@ -876,6 +876,11 @@ async function build(opcoes = {}) {
         headers: {
           ...(body ? { 'Content-Type': 'application/json' } : {}),
           'X-Internal-Token': process.env.PLATFORM_PAGAMENTOS_TOKEN,
+          // Essa chamada é container-a-container (rede interna do Docker) —
+          // sem isso, o request.ip que o platform vê é o IP do container do
+          // CRM (ex. 172.18.0.x), nunca o do cliente final, e isso quebrava
+          // o remoteIp mandado pro Asaas na cobrança de cartão.
+          ...(ip ? { 'X-Forwarded-For': ip } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(15000),
@@ -949,7 +954,7 @@ async function build(opcoes = {}) {
     // front manda, cacheado em localStorage desde o login (ver public/
     // plano-cobranca.html).
     const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${tenantId}/cadastrar`, {
-      method: 'POST', body: { ...request.body, email }, reply,
+      method: 'POST', body: { ...request.body, email }, reply, ip: request.ip,
     });
     if (dados) return dados;
   });
@@ -2396,7 +2401,7 @@ async function build(opcoes = {}) {
   fastify.post('/crm/api/automacoes/creditos/comprar', { preHandler: fastify.authenticate }, async (request, reply) => {
     const { tenantId, email } = request.user;
     const dados = await chamarPlatformInterno(`/internal/pagamentos-crm/${tenantId}/creditos/comprar`, {
-      method: 'POST', body: { ...request.body, email }, reply,
+      method: 'POST', body: { ...request.body, email }, reply, ip: request.ip,
     });
     if (dados) return dados;
   });
