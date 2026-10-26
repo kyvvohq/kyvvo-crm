@@ -178,17 +178,23 @@
       container.querySelectorAll('[data-assinar]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const chave = btn.dataset.assinar;
-          if (pagamento.plano) confirmarTrocaPlano(chave);
+          // Assinatura cancelada mantém `pagamento.plano` preenchido (pra
+          // mostrar o que o tenant tinha), mas não está mais ativa — tratar
+          // como se não tivesse plano (POST /cadastrar cria uma assinatura
+          // nova) em vez de PATCH /plano (que exige assinatura ativa e nunca
+          // deixava quem cancelou assinar de novo, nem pro mesmo plano).
+          if (pagamento.plano && pagamento.status === 'ativo') confirmarTrocaPlano(chave);
           else abrirModalPagamento(chave);
         });
       });
     }
 
     function renderizarPlanoCard(p) {
-      const atual = p.chave === pagamento.plano;
+      const temPlanoAtivo = pagamento.status === 'ativo';
+      const atual = temPlanoAtivo && p.chave === pagamento.plano;
       let rotulo = 'Assinar';
       if (atual) rotulo = 'Plano atual';
-      else if (pagamento.plano) rotulo = 'Trocar pra este';
+      else if (temPlanoAtivo) rotulo = 'Trocar pra este';
       return `
         <div class="plano-card${atual ? ' atual' : ''}">
           <div class="nome">${escapeHtml(p.nome)}</div>
