@@ -174,6 +174,18 @@
         <div class="ds-abas-painel" id="painel-au-comprar" aria-labelledby="aba-au-comprar" hidden>
           <p class="modal-texto" style="margin:0 0 14px">Créditos avulsos não expiram e são usados depois da cota mensal do seu plano acabar.</p>
           <div class="planos-grade" id="comprar-pacotes">Carregando…</div>
+
+          <h3 style="margin:28px 0 14px">Histórico de compras</h3>
+          <div class="ds-tabela" role="table" aria-label="Histórico de compras de créditos" style="--ds-colunas: 110px minmax(0,1fr) 90px 110px 130px">
+            <div class="ds-tabela-cabecalho" role="row">
+              <span role="columnheader">Data</span>
+              <span role="columnheader">Créditos</span>
+              <span role="columnheader">Valor</span>
+              <span role="columnheader">Meio</span>
+              <span role="columnheader">Status</span>
+            </div>
+            <div id="creditos-historico-linhas"><div class="ds-vazio"><p class="ds-vazio-texto">Carregando…</p></div></div>
+          </div>
         </div>
       </div>
     </div>
@@ -458,6 +470,30 @@
         btn.addEventListener('click', () => abrirModalComprarCreditos(btn.dataset.comprarPacote)));
     }
 
+    const STATUS_COMPRA_LABEL = { pendente: 'Pendente', confirmada: 'Confirmada', falhou: 'Falhou' };
+    const STATUS_COMPRA_TONE = { pendente: 'aviso', confirmada: 'sucesso', falhou: 'erro' };
+    const MEIO_COMPRA_LABEL = { pix: 'Pix', cartao: 'Cartão' };
+
+    async function carregarHistoricoCreditos() {
+      const linhas = document.getElementById('creditos-historico-linhas');
+      const res = await apiFetch('/crm/api/automacoes/creditos');
+      if (!res.ok) { linhas.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-texto">Não foi possível carregar o histórico agora.</p></div>'; return; }
+      const lista = await res.json();
+      if (!lista.length) {
+        linhas.innerHTML = '<div class="ds-vazio"><p class="ds-vazio-texto">Nenhuma compra de créditos ainda.</p></div>';
+        return;
+      }
+      linhas.innerHTML = lista.map((c) => `
+        <div class="ds-tabela-linha" role="row">
+          <span role="cell" data-rotulo="Data" style="white-space:nowrap">${formatarDataAbreviada(c.criado_em)}</span>
+          <span role="cell" data-rotulo="Créditos">${c.quantidade_creditos}</span>
+          <span role="cell" data-rotulo="Valor">${formatarMoeda(c.valor)}</span>
+          <span role="cell" data-rotulo="Meio">${MEIO_COMPRA_LABEL[c.meio] || c.meio}</span>
+          <span role="cell" data-rotulo="Status"><span class="ds-badge ds-badge-sm${STATUS_COMPRA_TONE[c.status] ? ' ds-badge-' + STATUS_COMPRA_TONE[c.status] : ''}">${STATUS_COMPRA_LABEL[c.status] || c.status}</span></span>
+        </div>
+      `).join('');
+    }
+
     function abrirModalComprarCreditos(pacoteChave) {
       const pacote = pacotesCreditos.find((p) => p.chave === pacoteChave);
       if (!pacote) return;
@@ -540,9 +576,11 @@
         if (dados.status === 'confirmada') {
           fecharModal();
           await carregarConsumo();
+          await carregarHistoricoCreditos();
           avisar('Créditos adicionados', `${pacote.quantidade} créditos já estão disponíveis.`);
           return;
         }
+        await carregarHistoricoCreditos();
 
         mostrarEsperaPix(dados);
       });
@@ -579,6 +617,7 @@
         if (compra && compra.status === 'confirmada') {
           statusEl.textContent = 'Pagamento confirmado! Créditos adicionados.';
           await carregarConsumo();
+          await carregarHistoricoCreditos();
           setTimeout(fecharModal, 1500);
           return;
         }
@@ -595,6 +634,7 @@
     });
     carregarConsumo();
     carregarPacotes();
+    carregarHistoricoCreditos();
   </script>
 </body>
 </html>
